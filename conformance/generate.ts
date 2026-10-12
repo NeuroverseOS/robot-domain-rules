@@ -18,8 +18,8 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import {
   compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest,
-  publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature,
-  type CompileDomainInput, type DomainRequest, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
+  publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, backtest, compareBacktests,
+  type BacktestEvent, type BacktestOptions, type CompileDomainInput, type DomainRequest, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
 } from '../src/index';
 import { projectDecision, projectFindings, projectPlan } from './compare.mjs';
 import * as grocery from '../examples/grocery-store';
@@ -94,6 +94,10 @@ interface Want {
   /** Findings as "kind:certainty:idA+idB". */
   findings?: string[];
   error?: true;
+  /** Backtest expectations, stated by hand: totals as "ALLOW/LIMIT/PAUSE/BLOCK/missingFacts", then the lists as IDs ("ruleId:status:count", "idA+idB:count", "action:count", "fact:count", "index:status:outcome"). */
+  backtest?: { totals: string; neverFired?: string[]; stalls?: string[]; conflicts?: string[]; gaps?: string[]; missing?: string[]; differences?: string[] };
+  /** Comparison expectations: how many events are newly blocked, newly allowed, changed otherwise. */
+  comparison?: { newlyBlocked: number; newlyAllowed: number; other: number };
 }
 
 interface Spec {
@@ -106,6 +110,10 @@ interface Spec {
   tamper?: (rb: Rulebook) => void;
   request?: DomainRequest;
   plan?: Plan;
+  /** A recorded log for a backtest case; with `proposed`, a comparison case. */
+  events?: BacktestEvent[];
+  options?: BacktestOptions;
+  proposed?: CompileDomainInput;
   want: Want;
 }
 
@@ -150,6 +158,30 @@ function add(file: string, s: Spec) {
       }
     }
     out.expect = { findings: projectFindings(got) };
+  } else if (s.events && w.backtest) {
+    out.events = s.events;
+    if (s.options) out.options = s.options;
+    const r = backtest(rulebook as Rulebook, s.events, s.options);
+    const b = w.backtest;
+    const totals = [r.totals.ALLOW, r.totals.LIMIT, r.totals.PAUSE, r.totals.BLOCK, r.totals.missingFacts].join('/');
+    if (totals !== b.totals) fail(s.id, `backtest totals: want ${b.totals}, got ${totals}`);
+    const same = (name: string, got: string[], want: string[] | undefined) => { if (JSON.stringify(got) !== JSON.stringify(want ?? [])) fail(s.id, `backtest ${name}: want ${JSON.stringify(want ?? [])}, got ${JSON.stringify(got)}`); };
+    same('neverFired', r.neverFired, b.neverFired);
+    same('wouldStall', r.wouldStall.map(x => `${x.ruleId}:${x.status}:${x.count}`), b.stalls);
+    same('conflictsOccurred', r.conflictsOccurred.map(x => `${x.ruleIds.join('+')}:${x.count}`), b.conflicts);
+    same('gaps', r.gaps.map(x => `${x.action}:${x.count}`), b.gaps);
+    same('missingFacts', r.missingFacts.map(x => `${x.fact}:${x.count}`), b.missing);
+    same('differences', r.differences.map(x => `${x.index}:${x.status}:${x.outcome}`), b.differences);
+    out.expect = { backtest: JSON.parse(JSON.stringify(r)) };
+  } else if (s.events && s.proposed && w.comparison) {
+    out.events = s.events;
+    if (s.options) out.options = s.options;
+    const proposed = compileDomain(s.proposed);
+    out.proposed = proposed;
+    const c = compareBacktests(backtest(rulebook as Rulebook, s.events, s.options), backtest(proposed, s.events, s.options));
+    const got = { newlyBlocked: c.newlyBlocked.length, newlyAllowed: c.newlyAllowed.length, other: c.otherChanges.length };
+    if (JSON.stringify(got) !== JSON.stringify(w.comparison)) fail(s.id, `comparison: want ${JSON.stringify(w.comparison)}, got ${JSON.stringify(got)}`);
+    out.expect = { comparison: JSON.parse(JSON.stringify(c)) };
   } else if (s.plan) {
     out.plan = s.plan;
     const p = evaluatePlan(rulebook as Rulebook, s.plan);
@@ -612,6 +644,75 @@ function history() {
     input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, clock: 'people', op: '>=', value: 5 }]; }, want: { error: true } });
 }
 
+// ─── Backtest: what the rulebook would have decided for recorded activity ────
+
+function backtestCases() {
+  const f = 'backtest.json';
+  const bot = (id: string) => ({ id, kind: 'robot', roleId: 'bot' });
+  const ev = (at: string, request: DomainRequest, outcome?: BacktestEvent['outcome']): BacktestEvent => ({ at, request, ...(outcome ? { outcome } : {}) });
+  const at = (h: number, m: number) => `2026-10-05T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  /** A request at a time of day, with the time fact matching the timestamp. */
+  const ask = (h: number, m: number, action = 'go', areaId = 'floor', facts: Record<string, unknown> = {}, participant = bot('b-1')) =>
+    req(action, areaId, { time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, ...facts }, participant);
+  const site = tiny([
+    rule('crowd_wait', { answer: 'wait', for: 'condition' }, { does: 'go', when: [{ fact: 'people', op: '>=', value: 3 }] }),
+    rule('yard_closed_at_night', { answer: 'deny' }, { where: 'yard', when: [{ fact: 'time', op: 'between', from: '20:00', to: '06:00' }] }),
+    rule('slow_in_yard', { answer: 'limit', limits: { speed: 0.5 } }, { does: 'go', where: 'yard' }),
+    rule('four_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 'time', op: '>=', value: 3 }] }),
+    rule('alarm_allows_look', { answer: 'allow' }, { does: 'look', when: [{ fact: 'alarm', op: '==', value: true }], setBy: 'low' }),
+    rule('no_look_in_alarm', { answer: 'deny' }, { does: 'look', when: [{ fact: 'alarm', op: '==', value: true }] }),
+    rule('never_used', { answer: 'deny' }, { does: 'go', when: [{ fact: 'mode', op: '==', value: 'c' }] }),
+  ]);
+  const b = (id: string, principle: number[], description: string, events: BacktestEvent[], want: Want['backtest'], options?: BacktestOptions) =>
+    add(f, { id, principle, description, input: site, events, options, want: { backtest: want } });
+
+  b('backtest-totals-and-rows', [5, 3], 'A log replayed through a rulebook gives one row per event with the decision\'s status and reasons, totals by status, and counts by area, by role and by rule; the fingerprint names the rulebook that decided.',
+    [ev(at(9, 0), ask(9, 0)), ev(at(9, 5), ask(9, 5, 'go', 'yard', { speedAsked: 1 })), ev(at(9, 10), ask(9, 10, 'go', 'floor', { people: 3 })), ev(at(21, 0), ask(21, 0, 'go', 'yard'))],
+    { totals: '1/1/1/1/0', neverFired: ['four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['crowd_wait:PAUSE:1', 'yard_closed_at_night:BLOCK:1'] });
+  b('backtest-history-is-built-from-earlier-events', [4, 9], 'A rule that counts history sees, for each event, the earlier events of the same participant in this log, timed by the clock fact: the fourth look within the hour is refused, another participant\'s looks do not count, and nothing is kept between runs.',
+    [ev(at(10, 0), ask(10, 0, 'look')), ev(at(10, 10), ask(10, 10, 'look')), ev(at(10, 20), ask(10, 20, 'look', 'floor', {}, bot('b-2'))), ev(at(10, 30), ask(10, 30, 'look')), ev(at(10, 40), ask(10, 40, 'look')), ev(at(11, 50), ask(11, 50, 'look'))],
+    { totals: '5/0/0/1/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['four_looks_an_hour:BLOCK:1'] });
+  b('backtest-history-does-not-cross-days', [4, 9], 'Built history never crosses a day (the text of `at` before its first "T"): three looks on Monday do not count toward Tuesday\'s first look, whose history is empty.',
+    [ev(at(10, 0), ask(10, 0, 'look')), ev(at(10, 10), ask(10, 10, 'look')), ev(at(10, 20), ask(10, 20, 'look')), ev(`2026-10-06T10:30`, ask(10, 30, 'look')), ev(`2026-10-06T10:40`, ask(10, 40, 'look'))],
+    { totals: '5/0/0/0/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'] });
+  b('backtest-history-on-the-request-is-used-as-given', [4, 9], 'An event whose request carries its own history is decided on that history, not on the log: the first look is refused because the request says three happened already.',
+    [ev(at(10, 0), { ...ask(10, 0, 'look'), history: [{ action: 'look', areaId: 'floor', at: '09:30' }, { action: 'look', areaId: 'floor', at: '09:40' }, { action: 'look', areaId: 'floor', at: '09:50' }] }), ev(at(10, 5), ask(10, 5, 'look'))],
+    { totals: '1/0/0/1/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['four_looks_an_hour:BLOCK:1'] });
+  b('backtest-missing-facts-are-named', [4], 'An event the log did not carry enough facts for is counted as missing facts, not as a refusal by a rule, and the report names each fact and how often it was missing or invalid.',
+    [ev(at(9, 0), { ...ask(9, 0), facts: { time: '09:00', day: 'mon' } }), ev(at(9, 5), { ...ask(9, 5), facts: { time: '09:05', day: 'mon', people: -1 } }), ev(at(9, 10), { ...ask(9, 10), facts: { day: 'mon' } }), ev(at(9, 15), ask(9, 15))],
+    { totals: '1/0/0/0/3', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], missing: ['people:3', 'time:1'] });
+  b('backtest-malformed-event-request-is-a-row', [4], 'An event whose request is not a request is a row refused as missing facts (`request`), never a throw.',
+    [ev(at(9, 0), {} as DomainRequest), ev(at(9, 5), ask(9, 5))],
+    { totals: '1/0/0/0/1', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], missing: ['request:1'] });
+  b('backtest-gaps-are-unknown-actions', [4], 'Requests for actions no rule covers are gaps, grouped by action, most often first.',
+    [ev(at(9, 0), ask(9, 0, 'fly')), ev(at(9, 5), ask(9, 5, 'dig')), ev(at(9, 10), ask(9, 10, 'fly')), ev(at(9, 15), ask(9, 15))],
+    { totals: '1/0/0/3/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['unknown_action:BLOCK:3'], gaps: ['fly:2', 'dig:1'] });
+  b('backtest-stalls-most-often-first', [5], 'Rules that would have stalled work are listed most often first, then by first occurrence, with the earliest example timestamps (three by default).',
+    [ev(at(21, 0), ask(21, 0, 'go', 'yard')), ev(at(9, 0), ask(9, 0, 'go', 'floor', { people: 5 })), ev(at(21, 5), ask(21, 5, 'go', 'yard')), ev(at(21, 10), ask(21, 10, 'go', 'yard')), ev(at(21, 15), ask(21, 15, 'go', 'yard')), ev(at(9, 5), ask(9, 5, 'go', 'floor', { people: 5 }))],
+    { totals: '0/0/2/4/0', neverFired: ['four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['yard_closed_at_night:BLOCK:4', 'crowd_wait:PAUSE:2'] });
+  b('backtest-conflicts-that-occurred', [7], 'A finding counts as having occurred when both of its rules matched a recorded request (the matching relation of § 6 step 4, as for a witness): the allow-versus-deny contradiction on alarm occurred twice; the finding between the yard rules did not occur in this log.',
+    [ev(at(9, 0), ask(9, 0, 'look', 'floor', { alarm: true })), ev(at(9, 5), ask(9, 5, 'look')), ev(at(9, 10), ask(9, 10, 'look', 'floor', { alarm: true }))],
+    { totals: '1/0/0/2/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'never_used'], stalls: ['no_look_in_alarm:BLOCK:2'], conflicts: ['alarm_allows_look+no_look_in_alarm:2'] });
+  b('backtest-rule-and-record-differ', [5, 9], 'When the log records what happened, the report lists where the rule and the record differ, in event order, without judging which is right: a refusal the record says happened, an allowance the record says did not; "unknown" and events without an outcome are left out.',
+    [ev(at(21, 0), ask(21, 0, 'go', 'yard'), 'happened'), ev(at(9, 0), ask(9, 0), 'did_not_happen'), ev(at(9, 5), ask(9, 5), 'happened'), ev(at(21, 5), ask(21, 5, 'go', 'yard'), 'unknown'), ev(at(21, 10), ask(21, 10, 'go', 'yard'))],
+    { totals: '2/0/0/3/0', neverFired: ['crowd_wait', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['yard_closed_at_night:BLOCK:3'], differences: ['0:BLOCK:happened', '1:ALLOW:did_not_happen'] });
+  b('backtest-empty-log', [5], 'An empty log is a report of zeros in which every rule never fired.', [],
+    { totals: '0/0/0/0/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'] });
+  b('backtest-examples-option', [5], 'The examples option bounds how many timestamps each list keeps; counts are unaffected.',
+    [ev(at(21, 0), ask(21, 0, 'go', 'yard')), ev(at(21, 5), ask(21, 5, 'go', 'yard')), ev(at(21, 10), ask(21, 10, 'go', 'yard'))],
+    { totals: '0/0/0/3/0', neverFired: ['crowd_wait', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['yard_closed_at_night:BLOCK:3'] }, { examples: 1 });
+
+  // Current rulebook versus proposed: the proposed one raises the crowd threshold and closes the floor at night.
+  const proposed = tiny([
+    rule('crowd_wait', { answer: 'wait', for: 'condition' }, { does: 'go', when: [{ fact: 'people', op: '>=', value: 5 }] }),
+    rule('yard_closed_at_night', { answer: 'deny' }, { where: '*', when: [{ fact: 'time', op: 'between', from: '20:00', to: '06:00' }] }),
+    rule('slow_in_yard', { answer: 'limit', limits: { speed: 0.5 } }, { does: 'go', where: 'yard' }),
+  ]);
+  add(f, { id: 'comparison-current-versus-proposed', principle: [5, 3], description: 'Two reports on the same log, current rulebook versus proposed: which events are newly blocked, which newly allowed, which changed otherwise, and how each rule\'s count of decided events moved.',
+    input: site, proposed, events: [ev(at(9, 0), ask(9, 0, 'go', 'floor', { people: 3 })), ev(at(9, 5), ask(9, 5, 'go', 'floor', { people: 6 })), ev(at(21, 0), ask(21, 0)), ev(at(21, 5), ask(21, 5, 'go', 'yard')), ev(at(9, 10), ask(9, 10, 'go', 'yard'))],
+    want: { comparison: { newlyBlocked: 1, newlyAllowed: 1, other: 0 } } });
+}
+
 // ─── Canonical JSON and the fingerprint ──────────────────────────────────────
 
 function fingerprintCases() {
@@ -730,7 +831,7 @@ async function main() {
   for (const [name, rb] of Object.entries(bases)) writeFileSync(join(OUT, 'rulebooks', `${name}.json`), JSON.stringify(rb, null, 2) + '\n');
 
   p1(); p2(); p3(); p4(); p5(); p6(); p7(); p8(); p9();
-  plans(); history();
+  plans(); history(); backtestCases();
   fingerprintCases();
   await approvals();
 

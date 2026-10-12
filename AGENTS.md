@@ -18,7 +18,7 @@ Plus the mechanical ones: rulebooks are deep-frozen and detached from their inpu
 
 ## Any behaviour change needs a conformance case
 
-If a change alters what `evaluate`, `evaluatePlan`, `matchingRules`, `check`, `validateRulebook`, `fingerprint`, `requestDigest` or the approval functions return for any input, it needs a case in [`conformance/`](conformance/) — that is how other implementations learn about it. Add it to `conformance/generate.ts` in the function for its principle, stating the intent by hand (status, reason rule IDs with authorities, finding kinds, or `error`); run `npx tsx conformance/generate.ts` (it refuses to write a case the implementation does not meet); read the JSON diff; run `npm test`. Update [SPEC.md](SPEC.md) in the same change. A change that alters a decision, finding, fingerprint or signature for an existing valid rulebook is a spec major bump (SPEC.md § 11).
+If a change alters what `evaluate`, `evaluatePlan`, `matchingRules`, `check`, `validateRulebook`, `fingerprint`, `requestDigest`, `backtest`, `compareBacktests` or the approval functions return for any input, it needs a case in [`conformance/`](conformance/) — that is how other implementations learn about it. Add it to `conformance/generate.ts` in the function for its principle, stating the intent by hand (status, reason rule IDs with authorities, finding kinds, or `error`); run `npx tsx conformance/generate.ts` (it refuses to write a case the implementation does not meet); read the JSON diff; run `npm test`. Update [SPEC.md](SPEC.md) in the same change. A change that alters a decision, finding, fingerprint or signature for an existing valid rulebook is a spec major bump (SPEC.md § 11).
 
 ## The contract, briefly
 
@@ -32,6 +32,8 @@ Rule: `{ id, text, who, does, where, when?, history?, then, reason?, source, set
 
 Finding: `{ kind, severity, ruleIds, certainty, witness?, message }`.
 
+Backtest: `backtest(rulebook, events: [{ at, request, outcome? }], { clock?, examples? })` → `{ fingerprint, events, totals, byArea, byRole, byRule, neverFired, wouldStall, conflictsOccurred, gaps, missingFacts, differences, rows }`; `compareBacktests(baseline, proposed)` → `{ newlyBlocked, newlyAllowed, otherChanges, byRule, … }`. History for a rule that counts it is built from the earlier events of the same participant on the same day of the log; `outcome` is reported, never decided on. No free text in the report; every list has a defined order. SPEC.md § 13.
+
 ## Files, in read order
 
 | File | Read it for |
@@ -43,6 +45,7 @@ Finding: `{ kind, severity, ruleIds, certainty, witness?, message }`.
 | `src/evaluate.ts` | One request → one decision, including approval sufficiency, binding and history conditions; `matchingRules` for witnesses. |
 | `src/plan.ts` | One plan → one evaluation: effects projected step by step, plan rules, approvals collected. |
 | `src/check.ts` | The conflict check: exact overlap with a witness, classification, plain-English messages; plan-rule duplicates. |
+| `src/backtest.ts` | A recorded log replayed through a rulebook: the report and the current-versus-proposed comparison. Uses `evaluate`, `matchingRules`, `missingFacts` and the rulebook's findings; adds no semantics of its own. |
 | `src/approvals.ts` | Ed25519 via WebCrypto: sign/verify approvals and rulebooks. Zero dependencies. |
 | `src/draft.ts` | Deterministic text drafting; model prompt and answer validation. |
 | `src/templates/template.ts` | The template contract. `grocery-store.ts`, `warehouse.ts` are the two shipped. |
@@ -50,7 +53,7 @@ Finding: `{ kind, severity, ruleIds, certainty, witness?, message }`.
 | `src/index.ts` | Public exports and `DomainRulesBuilder`. |
 | `conformance/` | The cases, `compare.mjs` (the judging rules), `run-node.mjs`, `generate.ts`. |
 | `test/domain-rules.test.ts` | One test per behaviour, plus the seeded exactness test. `test/conformance.test.ts` runs every case. `test/z3-crosscheck.test.ts` agrees with Z3 on every generated pair (z3-solver is a devDependency only). Do not add test files without being asked. |
-| `examples/` | Sites, `demo.ts`, `harness/` (volumes adapter, the agent replay, the planner replay `plan-replay.ts`), `mcp/` (its own package). |
+| `examples/` | Sites, `demo.ts`, `harness/` (volumes adapter, the agent replay, the planner replay `plan-replay.ts`), `backtest/` (the sample site, a synthetic sample week, `backtest.ts`), `mcp/` (its own package). |
 | `adapters/cedar/` | The Cedar export, its own package; lossy and says so; tested against cedar-wasm. Never imported by the core. |
 | `site/` | The switchboard. See below. |
 
@@ -64,7 +67,7 @@ Finding: `{ kind, severity, ruleIds, certainty, witness?, message }`.
 
 ## The switchboard (`site/`)
 
-Static Vite + Preact + TypeScript; live at https://neuroverseos.github.io/robot-domain-rules/ via `.github/workflows/pages.yml`. It imports the core from `../src` (never `dist/` or npm) and the example builders from `examples/`, runs entirely in the browser (no backend, no model call, no analytics; state in the URL hash and localStorage), and never changes the core's meaning: it only calls public functions. A UI need is not a reason to change `src/`. Pure logic in `site/src/lib/`, panels in `site/src/ui/`, tests of the pure logic in `site/test/`. Scenario presets live in `site/src/lib/starting-points.ts`.
+Static Vite + Preact + TypeScript; live at https://neuroverseos.github.io/robot-domain-rules/ via `.github/workflows/pages.yml`. It imports the core from `../src` (never `dist/` or npm) and the example builders from `examples/`, runs entirely in the browser (no backend, no model call, no analytics; state in the URL hash and localStorage), and never changes the core's meaning: it only calls public functions. A UI need is not a reason to change `src/`. Pure logic in `site/src/lib/`, panels in `site/src/ui/`, tests of the pure logic in `site/test/`. Scenario presets live in `site/src/lib/starting-points.ts`. Test mode (`site/src/lib/backtest.ts`, `site/src/ui/BacktestPanel.tsx`) loads the sample week from `examples/backtest/` or an imported JSON/JSONL log; the log is never put in the link.
 
 ## Commands
 
@@ -77,6 +80,7 @@ node conformance/run-node.mjs      # the cases against dist/, no framework
 npm run demo             # tsx examples/demo.ts; add -- --json to write <site>.rules.json
 npx tsx examples/harness/replay.ts
 npx tsx examples/harness/plan-replay.ts
+npx tsx examples/backtest/backtest.ts
 cd site && npm install && npm run typecheck && npm test && npm run build
 cd examples/mcp && npm install && npm run typecheck
 cd adapters/cedar && npm install && npm run typecheck && npm test
@@ -87,7 +91,8 @@ Run typecheck, test (which includes the Z3 cross-check), build and the conforman
 ## Do not build here
 
 - Area geometry, localisation, people counting, identity, sensors, maps. The surrounding system owns that (`examples/harness/volumeAt` is an example helper, not a feature).
-- A clock, scheduler, history store or live feed. Facts and history arrive in the request; a plan's clock is the plan's; `issuedAt` is for the caller.
+- A clock, scheduler, history store or live feed. Facts and history arrive in the request; a plan's clock is the plan's; a backtest's times come from its log; `issuedAt` is for the caller.
+- An explanation of why things happened. A backtest applies rules to recorded requests and reports the decisions; reading evidence across sources is for an evidence system, not for this layer.
 - A planner. `evaluatePlan` checks a plan it is handed; it never searches for one.
 - A model call anywhere in the core. `buildRuleDraftPrompt` / `parseRuleDraft` are the whole model surface.
 - A key store, expiry policy, or HTTP service. Key custody and age limits are the deployment's.

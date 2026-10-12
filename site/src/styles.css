@@ -137,6 +137,19 @@ details.quiet > summary { color: var(--muted); font-weight: 500; }
 .count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--conflict); color: #fff; font-size: 12px; font-weight: 700; }
 .count.zero { background: var(--line); color: var(--muted); }
 
+/* ─── test against recorded activity ─── */
+.panel.wide { grid-column: 2 / -1; }
+@media (max-width: 1100px) { .panel.wide { grid-column: 1 / -1; } }
+.summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0 6px; }
+@media (max-width: 560px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+.tile { display: grid; gap: 2px; border-radius: var(--radius); padding: 10px 12px; border: 1px solid transparent; background: var(--panel-2); }
+.tile b { font-size: 24px; line-height: 1; }
+.tile span { font-size: 12px; }
+.tile.ALLOW { background: var(--yes-bg); color: var(--yes); } .tile.LIMIT { background: var(--slower-bg); color: var(--slower); }
+.tile.PAUSE { background: var(--wait-bg); color: var(--wait); } .tile.BLOCK { background: var(--no-bg); color: var(--no); }
+.tile.missing { color: var(--muted); }
+.mini.missing { color: var(--muted); }
+
 /* ─── decision ─── */
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 @media (max-width: 420px) { .compare { grid-template-columns: 1fr; } }

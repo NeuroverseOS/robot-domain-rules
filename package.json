@@ -1,7 +1,7 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.5.0",
-  "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, whole-plan checking for AI planners, exact conflict analysis with witnesses, signed approvals, and a language-neutral spec with conformance tests.",
+  "version": "0.5.1",
+  "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, whole-plan checking for AI planners, exact conflict analysis with witnesses, signed approvals, a backtest of a rulebook against recorded activity, and a language-neutral spec with conformance tests.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -18,6 +18,7 @@
     "dist",
     "examples/*.ts",
     "examples/harness",
+    "examples/backtest",
     "examples/mcp/server.ts",
     "examples/mcp/package.json",
     "examples/mcp/tsconfig.json",
@@ -55,6 +56,7 @@
     "conformance:generate": "tsx conformance/generate.ts",
     "replay": "tsx examples/harness/replay.ts",
     "plan-replay": "tsx examples/harness/plan-replay.ts",
+    "backtest": "tsx examples/backtest/backtest.ts",
     "cedar:test": "npm --prefix adapters/cedar run typecheck && npm --prefix adapters/cedar test"
   },
   "devDependencies": {
@@ -76,7 +78,8 @@
     "spatial-computing",
     "conformance",
     "plan-checking",
-    "cedar"
+    "cedar",
+    "backtesting"
   ],
   "repository": {
     "type": "git",

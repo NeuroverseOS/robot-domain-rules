@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { evaluateDomainAction, evaluatePlan, type Rulebook, type Witness } from '../../src/index';
+import { evaluateDomainAction, evaluatePlan, backtest, compareBacktests, type BacktestEvent, type Rulebook, type Witness } from '../../src/index';
 import { type RulebookState, type StartingPointId, compileState, findingsOf, inputFromRulebook } from './lib/model';
 import { STARTING_POINTS, freshState, startingPoint } from './lib/starting-points';
 import { type Situation, toRequest, defaultSituation, reconcile, fromRequest } from './lib/situation';
@@ -12,6 +12,8 @@ import { ConflictsBadge, ConflictsPanel } from './ui/ConflictsPanel';
 import { PlanPanel } from './ui/PlanPanel';
 import { PlanResultPanel } from './ui/PlanResultPanel';
 import { type PlanState, toPlan, defaultPlanState, reconcilePlan, planPresets, fromPlan } from './lib/plan';
+import { BacktestPanel } from './ui/BacktestPanel';
+import { sampleWeek } from './lib/backtest';
 
 const GITHUB = 'https://github.com/NeuroverseOS/robot-domain-rules';
 const NPM = 'https://www.npmjs.com/package/@neuroverseos/robot-domain-rules';
@@ -31,9 +33,13 @@ export function App({ initial }: { initial: SharedState }) {
   const [highlight, setHighlight] = useState<string[]>([]);
   const [conflictsOpen, setConflictsOpen] = useState(false);
   const [shareNote, setShareNote] = useState('');
-  const [mode, setMode] = useState<'ask' | 'plan'>(initial.mode ?? 'ask');
+  const [mode, setMode] = useState<'ask' | 'plan' | 'test'>(initial.mode ?? 'ask');
   const [plan, setPlan] = useState<PlanState | null>(initial.plan ?? null);
   const [selectedStep, setSelectedStep] = useState(0);
+  // Test mode: the recorded log (never in the link) and the baseline a proposed change is compared against.
+  const [events, setEvents] = useState<BacktestEvent[] | null>(null);
+  const [eventsSource, setEventsSource] = useState('');
+  const [baseline, setBaseline] = useState<Rulebook | null>(null);
 
   const compiled = useMemo(() => readOnly ? { rulebook: readOnly, error: null } : compileState(rb), [rb, readOnly]);
   const findings = useMemo(() => readOnly ? readOnly.findings : findingsOf(rb), [rb, readOnly]);
@@ -43,6 +49,9 @@ export function App({ initial }: { initial: SharedState }) {
   const planState = useMemo(() => plan ?? (compiled.rulebook ? firstPlan(rb.startingPoint, compiled.rulebook) : null), [plan, compiled, rb.startingPoint]);
   const planInput = useMemo(() => planState ? toPlan(planState) : null, [planState]);
   const planResult = useMemo(() => compiled.rulebook && planInput ? evaluatePlan(compiled.rulebook, planInput) : null, [compiled, planInput]);
+  const report = useMemo(() => compiled.rulebook && events ? backtest(compiled.rulebook, events) : null, [compiled, events]);
+  const baselineReport = useMemo(() => baseline && events ? backtest(baseline, events) : null, [baseline, events]);
+  const comparison = useMemo(() => baselineReport && report ? compareBacktests(baselineReport, report) : null, [baselineReport, report]);
 
   // Keep the situation valid when the rulebook changes shape.
   const lastFingerprint = useRef<string | null>(null);
@@ -91,6 +100,17 @@ export function App({ initial }: { initial: SharedState }) {
     setConflictsOpen(false);
   };
 
+  /** The synthetic sample week, with the site it was written for (the grocery store plus aisle 5, a robots count and the rule under test). */
+  const loadSample = () => {
+    const sample = sampleWeek();
+    setReadOnly(null);
+    setBaseline(null);
+    setRb(sample.rulebook);
+    setEvents(sample.events);
+    setEventsSource('the synthetic sample week (illustrative data, not from a real store)');
+    setHighlight([]);
+  };
+
   const onImport = (result: ImportResult) => {
     if (!result.ok || !result.rulebook) return;
     if (result.editable) {
@@ -122,6 +142,7 @@ export function App({ initial }: { initial: SharedState }) {
           <span class="seg" role="group" aria-label="Mode">
             <button class={`btn${mode === 'ask' ? ' on' : ''}`} aria-pressed={mode === 'ask'} onClick={() => setMode('ask')} title="One action: may I?">Ask</button>
             <button class={`btn${mode === 'plan' ? ' on' : ''}`} aria-pressed={mode === 'plan'} onClick={() => setMode('plan')} title="A whole plan, step by step on projected facts">Plan</button>
+            <button class={`btn${mode === 'test' ? ' on' : ''}`} aria-pressed={mode === 'test'} onClick={() => setMode('test')} title="Replay recorded activity through these rules before they go live">Test</button>
           </span>
           <ConflictsBadge findings={findings} open={conflictsOpen} onToggle={() => setConflictsOpen(o => !o)} />
           <button class="btn" onClick={share} title="Everything on this page is in the link">{shareNote || 'Share link'}</button>
@@ -141,6 +162,10 @@ export function App({ initial }: { initial: SharedState }) {
             <SituationPanel situation={situation} rulebook={compiled.rulebook} presets={presets} onChange={setSituation} />
             <DecisionPanel rulebook={compiled.rulebook} situation={situation} request={request} decision={decision} findings={findings} onHighlight={setHighlight} onImport={onImport} />
           </>
+        ) : mode === 'test' ? (
+          <BacktestPanel rulebook={compiled.rulebook} events={events} source={eventsSource} report={report} baseline={baseline} comparison={comparison}
+            onLoadSample={loadSample} onImport={(evs, name) => { setEvents(evs); setEventsSource(name); setBaseline(null); }}
+            onSnapshot={() => compiled.rulebook && setBaseline(compiled.rulebook)} onDropBaseline={() => setBaseline(null)} onHighlight={setHighlight} />
         ) : planState && planInput ? (
           <>
             <PlanPanel plan={planState} rulebook={compiled.rulebook} presets={planPresets(rb.startingPoint)} selected={selectedStep} onChange={next => { setPlan(next); }} onSelect={setSelectedStep} />

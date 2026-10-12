@@ -198,6 +198,32 @@ export function matchingRules(rulebook: Rulebook, request: DomainRequest): strin
   }).map(r => r.id);
 }
 
+/**
+ * Why a request would be BLOCK `required_facts`, as IDs: each declared fact
+ * that is missing or invalid, `approvedBy` when the approval is malformed,
+ * `history` when a rule in scope counts history and the request has none or
+ * an invalid one, `request` when the request's shape is incomplete (§ 6 step
+ * 1). Empty when the facts are complete. The same checks as the evaluator's,
+ * returned as names instead of sentences; used by `backtest`.
+ */
+export function missingFacts(rulebook: Rulebook, request: DomainRequest): string[] {
+  const vocab = vocabularyOf(rulebook);
+  if (shapeProblems(request, vocab).length) return ['request'];
+  const areaId = request.areaId ?? request.zoneId!;
+  const area = vocab.areas.get(areaId);
+  const role = vocab.roles.get(request.participant.roleId);
+  if (!area || !role || role.kind !== request.participant.kind) return [];
+  const actionDef = vocab.actions.get(request.action);
+  const { problemFacts } = validateFacts(rulebook, vocab, request, actionDef?.requires ?? []);
+  const out = [...problemFacts];
+  const needHistory = rulebook.rules.filter(r => r.history?.length && selectorsMatch(r, role.id, request.action, actionDef !== undefined, area.id, vocab));
+  if (needHistory.length) {
+    const needTimes = needHistory.some(r => r.history!.some(h => h.withinMinutes !== undefined));
+    if (request.history === undefined || historyProblems(request.history, needTimes).length) out.push('history');
+  }
+  return out;
+}
+
 function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string, number> | undefined, then: string | undefined, approvalRequests: ApprovalRequest[]): DomainDecision {
   let status: DomainDecisionStatus = 'ALLOW';
   for (const c of trace) if (SEVERITY[c.status] > SEVERITY[status]) status = c.status;
@@ -263,20 +289,23 @@ function shapeProblems(request: DomainRequest, vocab: Vocabulary): string[] {
 }
 
 function validateFacts(rulebook: Rulebook, vocab: Vocabulary, request: DomainRequest, alsoRequired: string[]):
-  { problems: string[]; facts: Record<string, FactValue>; approval: Approval | null } {
+  { problems: string[]; problemFacts: string[]; facts: Record<string, FactValue>; approval: Approval | null } {
   const problems: string[] = [];
+  /** The IDs behind `problems`, in order, once each (`approvedBy` for the built-in approval). */
+  const problemFacts: string[] = [];
+  const flag = (id: string) => { if (!problemFacts.includes(id)) problemFacts.push(id); };
   const facts: Record<string, FactValue> = {};
   const given: Record<string, unknown> = { ...request.facts };
   if (request.targetRobotId !== undefined && given.targetRobotId === undefined) given.targetRobotId = request.targetRobotId;
   for (const def of rulebook.facts) {
     const v = given[def.id];
     if (v === undefined) {
-      if (def.required || alsoRequired.includes(def.id)) problems.push(`${def.id} is required (${describeType(def)}), got nothing`);
+      if (def.required || alsoRequired.includes(def.id)) { problems.push(`${def.id} is required (${describeType(def)}), got nothing`); flag(def.id); }
       else if (def.default !== undefined) facts[def.id] = def.default;
       continue;
     }
     const p = factProblem(def, v);
-    if (p) problems.push(p); else facts[def.id] = v as FactValue;
+    if (p) { problems.push(p); flag(def.id); } else facts[def.id] = v as FactValue;
   }
   let approval: Approval | null = null;
   const a = given.approvedBy;
@@ -298,8 +327,9 @@ function validateFacts(rulebook: Rulebook, vocab: Vocabulary, request: DomainReq
         else approval.roleId = o.roleId;
       }
     } else problems.push(`approvedBy must be a non-empty string or { id, authority?, roleId? } when given, got ${show(a)}`);
+    if (problems.some(x => x.startsWith('approvedBy'))) flag('approvedBy');
   }
-  return { problems, facts, approval };
+  return { problems, problemFacts, facts, approval };
 }
 
 function describeType(def: Rulebook['facts'][number]): string {

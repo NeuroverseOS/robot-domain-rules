@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  backtest,
   buildRuleDraftPrompt,
   checkRulebook,
+  compareBacktests,
   compileDomain,
   DomainRulesBuilder,
   DomainRulesError,
@@ -816,6 +818,37 @@ describe('history conditions: what the participant did recently, as the caller r
 });
 
 // ─── 0.4: soundness of the conflict check, under a seeded random generator ──
+
+describe('backtest: what a rulebook would have decided for recorded activity', () => {
+  it('replays the grocery day deterministically, names the rules that never fired, and refuses a malformed log or a comparison across different logs', () => {
+    const events = grocery.day.map(([, request], i) => ({ at: `2026-10-05T${String(9 + i).padStart(2, '0')}:00`, request, ...(i % 2 ? { outcome: 'happened' as const } : {}) }));
+    const a = backtest(grocery.rulebook, events), b = backtest(grocery.rulebook, events);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.fingerprint).toBe(grocery.rulebook.fingerprint);
+    expect(a.totals.ALLOW + a.totals.LIMIT + a.totals.PAUSE + a.totals.BLOCK + a.totals.missingFacts).toBe(events.length);
+    expect(a.neverFired).toContain('no_carrying_through_checkout');
+    expect(a.rows.map(r => r.status)).toEqual(events.map(e => evaluateDomainAction(grocery.rulebook, e.request).status));
+    expect(a.conflictsOccurred.map(c => c.ruleIds.join('+'))).toContain('shopper_photos_entrance+glasses_capture');
+    expect(a.differences.every(d => d.outcome === 'happened' && (d.status === 'BLOCK' || d.status === 'PAUSE'))).toBe(true);
+    expect(compareBacktests(a, b).changed).toBe(0);
+    expect(() => compareBacktests(a, backtest(grocery.rulebook, events.slice(1)))).toThrow(DomainRulesError);
+    expect(() => backtest(grocery.rulebook, [{ at: '', request: events[0].request }])).toThrow(DomainRulesError);
+    expect(() => backtest(grocery.rulebook, events, { clock: 'peopleInZone' })).toThrow(DomainRulesError);
+  });
+
+  it('builds each participant\'s history from the earlier events of the same log, timed by the clock fact, and never from another participant', () => {
+    const rb = compileDomain({
+      site: { id: 's', name: 'S' }, authorities: [{ id: 'site' }],
+      actions: [{ id: 'scan', kinds: ['robot'] }], facts: [{ id: 'time', type: 'time', required: true }],
+      areas: [{ id: 'a', name: 'A' }], roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['scan'] }],
+      rules: [{ id: 'two_scans_an_hour', text: 'two', who: '*', does: 'scan', where: '*', history: [{ actions: 'scan', withinMinutes: 60, clock: 'time', op: '>=', value: 2 }], then: { answer: 'wait', for: 'condition' }, setBy: 'site', source: { kind: 'manual', ref: 'x' } }],
+    });
+    const scan = (id: string, time: string) => ({ at: `2026-10-05T${time}`, request: { participant: { id, kind: 'robot', roleId: 'bot' }, action: 'scan', areaId: 'a', facts: { time } } });
+    const r = backtest(rb, [scan('r-1', '09:00'), scan('r-2', '09:10'), scan('r-1', '09:20'), scan('r-1', '09:30'), scan('r-1', '10:25')]);
+    expect(r.rows.map(x => x.status)).toEqual(['ALLOW', 'ALLOW', 'ALLOW', 'PAUSE', 'ALLOW']);
+    expect(r.wouldStall).toEqual([{ ruleId: 'two_scans_an_hour', setBy: 'site', status: 'PAUSE', count: 1, examples: ['2026-10-05T09:30'] }]);
+  });
+});
 
 describe('conflict check exactness: "disjoint" is never a lie, and every witness is real', () => {
   it('whenever the checker reports no overlap, no generated request matches both; whenever it reports one, its witness matches both', () => {

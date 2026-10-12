@@ -8,6 +8,9 @@ import { importRulebook, rulebookJson, codeSnippet } from '../src/lib/share';
 import { evaluatePlan, matchingRules } from '../../src/index';
 import { planPresets, toPlan, fromPlan, defaultPlanState, reconcilePlan, parseFacts } from '../src/lib/plan';
 import { describeWitness } from '../src/ui/ConflictsPanel';
+import { backtest, compareBacktests } from '../../src/index';
+import { parseEventLog, sampleWeek, shortAt } from '../src/lib/backtest';
+import { sampleSite } from '../../examples/backtest/rulebook';
 
 describe('starting points', () => {
   it('every starting point compiles, and the grocery seed shows the deliberate conflicts on first visit', () => {
@@ -164,5 +167,45 @@ describe('plan mode', () => {
       expect(matchingRules(rb, f.witness!)).toEqual(expect.arrayContaining(f.ruleIds));
       expect(describeWitness(f.witness!)).toContain(` does ${f.witness!.action} in `);
     }
+  });
+});
+
+describe('test against recorded activity', () => {
+  it('the sample week loads with its own site, compiles, and the rule under test blocks aisle-5 entries the record says happened; raising the limit to three newly allows exactly those', () => {
+    const sample = sampleWeek();
+    const { rulebook, error } = compileState(sample.rulebook);
+    expect(error).toBeNull();
+    expect(rulebook!.fingerprint).toBe(sampleSite(2).rulebook.fingerprint);
+    expect(rulebook!.rules.some(r => r.id === 'aisle5_robot_limit')).toBe(true);
+    const report = backtest(rulebook!, sample.events);
+    expect(report.events).toBe(sample.events.length);
+    expect(report.totals.ALLOW + report.totals.LIMIT + report.totals.PAUSE + report.totals.BLOCK + report.totals.missingFacts).toBe(report.events);
+    expect(report.wouldStall[0]).toMatchObject({ ruleId: 'aisle5_robot_limit', status: 'BLOCK', count: 11 });
+    expect(report.missingFacts.map(m => m.fact)).toEqual(['robotsInZone', 'peopleInZone']);
+    expect(report.gaps).toEqual([{ action: 'open_door', count: 4, examples: ['2026-10-05T17:00', '2026-10-07T17:00', '2026-10-09T17:00'] }]);
+    expect(report.neverFired).toContain('back_room_evening_approval');
+    expect(report.conflictsOccurred.map(c => c.kind)).toEqual(['tightening', 'authority-override', 'contradiction']);
+    expect(report.differences.filter(d => d.ruleIds.includes('aisle5_robot_limit') && d.outcome === 'happened').length).toBe(11);
+    const proposed = backtest(sampleSite(3).rulebook, sample.events);
+    const c = compareBacktests(report, proposed);
+    expect(c.newlyAllowed.length).toBe(7);
+    expect(c.newlyBlocked.length).toBe(0);
+    expect(c.newlyAllowed.every(x => x.before.includes('aisle5_robot_limit'))).toBe(true);
+    expect(c.byRule[0]).toEqual({ ruleId: 'aisle5_robot_limit', baseline: 11, proposed: 4, change: -7 });
+  });
+
+  it('an imported log may be a JSON array, an object with events, or JSON Lines with a header line; items without at and request are skipped, order is kept, and junk is refused', () => {
+    const [a, b] = sampleWeek().events;
+    expect(parseEventLog(JSON.stringify([a, b])).events).toEqual([a, b]);
+    expect(parseEventLog(JSON.stringify({ events: [b, a] })).events).toEqual([b, a]);
+    const jsonl = [JSON.stringify({ note: 'header' }), JSON.stringify(a), '', JSON.stringify({ ...b, outcome: 'nope' })].join('\n');
+    const parsed = parseEventLog(jsonl);
+    expect(parsed.skipped).toBe(1);
+    expect(parsed.events).toEqual([a, { at: b.at, request: b.request }]);
+    expect(parseEventLog('{').error).toBeTruthy();
+    expect(parseEventLog('').error).toBeTruthy();
+    expect(parseEventLog('[{"x":1}]').error).toBeTruthy();
+    expect(shortAt('2026-10-05T08:10')).toBe('10-05 08:10');
+    expect(shortAt('day 3')).toBe('day 3');
   });
 });

@@ -12,6 +12,8 @@
  *   { requestDigest }  of `case.request`
  *   { verify: { ok } } verifyApproval(case.approval, case.trustedKeys)
  *   { rulebookSignature: { ok } }  verifyRulebookSignature(rulebook, case.signature, case.publicKey)
+ *   { backtest }       backtest(rulebook, case.events, case.options) must equal it, deep (the report has no free text)
+ *   { comparison }     compareBacktests(backtest(rulebook, …), backtest(case.proposed, …)) must equal it, deep
  *
  * Decision comparison — exact on: status, limits (deep), then, fingerprint;
  * reasons and trace as ordered lists of { ruleId, status, setBy } (the
@@ -90,7 +92,8 @@ export function deepEqual(a, b) {
  *   { evaluate(rulebook, request), evaluatePlan(rulebook, plan), check(rulebook), validate(rulebook) → problems[],
  *     matches?(rulebook, request) → ruleIds (optional; see witness rule above),
  *     canonical(value), fingerprint(value), requestDigest(request),
- *     verifyApproval(approval, keys) → Promise<{ok}>, verifyRulebookSignature(rulebook, sig, pub) → Promise<boolean> }
+ *     verifyApproval(approval, keys) → Promise<{ok}>, verifyRulebookSignature(rulebook, sig, pub) → Promise<boolean>,
+ *     backtest(rulebook, events, options?) → report, compareBacktests(reportA, reportB) → comparison }
  * Returns null when the case passes, else a short description of the mismatch.
  */
 export async function runCase(c, impl, rulebook) {
@@ -141,6 +144,14 @@ export async function runCase(c, impl, rulebook) {
   if (e.rulebookSignature) {
     const ok = await impl.verifyRulebookSignature(rulebook, c.signature, c.publicKey);
     return ok === e.rulebookSignature.ok ? null : `verifyRulebookSignature: want ${e.rulebookSignature.ok}, got ${ok}`;
+  }
+  if (e.backtest) {
+    const got = strip(impl.backtest(rulebook, c.events, c.options));
+    return deepEqual(got, strip(e.backtest)) ? null : `backtest report differs\n  want ${JSON.stringify(e.backtest)}\n  got  ${JSON.stringify(got)}`;
+  }
+  if (e.comparison) {
+    const got = strip(impl.compareBacktests(impl.backtest(rulebook, c.events, c.options), impl.backtest(c.proposed, c.events, c.options)));
+    return deepEqual(got, strip(e.comparison)) ? null : `backtest comparison differs\n  want ${JSON.stringify(e.comparison)}\n  got  ${JSON.stringify(got)}`;
   }
   return `case has no recognised expectation: ${Object.keys(e).join(', ')}`;
 }

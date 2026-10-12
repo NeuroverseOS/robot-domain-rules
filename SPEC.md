@@ -418,7 +418,7 @@ The `authorities` list is a total order, highest first; `rank(id)` is the index.
 
 ## 11. Versioning and conformance
 
-This specification is `robot-domain-rules/2`. The rulebook `format` string is `neuroverse-domain-rules/2` and changes only with the rulebook's shape; `/2` of this document added optional members (`effects`, `history`, `planRules`, `witness`) and did not change it. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. (`/2` did: the exact analysis changed the certainty of some findings and, through `witness`, the fingerprint of rulebooks that have findings.) An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
+This specification is `robot-domain-rules/2`. The rulebook `format` string is `neuroverse-domain-rules/2` and changes only with the rulebook's shape; `/2` of this document added optional members (`effects`, `history`, `planRules`, `witness`) and did not change it. § 13 (backtest) was added to `/2` without a version change: it is a new function over existing formats, defined entirely in terms of § 6 and § 7, and alters no decision, finding, fingerprint or signature. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. (`/2` did: the exact analysis changed the certainty of some findings and, through `witness`, the fingerprint of rulebooks that have findings.) An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
 
 ## 12. Plans
 
@@ -488,3 +488,105 @@ This specification is `robot-domain-rules/2`. The rulebook `format` string is `n
 ```
 
 Consequences: nothing is projected past a refusal (the steps list is cut at the first BLOCK); a PAUSE does not stop projection, so a planner sees every approval the plan needs; the plan is judged on the effects the site declared and the facts the planner supplied, nothing else; approvals are bound per step, by that step's request digest, exactly as for a single request.
+
+## 13. Backtest
+
+`backtest(rulebook, events, options?) → BacktestReport` and `compareBacktests(baseline, proposed) → BacktestComparison` ([`spec/backtest.schema.json`](spec/backtest.schema.json), [`spec/backtest-report.schema.json`](spec/backtest-report.schema.json)). A site replays a log of what its participants asked to do through a rulebook before the rulebook goes live, and reads what the rulebook *would have decided*. Pure and synchronous, like § 6: every time comes from the log, nothing is kept between runs, and the report contains no free text. The report never says *why* anything happened; it applies rules to recorded requests and nothing else.
+
+### 13.1 Input
+
+```json
+{ "events": [ { "at": "2026-10-05T09:00", "request": { …a request, § 4… }, "outcome": "happened" }, … ],
+  "options": { "clock": "localTime", "examples": 3 } }
+```
+
+| Field | Req | Meaning |
+|---|---|---|
+| `events[].at` | yes | When it was asked. Any non-empty string; "YYYY-MM-DDTHH:MM" is the convention. Reported as given; the implementation MUST process events in the order given and MUST NOT sort them. |
+| `events[].request` | yes | Exactly what the participant asked (§ 4). A malformed request is a row refused as missing facts (`request`), never an error. |
+| `events[].outcome` | no | `happened`, `did_not_happen` or `unknown`: what the record says happened next. Used only for `differences` (13.3); it MUST NOT influence any decision. |
+| `options.clock` | no | A declared `time` fact; each built history entry's `at` is the request's value of it. Default: the first declared `time` fact; none if the rulebook declares no time fact. A clock that is not a declared time fact is an error. |
+| `options.examples` | no | How many `at` values each list keeps (the earliest). Default 3. |
+
+An `events` value that is not a list, an event without a non-empty `at` or without `request`, or an `outcome` outside the three values is an error (bad input, like a bad rulebook), not a decision.
+
+### 13.2 The report
+
+```
+ 0. history = {} (participant ID → (day, entries)); day(at) = the text of `at` before its
+    first "T", or "" when there is none. For each event i, in order:
+      request = event.request; if it is an object, has no `history` member, and names a
+        participant with a string id: request = request ⊕ { history: history[id].entries
+        when history[id] exists and its day == day(at), else [] }
+      decision = evaluate(rulebook, request)                                      (§ 6)
+      missing  = decision.status == BLOCK and some reason has ruleId "required_facts"
+      row = { index: i, at, participantId, kind, roleId, action, areaId, status,
+              missingFacts: missing, ruleIds: [reasons' ruleIds, in order], outcome? }
+        (participant fields, action and areaId are "" when the request lacks them;
+         areaId is areaId ?? zoneId)
+      matched = matches(rulebook, request)                                         (§ 6 step 4; [] for an incomplete request)
+      after deciding, if the request named a participant id and an action:
+        if history[id] is absent or its day != day(at): history[id] = (day(at), [])
+        history[id].entries += { action, areaId, at: request.facts[clock] if clock is set
+                                 and that value is a string }
+    Every earlier event of the same participant on the same day counts, whatever was
+    decided or recorded. History never crosses a day: windows are minute-of-day
+    arithmetic (§ 3.4), so yesterday's actions must not count as today's.
+
+ 1. Counts. A counts object is { events, ALLOW, LIMIT, PAUSE, BLOCK, missingFacts }; an
+    event adds to `events` and to `missingFacts` when `missing`, else to its status. So
+    BLOCK counts refusals by rules and by built-in checks other than required_facts, and
+    the five sum to events. totals over every event; byArea keyed by areaId ("(none)" when
+    empty), byRole by roleId ("(none)"), keys in code-unit order.
+
+ 2. byRule. For every rule of rulebook.rules, in rulebook order: matched += 1 when the
+    rule ∈ matched; decided += 1 when the rule ∈ row.ruleIds. neverFired = the rules with
+    matched == 0, in rulebook order.
+
+ 3. wouldStall. For each event that is PAUSE or BLOCK and not `missing`, for each reason
+    r: the entry (r.ruleId, status) gains count 1 and, while it has fewer than
+    options.examples, the event's `at`; `setBy` is r.setBy. Order: count descending,
+    then first occurrence.
+
+ 4. conflictsOccurred. For each finding of rulebook.findings, in order, whose ruleIds are
+    all ∈ matched for some event: { kind, severity, ruleIds, count, firstAt, examples }
+    where count is the number of such events and examples their earliest `at` values.
+    (A finding between plan rules never occurs: its IDs are not rules.)
+
+ 5. gaps. For each event whose ruleIds include "unknown_action": the entry for
+    row.action gains count 1 and an example. Order: count descending, then action.
+
+ 6. missingFacts. For each `missing` event, for each name in missingFacts(rulebook,
+    request): the entry for that name gains count 1 and an example. The names are, in
+    this order: "request" alone when the request's shape is incomplete (§ 6 step 1);
+    else each declared fact that is absent while required (by the fact or by the action)
+    or present and invalid, in declaration order; "approvedBy" when the approval is
+    malformed; "history" when a rule in scope (§ 6 step 3) has history conditions and
+    the request's history is absent or invalid. Order: count descending, then name.
+
+ 7. differences. In event order: { index, at, status, outcome, ruleIds } for each event
+    with outcome "happened" and status PAUSE or BLOCK, and for each with outcome
+    "did_not_happen" and status ALLOW or LIMIT. Events without an outcome, or with
+    "unknown", are left out. The report does not say which is right.
+
+ 8. fingerprint = rulebook.fingerprint; events = the number of events; rows in order.
+```
+
+### 13.3 Comparison
+
+`compareBacktests(baseline, proposed)`: both reports MUST come from the same log (same `events` and the same `at` at every index); otherwise an error.
+
+```
+ for each index i: a = baseline.rows[i], b = proposed.rows[i]
+   every id in a.ruleIds counts once for that rule's `baseline`; every id in b.ruleIds for its `proposed`
+   if a.status != b.status: change = { index, at, from: a.status, to: b.status, before: a.ruleIds, after: b.ruleIds }
+     b.status == BLOCK                                   → newlyBlocked
+     a.status ∈ {PAUSE, BLOCK} and b.status ∈ {ALLOW, LIMIT} → newlyAllowed
+     otherwise                                           → otherChanges
+ changed = |newlyBlocked| + |newlyAllowed| + |otherChanges|
+ byRule = every rule seen, { ruleId, baseline, proposed, change: proposed − baseline },
+          ordered by |change| descending, then ruleId
+ totals = { baseline: baseline.totals, proposed: proposed.totals }; the two fingerprints; events
+```
+
+Consequences: a row's status under a `missing` refusal is BLOCK, so a log that lacks a fact the proposed rulebook newly needs shows up as newly blocked, with `required_facts` in `after` — the honest answer, since the rulebook could not have decided those events. Conformance: [`conformance/backtest.json`](conformance/backtest.json).

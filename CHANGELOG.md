@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1
+
+Test a rulebook against recorded activity before it goes live. Spec stays `robot-domain-rules/2`: § 13 is a new function over existing formats and changes no decision, finding, fingerprint or signature.
+
+### Added
+
+- **Backtest.** `backtest(rulebook, events, options?)`: replays a recorded log — `[{ at, request, outcome? }]` in time order — through a rulebook and reports what it *would have decided*: totals and counts by area, by role and by rule (ALLOW / LIMIT / PAUSE / BLOCK / missing facts, the five summing to the events); the rules that never fired; the rules and built-in checks that would have stalled work (PAUSE or BLOCK, most often first, with example timestamps); the findings that actually occurred (both rules matched a recorded request, by the same matching relation a witness is judged by); gaps (`unknown_action`, by action); the facts the log did not carry (by fact, via the new `missingFacts(rulebook, request)`); and, when the log records outcomes, where the rule and the record differ, without judging which is right. A rule that counts history gets the earlier events of the same participant on the same day of the log, unless the request brings its own. Pure, deterministic, no free text; every list has a defined order. `compareBacktests(baseline, proposed)` sets a current rulebook against a proposed one on the same log: newly blocked, newly allowed, other changes, and each rule's decided count before and after. SPEC.md § 13; `spec/backtest.schema.json`, `spec/backtest-report.schema.json`; `conformance/backtest.json` (13 cases, 194 in all); `compare.mjs` judges the report and the comparison deep-equal.
+- **Sample week** (`examples/backtest/`): a clearly labelled synthetic week (189 events, not from a real store) at a grocery site with aisle 5, a `robotsInZone` count fact and the rule "at most two robots in aisle 5"; `backtest.ts` prints the report and the comparison with "at most three", and writes `sample-week.jsonl`.
+- **Switchboard Test mode**: load the sample week (with its site) or import a JSON/JSONL log; the five-word summary, then the findings lists; "Compare with a proposed change" snapshots the rulebook as baseline, then any edit in the rulebook panel shows what would change. The log never goes in the link.
+- Docs: README (engineer path step 4, operator path, roadmap: explaining *why* is out of scope), PRINCIPLES 5 "In code", RELATED-WORK row, AGENTS.md.
+
+### Changed
+
+- `evaluate.ts` names the facts behind a `required_facts` refusal internally (`missingFacts`); decisions, findings and fingerprints are unchanged for every existing rulebook (the 181 earlier conformance cases are byte-identical).
+
 ## 0.5.0
 
 Whole-plan checking for AI planners, an exact conflict analysis cross-checked with Z3, a Cedar export, and a planner replay. Spec `robot-domain-rules/2`.

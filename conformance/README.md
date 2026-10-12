@@ -15,6 +15,7 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | `p9-boundary.json` | Facts are trusted; time is a fact; a limit is a ceiling |
 | `plans.json` | Whole plans: effects projected step by step, the first BLOCK, plan rules, approvals collected, malformed plans, effect and plan-rule validation |
 | `history.json` | History conditions: counts in a window of a clock fact, same-area, missing history is a refusal, validation |
+| `backtest.json` | A recorded log replayed through a rulebook: totals, history built from earlier events, missing facts named, gaps, stalls, conflicts that occurred, rule-versus-record differences, and a current-versus-proposed comparison |
 | `fingerprint.json` | Canonical JSON and the FNV-1a fingerprint, byte for byte; `requestDigest` |
 | `approvals.json` | Ed25519 test vectors (TEST ONLY keys), verification, binding, rulebook signatures |
 
@@ -43,6 +44,8 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | `requestDigest` | `request` | produce exactly this digest |
 | `verify: { ok }` | `approval`, `trustedKeys` | `verifyApproval` returns this `ok` |
 | `rulebookSignature: { ok }` | `rulebook`, `signature`, `publicKey` | `verifyRulebookSignature` returns this `ok` |
+| `backtest` | `rulebook`, `events`, `options?` | `backtest(rulebook, events, options)` equals this report exactly (SPEC.md § 13) |
+| `comparison` | `rulebook`, `proposed`, `events`, `options?` | `compareBacktests(backtest(rulebook, …), backtest(proposed, …))` equals this exactly |
 
 The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY private seeds behind every signature in that file, so you can reproduce the signatures, not just verify them.
 
@@ -66,6 +69,8 @@ The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY 
 
 **Canonical JSON and fingerprint.** Byte for byte (SPEC.md § Canonical JSON).
 
+**Backtest and comparison.** Deep-equal on the whole report or comparison: neither carries free text, and every list has a defined order (SPEC.md § 13).
+
 ## The loop
 
 ```
@@ -81,6 +86,8 @@ for each file in conformance/*.json (alphabetical):
     elif case.expect.requestDigest: assert requestDigest(case.request) == expect.requestDigest
     elif case.expect.verify:    assert verifyApproval(case.approval, case.trustedKeys).ok == expect.verify.ok
     elif case.expect.rulebookSignature: assert verifyRulebookSignature(rulebook, case.signature, case.publicKey) == expect.rulebookSignature.ok
+    elif case.expect.backtest:  assert backtest(rulebook, case.events, case.options) == expect.backtest
+    elif case.expect.comparison: assert compareBacktests(backtest(rulebook, case.events, case.options), backtest(case.proposed, case.events, case.options)) == expect.comparison
 ```
 
 `project` keeps the compared fields above and drops the rest. The reference loop is [`compare.mjs`](compare.mjs) (plain JavaScript, 100 lines); [`run-node.mjs`](run-node.mjs) runs it against the built package with no test framework:

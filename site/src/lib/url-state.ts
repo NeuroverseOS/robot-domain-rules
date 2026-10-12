@@ -14,8 +14,8 @@ export interface SharedState {
   v: 1;
   rulebook: RulebookState;
   situation: Situation;
-  /** Plan mode (0.5). Absent in links made before it existed. */
-  mode?: 'ask' | 'plan';
+  /** Plan mode (0.5) and Test mode (0.5.1). Absent in links made before they existed. A test log is never in the link. */
+  mode?: 'ask' | 'plan' | 'test';
   plan?: PlanState;
 }
 

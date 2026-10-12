@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest, verifyApproval, verifyRulebookSignature,
+  backtest, compareBacktests,
   type Rulebook,
 } from '../src/index';
 import { loadCases, runCase } from '../conformance/compare.mjs';
@@ -23,6 +24,8 @@ const impl = {
   requestDigest,
   verifyApproval,
   verifyRulebookSignature,
+  backtest,
+  compareBacktests,
 };
 
 const dir = path.join(__dirname, '..', 'conformance');

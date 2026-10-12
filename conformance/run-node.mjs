@@ -26,6 +26,8 @@ const impl = {
   requestDigest: core.requestDigest,
   verifyApproval: core.verifyApproval,
   verifyRulebookSignature: core.verifyRulebookSignature,
+  backtest: core.backtest,
+  compareBacktests: core.compareBacktests,
 };
 
 const dir = path.dirname(fileURLToPath(import.meta.url));

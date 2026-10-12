@@ -11,6 +11,7 @@ How this compares with the systems a robotics or agent team is likely to weigh i
 | Robots / people / AI agents under one law | ✅ / ✅ / ✅ | — / — / ✅ | ✅ / — / — | ✅ / — / — | ✅ / — / — |
 | Declared authority that can only tighten | ✅ | ❌ (forbid-wins, no authority levels) | ❌ | ❌ | ❌ |
 | Conflicts between rules | Exact for the rule language, with a witness request per finding; cross-checked with the Z3 SMT solver in tests; plain words saying who wins | Formal automated reasoning over Cedar's richer language | ❌ | Resolved automatically, not shown | Traffic conflicts resolved, not rule conflicts |
+| Test rules against recorded activity before they go live | ✅ deterministic backtest of a rulebook over a request log: what it would have decided, rules that never fired or would stall work, conflicts that occurred, current vs proposed; says nothing about *why* things happened | Policy simulation against logged requests, as far as I found; no authority or stall view | ❌ | ❌ | Fleet simulation, not rule backtesting |
 | Human approval from the right authority | ✅ separate from "wait until clear", signed | Not built in, as far as I found | ❌ | ❌ | ❌ |
 | Unknown or missing fact → no | ✅ | ✅ default deny | ❌ the model guesses | Partly | n/a |
 | Each decision says why and whose rule | ✅ rule, reason, authority | ✅ rule and reason, no authority | Model reasoning text | Logic trace | ❌ |

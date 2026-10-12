@@ -40,7 +40,7 @@ In code: `required_facts`, `area_declared`, `role_declared`, `role_permits_actio
 
 A decision is not a verdict; it is a verdict with its working. It names every rule that decided it and the authority that set each one, lists every check that ran in the order it ran, carries the effective limits even when the request was within them, carries a deny rule's "do this instead" hint, and carries the fingerprint of the exact rulebook that decided, so a log line can be checked against the rules in force at that moment. A decision that cannot say why is not a decision this layer produces.
 
-In code: `reasons`, `trace`, `setBy` on every check, `limits`, `then`, `fingerprint`; the canonical JSON and hash another implementation must reproduce byte for byte — [`p5-explains.json`](conformance/p5-explains.json), [`fingerprint.json`](conformance/fingerprint.json).
+In code: `reasons`, `trace`, `setBy` on every check, `limits`, `then`, `fingerprint`; the canonical JSON and hash another implementation must reproduce byte for byte — [`p5-explains.json`](conformance/p5-explains.json), [`fingerprint.json`](conformance/fingerprint.json); a recorded log replayed through a rulebook before it goes live (`backtest`) reports what it would have decided, the rules that never fired, the rules that would have stalled work, and where the rule and the record differ, without saying why anything happened — [`backtest.json`](conformance/backtest.json).
 
 ## 6. Waiting has two meanings, and humans stay in the loop
 
