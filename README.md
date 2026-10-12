@@ -160,4 +160,4 @@ The fingerprint is a deterministic hash for citing which rule set decided. It is
 
 ## License
 
-Apache-2.0
+MIT (versions 0.1.0 and 0.2.0 were published under Apache-2.0).

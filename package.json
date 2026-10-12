@@ -1,8 +1,8 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Rules for robots and smart-glasses wearers in one physical site. Your spatial system says where; this says what's allowed.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
