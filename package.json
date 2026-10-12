@@ -1,6 +1,6 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A governance core for physical spaces: turn any site's answers and plain-language rules into one rulebook, flag rules that conflict, and let robots, glasses and AI agents ask before they act.",
   "license": "MIT",
   "type": "module",
@@ -24,10 +24,13 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
-    "test": "vitest run",
+    "test": "vitest run --dir test",
     "typecheck": "tsc --noEmit",
     "demo": "tsx examples/demo.ts",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "site": "npm --prefix site run dev",
+    "site:build": "npm --prefix site run build",
+    "site:test": "npm --prefix site test"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
@@ -48,7 +51,7 @@
     "type": "git",
     "url": "git+https://github.com/NeuroverseOS/robot-domain-rules.git"
   },
-  "homepage": "https://github.com/NeuroverseOS/robot-domain-rules#readme",
+  "homepage": "https://neuroverseos.github.io/robot-domain-rules/",
   "bugs": {
     "url": "https://github.com/NeuroverseOS/robot-domain-rules/issues"
   },

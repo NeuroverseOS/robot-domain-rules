@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1
+
+### Added
+
+- **The switchboard** (`site/`): a static page that builds a rulebook, sets a situation and shows the decision with the authority behind it. Three columns: start from the grocery store, the warehouse, the clinic or an empty site; answer the template questions and watch the rules change; write a rule in plain words, read the draft and confirm it as a chosen authority; switch operator rules off or delete them. Set who is asking, the action, the area, every declared fact, the emergency switch and an approval, or pick a scenario in one click. See YES / SLOWER / WAIT / NO with limits, reasons, the authority chain in declared order, the full trace and the fingerprint, next to what would happen without rules. A "Rules at odds" panel shows the conflict check live. Export the rulebook as JSON or readable text, import one (fingerprint verified), copy the code that asks it. The whole state lives in the link and in the browser; nothing leaves the page.
+- Live demo on GitHub Pages: https://neuroverseos.github.io/robot-domain-rules/ (`.github/workflows/pages.yml`, built from `site/`, which imports the core from `src/`).
+- README reorganised: the idea, the live demo, a screenshot, what it does in 30 seconds, install and a short example, then the detail. A repo map. AGENTS.md covers the site.
+
+### Changed
+
+- No core behaviour change. `package.json` `homepage` points at the live demo; `npm test` runs the core's `test/` directory only (the site has its own tests, `npm run site:test`). The published package is unchanged in content and still has no runtime dependencies; `site/` and `docs/` are not published.
+
 ## 0.3.0
 
 ### Changed

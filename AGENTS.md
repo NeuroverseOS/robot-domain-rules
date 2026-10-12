@@ -48,6 +48,7 @@ Rule: `{ id, text, who, does, where, when?, then, reason?, source, setBy, never?
 | `src/index.ts` | Public exports and `DomainRulesBuilder`. |
 | `examples/` | `grocery-store.ts`, `warehouse.ts`, `clinic.ts`, `demo.ts`, `legacy-store-0.2.ts`. |
 | `test/domain-rules.test.ts` | One test per behaviour. Add here; do not add test files without being asked. |
+| `site/` | The switchboard (the live demo). Its own package; not published to npm. See below. |
 
 ## How to extend
 
@@ -57,17 +58,38 @@ Rule: `{ id, text, who, does, where, when?, then, reason?, source, setBy, never?
 - **A condition operator:** add it to `Condition` in `types.ts`; validate it, evaluate it and give it an exact constraint in `vocabulary.ts`; describe it; add it to the model prompt in `draft.ts`. Add a test that proves disjointness still holds where it should.
 - **A text pattern:** `draft.ts` only. Keep it deterministic and keep `unmatched` honest.
 
+## The switchboard (`site/`)
+
+A static single-page app (Vite + Preact + TypeScript) that lets a visitor build a rulebook, set a situation and see the decision with the authority behind it. Live at https://neuroverseos.github.io/robot-domain-rules/ via `.github/workflows/pages.yml`.
+
+- **It imports the core from the repo source**, never from `dist/` or npm: `site/src/**` imports `../../../src/index` (and two internals, `src/vocabulary.ts` `vocabularyOf` and `src/check.ts` `say`, to render rules the way `renderDomainRules` does). The starting points import the example builders from `examples/` and call `toInput()`, so the demo always shows the current code and the current examples.
+- **It runs entirely in the browser.** No backend, no model call, no analytics, no cookies, no external fonts. State is in the URL hash (`#s=`, deflated JSON) and in localStorage. Keep it that way.
+- **It never changes the core's meaning.** The site only calls public functions (`compileDomain`, `checkRulebook`, `evaluateDomainAction`, `draftRuleFromText`, `verifyFingerprint`, `renderDomainRules`). A UI need is not a reason to change `src/`; if the core needs something, change the core on its own terms, with a test.
+- **Where things are:** `site/src/lib/` is pure logic (`model.ts` the editable input and edits, `starting-points.ts` the four starting points and their scenario presets, `situation.ts` the request form, `url-state.ts` sharing, `share.ts` export/import/snippet); `site/src/ui/` the three panels and the conflicts panel; `site/test/switchboard.test.ts` tests the pure logic only.
+- **To add a scenario preset:** add `{ label, request }` to the starting point's `presets` in `site/src/lib/starting-points.ts`. The request is exactly what `evaluateDomainAction` receives; the test checks every preset round-trips through the situation form and decides.
+- **To add a starting point:** add an entry to `STARTING_POINTS` (an `input()` returning a plain `CompileDomainInput` with the template as its ID string, an `actingAs` authority, presets) and its ID to `StartingPointId` in `model.ts`.
+
+```bash
+cd site && npm install
+npm run dev         # vite dev server
+npm run typecheck   # tsc --noEmit (covers the site and the core it imports)
+npm test            # vitest run — the site's pure logic
+npm run build       # vite build → site/dist (base /robot-domain-rules/)
+```
+
+From the repo root: `npm run site`, `npm run site:test`, `npm run site:build`.
+
 ## Commands
 
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit
-npm test            # vitest run — 38 tests
+npm test            # vitest run --dir test — 38 core tests
 npm run build       # tsup → dist/ (esm, cjs, d.ts)
 npm run demo        # tsx examples/demo.ts; add -- --json to write <site>.rules.json
 ```
 
-Run all four before you say a change is done.
+Run all four before you say a change is done. If you touched `site/` or anything it imports, also run the site's typecheck, tests and build.
 
 ## Do not build here
 

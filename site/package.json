@@ -1,0 +1,20 @@
+{
+  "name": "robot-domain-rules-switchboard",
+  "private": true,
+  "version": "0.3.1",
+  "description": "The switchboard: build a rulebook, set a situation, see the decision and the authority behind it. Static, runs in the browser, imports the core from ../src.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "preact": "^10.25.0",
+    "typescript": "^5.3.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0"
+  }
+}
