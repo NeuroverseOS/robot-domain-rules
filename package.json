@@ -1,0 +1,57 @@
+{
+  "name": "@neuroverseos/robot-domain-rules",
+  "version": "0.1.0",
+  "description": "Rules for robots and smart-glasses wearers in one physical site. Your spatial system says where; this says what's allowed.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "AGENTS.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx examples/demo.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "tsup": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.0.0"
+  },
+  "keywords": [
+    "robotics",
+    "smart-glasses",
+    "governance",
+    "rules",
+    "posemesh",
+    "spatial-computing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NeuroverseOS/robot-domain-rules.git"
+  },
+  "homepage": "https://github.com/NeuroverseOS/robot-domain-rules#readme",
+  "bugs": {
+    "url": "https://github.com/NeuroverseOS/robot-domain-rules/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
