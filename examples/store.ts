@@ -20,6 +20,8 @@ export const store: CompileDomainInput = {
     { zoneId: 'entrance', name: 'Entrance', kind: 'public' },
     { zoneId: 'aisle-3', name: 'Aisle 3', kind: 'public' },
     { zoneId: 'checkout', name: 'Checkout', kind: 'public', maxSpeedMps: 0.3 },
+    // Only these roles may act here. A role must be listed itself; inheriting a listed role does not count.
+    { zoneId: 'restroom', name: 'Restroom', kind: 'public', allowRoles: ['cleaning_robot', 'staff', 'shopper'] },
     { zoneId: 'back-room', name: 'Back room', kind: 'staff_only' },
     { zoneId: 'electrical', name: 'Electrical room', kind: 'restricted' },
     { zoneId: 'dock-a', name: 'Charging dock A', kind: 'dock' },

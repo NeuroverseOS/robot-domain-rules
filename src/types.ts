@@ -66,6 +66,14 @@ export interface DomainZone {
   kind: ZoneKind;
   /** Optional per-zone speed cap in metres per second. Tighter of this and the site cap wins. */
   maxSpeedMps?: number;
+  /**
+   * Only these roles (by role ID, any participant kind) may act in this zone.
+   * A role must be listed itself: inheriting a listed role's actions does
+   * not pass its zone permission. Omit to allow every declared role.
+   */
+  allowRoles?: string[];
+  /** These roles (by role ID) may never act in this zone. Checked before allowRoles. */
+  denyRoles?: string[];
 }
 
 // ─── Roles ───────────────────────────────────────────────────────────────────
@@ -135,7 +143,14 @@ export interface CompiledDomainRule {
   sourceAnswer: string;
 }
 
-/** The complete, portable rule set for one domain. Plain JSON — store it, sign it, ship it. */
+/**
+ * The complete, portable rule set for one domain. Plain JSON — store it, sign it, ship it.
+ *
+ * `compileDomain` returns it deep-frozen and detached from the input: editing
+ * the input afterwards changes nothing here, and editing this object throws.
+ * `verifyFingerprint(ruleSet)` recomputes the fingerprint of a copy received
+ * as JSON and says whether it still matches.
+ */
 export interface DomainRuleSet {
   format: 'neuroverse-domain-rules/1';
   site: DomainSite;
@@ -151,19 +166,28 @@ export interface DomainRuleSet {
 
 // ─── Requests and decisions ──────────────────────────────────────────────────
 
-/** Live facts your system supplies with each request. The evaluator never guesses them. */
+/**
+ * Live facts your system supplies with each request. The evaluator never
+ * guesses them: a required fact that is missing or invalid gives BLOCK with
+ * rule `required_facts`, never a crash and never permission. Absent optional
+ * facts take the conservative reading noted on each field.
+ */
 export interface DomainFacts {
-  /** People (not robots) currently in the zone, as your spatial system reports. */
+  /** People (not robots) currently in the zone, as your spatial system reports. Required; a whole number, 0 or more. */
   peopleInZone: number;
-  /** Staff currently in the zone. Defaults to 0. */
+  /** Staff currently in the zone. A whole number, 0 or more. Absent means 0 (the conservative reading). */
   staffInZone?: number;
-  /** Local time as "HH:MM". Required: the evaluator has no clock. */
+  /** Local time as "HH:MM" (24h). Required: the evaluator has no clock. */
   localTime: string;
-  /** Requested speed for move / enter_zone, m/s. */
+  /** Requested speed for move / enter_zone / dock, m/s, 0 or more. Absent means "cap me". */
   requestedSpeedMps?: number;
-  /** True while a site emergency is active. */
+  /**
+   * True while a site emergency is active. This is the one fact with a
+   * default: absent means no emergency is active. A site's emergency signal
+   * is an explicit event your system raises; the evaluator cannot infer one.
+   */
   emergency?: boolean;
-  /** Set when a human has approved this specific action (the answer to an earlier PAUSE). */
+  /** Set when a human has approved this specific action (the answer to an earlier PAUSE). Non-empty. */
   approvedBy?: string;
 }
 

@@ -6,6 +6,8 @@ import {
   evaluateDomainAction,
   glassesZoneRules,
   isOpen,
+  renderDomainRules,
+  verifyFingerprint,
 } from '../src/index';
 import type { CompileDomainInput, DomainRequest } from '../src/index';
 import { store } from '../examples/store';
@@ -145,7 +147,111 @@ describe('domain rules: robots', () => {
     const d = evaluateDomainAction(rules, robot('inventory_robot', 'move', 'aisle-3', { peopleInZone: 2, requestedSpeedMps: 1 }));
     expect(d.trace.map(c => c.ruleId)).toEqual(['role_permits_action', 'robots_near_people']);
     expect(d.fingerprint).toBe(rules.fingerprint);
-    expect(() => evaluateDomainAction(rules, robot('inventory_robot', 'move', 'aisle-3', { localTime: '9:00' }))).toThrow(/HH:MM/);
+  });
+});
+
+describe('domain rules: required facts', () => {
+  it('never treats a missing or invalid fact as permission', () => {
+    const base = robot('inventory_robot', 'move', 'aisle-3', { requestedSpeedMps: 0.5 });
+    expect(evaluateDomainAction(rules, base).status).toBe('ALLOW');   // absent emergency = none, absent staffInZone = 0
+
+    const missing = evaluateDomainAction(rules, { ...base, facts: { localTime: '10:00', requestedSpeedMps: 0.5 } as any });
+    expect(missing.status).toBe('BLOCK');
+    expect(ids(missing)).toEqual(['required_facts']);
+    expect(missing.reasons[0].reason).toMatch(/peopleInZone/);
+
+    const badFacts = [
+      { peopleInZone: -1 }, { peopleInZone: 1.5 }, { peopleInZone: '2' }, { peopleInZone: NaN },
+      { staffInZone: -1 }, { staffInZone: 0.5 },
+      { requestedSpeedMps: -1 }, { requestedSpeedMps: Infinity },
+      { localTime: '9:00' }, { localTime: undefined },
+      { emergency: 'no' }, { approvedBy: true },
+    ];
+    for (const patch of badFacts) {
+      const d = evaluateDomainAction(rules, { ...base, facts: { ...base.facts, ...patch } as any });
+      expect(d.status, JSON.stringify(patch)).toBe('BLOCK');
+      expect(ids(d), JSON.stringify(patch)).toEqual(['required_facts']);
+    }
+    expect(ids(evaluateDomainAction(rules, { ...base, participant: { ...base.participant, kind: 'drone' as any } }))).toEqual(['required_facts']);
+    expect(ids(evaluateDomainAction(rules, { ...base, participant: { ...base.participant, roleId: '' } }))).toEqual(['required_facts']);
+    expect(ids(evaluateDomainAction(rules, { ...base, action: '' }))).toEqual(['required_facts']);
+    expect(ids(evaluateDomainAction(rules, { ...base, zoneId: '' }))).toEqual(['required_facts']);
+    expect(rules.rules.some(r => r.ruleId === 'required_facts')).toBe(true);
+  });
+
+  it('applies emergency, hours, zone and people rules to approved unknown actions too', () => {
+    const pausing = compileDomain({ ...store, answers: { ...store.answers, unknown_actions: 'pause', robots_restricted_zones: 'never' } });
+    const approved = (zoneId: string, facts: Partial<DomainRequest['facts']>) =>
+      robot('inventory_robot', 'open_door', zoneId, { approvedBy: 'dana', ...facts });
+    expect(evaluateDomainAction(pausing, approved('aisle-3', {})).status).toBe('ALLOW');
+    expect(ids(evaluateDomainAction(pausing, approved('aisle-3', { emergency: true })))).toEqual(['emergency_stop']);
+    expect(ids(evaluateDomainAction(pausing, approved('aisle-3', { localTime: '23:30' })))).toEqual(['robots_after_hours']);
+    expect(ids(evaluateDomainAction(pausing, approved('electrical', {})))).toEqual(['robots_restricted_zones']);
+    expect(ids(evaluateDomainAction(pausing, approved('back-room', { staffInZone: 0 })))).toEqual(['robots_staff_zones']);
+    const strict = compileDomain({ ...store, answers: { ...store.answers, unknown_actions: 'pause', robots_near_people: 'stop' } });
+    expect(ids(evaluateDomainAction(strict, approved('aisle-3', { peopleInZone: 1 })))).toEqual(['robots_near_people']);
+    // An unknown glasses action is not a robot command, so an emergency does not block it.
+    const wave = { ...person('staff', 'wave', 'aisle-3'), facts: { peopleInZone: 1, localTime: '10:00', emergency: true, approvedBy: 'dana' } };
+    expect(evaluateDomainAction(pausing, wave).status).toBe('ALLOW');
+  });
+});
+
+describe('domain rules: zone role limits', () => {
+  it('lets a zone limit which roles may act in it; inheritance does not pass zone permission', () => {
+    // The example store's restroom allows only cleaning_robot, staff and shopper.
+    expect(ids(evaluateDomainAction(rules, robot('restock_robot', 'enter_zone', 'restroom', { requestedSpeedMps: 0.5 })))).toEqual(['zone_role_limits']);
+    expect(ids(evaluateDomainAction(rules, robot('inventory_robot', 'enter_zone', 'restroom', { requestedSpeedMps: 0.5 })))).toEqual(['zone_role_limits']);
+    expect(evaluateDomainAction(rules, robot('cleaning_robot', 'enter_zone', 'restroom', { requestedSpeedMps: 0.5 })).status).toBe('ALLOW');
+    expect(evaluateDomainAction(rules, person('staff', 'ai_overlay', 'restroom')).status).toBe('ALLOW');
+
+    const extra = compileDomain({ ...store, zones: [
+      ...store.zones,
+      { zoneId: 'parents-only', name: 'Parents only', kind: 'public', allowRoles: ['inventory_robot'] },
+      { zoneId: 'no-staff', name: 'No staff', kind: 'public', denyRoles: ['staff'] },
+    ] });
+    // restock_robot inherits inventory_robot's actions, not its zone permission.
+    expect(ids(evaluateDomainAction(extra, robot('restock_robot', 'move', 'parents-only', { requestedSpeedMps: 0.5 })))).toEqual(['zone_role_limits']);
+    expect(evaluateDomainAction(extra, robot('inventory_robot', 'move', 'parents-only', { requestedSpeedMps: 0.5 })).status).toBe('ALLOW');
+    expect(ids(evaluateDomainAction(extra, person('staff', 'ai_overlay', 'no-staff')))).toEqual(['zone_role_limits']);
+    expect(evaluateDomainAction(extra, person('shopper', 'ai_overlay', 'no-staff')).status).toBe('ALLOW');
+    expect(renderDomainRules(extra)).toContain('only: inventory_robot');
+    expect(renderDomainRules(extra)).toContain('never: staff');
+
+    const bad = (zone: Record<string, unknown>) => () => compileDomain({ ...store, zones: [...store.zones, { zoneId: 'z', name: 'Z', kind: 'public', ...zone } as any] });
+    expect(bad({ allowRoles: ['ghost'] })).toThrow(/unknown role "ghost"/);
+    expect(bad({ allowRoles: ['staff'], denyRoles: ['staff'] })).toThrow(/both/);
+  });
+});
+
+describe('domain rules: frozen rule sets', () => {
+  it('copies and freezes the input so later mutation cannot change a compiled rule set', () => {
+    const input = JSON.parse(JSON.stringify(store)) as CompileDomainInput;
+    const compiled = compileDomain(input);
+    const before = compiled.fingerprint;
+    input.site.hours.close = '23:59';
+    input.zones[0].kind = 'restricted';
+    input.roles[0].actions.push('manipulate');
+    expect(compiled.site.hours.close).toBe('22:00');
+    expect(compiled.zones[0].kind).toBe('public');
+    expect(compiled.roles[0].actions).not.toContain('manipulate');
+    expect(compiled.fingerprint).toBe(before);
+    expect(verifyFingerprint(compiled)).toBe(true);
+    expect(compileDomain(input).fingerprint).not.toBe(before);
+    expect(Object.isFrozen(compiled)).toBe(true);
+    expect(Object.isFrozen(compiled.site.hours)).toBe(true);
+    expect(Object.isFrozen(compiled.zones[0])).toBe(true);
+    expect(Object.isFrozen(compiled.roles[0].actions)).toBe(true);
+    expect(() => { (compiled as any).policy.maxSpeedMps = 99; }).toThrow();
+  });
+
+  it('verifyFingerprint catches a tampered copy received as JSON', () => {
+    const wire = JSON.parse(JSON.stringify(rules));
+    expect(verifyFingerprint(wire)).toBe(true);
+    wire.policy.maxSpeedMps = 5;
+    expect(verifyFingerprint(wire)).toBe(false);
+    wire.policy.maxSpeedMps = rules.policy.maxSpeedMps;
+    wire.fingerprint = 'abc';
+    expect(verifyFingerprint(wire)).toBe(false);
   });
 });
 

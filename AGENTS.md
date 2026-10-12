@@ -2,11 +2,17 @@
 
 ## What this is
 
-One rule set for a physical site where robots and people wearing smart glasses work together. A site operator answers ten questions and declares zones and roles; `compileDomain()` turns that into a portable JSON rule set; `evaluateDomainAction(ruleSet, request)` answers "may this participant do this action, in this zone, now?" with `ALLOW | LIMIT | PAUSE | BLOCK`, the `ruleId`s that decided it, a full `trace`, and the rule set's `fingerprint`. It is a pure library with no runtime dependencies.
+A small governance core for physical spaces where robots and people wearing smart glasses work together. A site operator answers ten questions and declares zones and roles; `compileDomain()` turns that into a portable, frozen JSON rule set; `evaluateDomainAction(ruleSet, request)` answers "may this participant do this action, in this zone, now?" with `ALLOW | LIMIT | PAUSE | BLOCK`, the `ruleId`s that decided it, a full `trace`, and the rule set's `fingerprint`. It is a pure library with no runtime dependencies.
 
-## The boundary
+> Give us the rules, the proposed action and the required facts. We'll tell you what is permitted, under what constraints, and why.
 
-The spatial system (e.g. posemesh) supplies the facts: which zone a participant is in, how many people are there, whether staff are present, the local time. This package never computes location, never reads a clock, never calls a network, never calls a model. If a fact is not in the request, the evaluator does not guess it.
+## The boundary — who does what
+
+- **The surrounding system** supplies location, identity, observations and verified approvals (which zone, how many people, staff present, local time, emergency, who approved).
+- **This core** checks permissions, returns constraints and explains decisions. An AI may propose an action; the core decides whether it is permitted, with explicit rules only.
+- **The robot controller** enforces.
+
+This package never computes location, verifies identity, reads sensors, reads a clock, calls a network, or calls a model. It trusts the facts it is given. If a required fact is not in the request, or is invalid, the evaluator does not guess it: the decision is `BLOCK` with rule `required_facts`. The one fact with a default is `emergency` (absent = no emergency is active), because a site's emergency signal is an explicit event the surrounding system raises.
 
 ## Files, in read order
 
@@ -25,9 +31,13 @@ The spatial system (e.g. posemesh) supplies the facts: which zone a participant 
 
 Request: `{ participant: { id, kind: 'robot' | 'person', roleId }, action, zoneId, targetRobotId?, facts: { peopleInZone, localTime: 'HH:MM', staffInZone?, requestedSpeedMps?, approvedBy?, emergency? } }`
 
+Required facts: `peopleInZone` (whole number ≥ 0) and `localTime` (`"HH:MM"`). Optional, validated when present: `staffInZone` (whole number ≥ 0, absent = 0), `requestedSpeedMps` (number ≥ 0), `emergency` (boolean, absent = none), `approvedBy` (non-empty string). `participant.kind` must be `'robot' | 'person'`; `zoneId`, `roleId`, `action` non-empty strings.
+
 Decision: `{ status, reasons: [{ ruleId, reason }], limits?: { maxSpeedMps }, then?: 'dock', trace: [...every check...], fingerprint }`
 
 Status is the strictest check: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`.
+
+Check order in `evaluate.ts`: request shape and declared zone/role → required facts → zone role limits → emergency → unknown action or role-permits-action → zone and situation rules (hours, zone kind, people, speed, capture, commands).
 
 ## Invariants — keep every one
 
@@ -37,8 +47,12 @@ Status is the strictest check: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`.
 4. **Every decision cites rules.** Every reason carries a `ruleId` that exists in `ruleSet.rules`. Nothing is blocked or allowed silently.
 5. **Glasses rules only tighten.** `glassesZoneRules()` merges with the base using most-restrictive-wins; it never loosens a stricter base.
 6. **The compiler never invents rules.** Every rule in the output comes from an answer, a declared zone or role, or `SITE_RULES`.
-7. **Bad input throws `DomainRulesError`** with a message that says what to fix.
-8. **The fingerprint identifies; it does not secure.** Do not describe it as a signature.
+7. **Bad operator config throws `DomainRulesError`** (in `compileDomain`) with a message that says what to fix. A bad *request* never throws: `evaluateDomainAction` answers `BLOCK` `required_facts` and says what is missing.
+8. **The fingerprint identifies; it does not secure.** Do not describe it as a signature. `verifyFingerprint` detects change, not tampering by someone who recomputes it.
+9. **Missing facts never mean permission.** A required fact that is absent or invalid is `BLOCK`. Never read `undefined` as "zero people", "no staff", "no approval needed". The only default is `emergency` absent = none.
+10. **Fundamental restrictions apply to every action.** Emergency, hours, zone kind, zone role limits and people rules run for every request, including an approved unknown action. Do not return early before them.
+11. **Rule sets are frozen.** `compileDomain` deep-copies its input and deep-freezes the result. Nothing in the rule set shares a reference with the caller's input.
+12. **Zone role limits are not inherited.** `allowRoles` / `denyRoles` name roles directly; a child role is not covered by its parent's listing.
 
 ## How to extend
 
@@ -51,7 +65,7 @@ Status is the strictest check: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`.
 ```bash
 npm install
 npm run typecheck   # tsc --noEmit
-npm test            # vitest run — 15 tests
+npm test            # vitest run — 20 tests
 npm run build       # tsup → dist/ (esm, cjs, d.ts)
 npm run demo        # tsx examples/demo.ts; add --json to write domain-rules.json
 ```
@@ -60,7 +74,7 @@ Run all four before you say a change is done.
 
 ## Do not build here
 
-- Zone geometry, localization, people counting, or any map. The spatial system owns that.
+- Zone geometry, localization, people counting, identity, sensors, or any map. The surrounding system owns that.
 - A clock, scheduler, or live feed. Facts arrive in the request.
 - An LLM step anywhere in compile or evaluate.
 - Per-zone overrides of the ten answers, signing, or a spatial-system client, unless asked. The README's "Not built" table lists these on purpose.

@@ -24,6 +24,8 @@ import type { ZoneRules } from './zone-rules';
 export const SITE_RULES: CompiledDomainRule[] = [
   { ruleId: 'zone_declared', text: 'Only declared zones are governed; anything in an undeclared zone is blocked.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
   { ruleId: 'role_declared', text: 'Only declared roles may act; unknown roles are blocked.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
+  { ruleId: 'required_facts', text: 'Every fact a decision needs must be supplied and valid.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
+  { ruleId: 'zone_role_limits', text: 'A zone may limit which roles may act in it.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
   { ruleId: 'role_permits_action', text: 'A participant may only take actions its role lists.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
   { ruleId: 'emergency_stop', text: 'During an emergency, robots stop and nobody commands them from glasses.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
   { ruleId: 'zone_speed_cap', text: 'A zone\'s own speed cap applies when it is lower than the site cap.', sourceQuestion: 'site', sourceAnswer: 'fixed' },
@@ -48,8 +50,8 @@ export class DomainRulesError extends Error {
 export function compileDomain(input: CompileDomainInput): DomainRuleSet {
   validateTime(input.site.hours.open, 'site.hours.open');
   validateTime(input.site.hours.close, 'site.hours.close');
-  const zones = validateZones(input.zones);
   const roles = resolveRoles(input.roles);
+  const zones = validateZones(input.zones, new Set(roles.map(r => r.roleId)));
 
   const answers = { ...defaultDomainAnswers() };
   for (const [questionId, value] of Object.entries(input.answers ?? {})) {
@@ -70,8 +72,21 @@ export function compileDomain(input: CompileDomainInput): DomainRuleSet {
   }
   rules.push(...SITE_RULES);
 
-  const body = { format: 'neuroverse-domain-rules/1' as const, site: input.site, zones, roles, answers, policy, rules };
-  return { ...body, fingerprint: fingerprint(body) };
+  // Everything in the rule set is a copy, so editing the input later cannot
+  // change it, and the whole object is frozen so editing it directly throws.
+  const body = { format: 'neuroverse-domain-rules/1' as const, site: clone(input.site), zones, roles, answers, policy, rules: clone(rules) };
+  return deepFreeze({ ...body, fingerprint: fingerprint(body) });
+}
+
+/**
+ * Does the rule set's fingerprint still match its contents? Use it on a rule
+ * set received as JSON before trusting it. It catches accidental change in
+ * transit; it is not a signature (see `fingerprint`).
+ */
+export function verifyFingerprint(ruleSet: DomainRuleSet): boolean {
+  if (!ruleSet || typeof ruleSet !== 'object') return false;
+  const { fingerprint: claimed, ...body } = ruleSet;
+  return typeof claimed === 'string' && fingerprint(body) === claimed;
 }
 
 // ─── Glasses bridge ──────────────────────────────────────────────────────────
@@ -143,7 +158,12 @@ export function renderDomainRules(ruleSet: DomainRuleSet): string {
   lines.push(`Open ${ruleSet.site.hours.open}–${ruleSet.site.hours.close}. Rule set fingerprint \`${ruleSet.fingerprint}\`.`, '');
   lines.push('## Zones', '');
   for (const z of ruleSet.zones) {
-    lines.push(`- **${z.name}** (\`${z.zoneId}\`) — ${z.kind.replace('_', '-')}${z.maxSpeedMps !== undefined ? `, max ${z.maxSpeedMps} m/s` : ''}`);
+    const extras = [
+      z.maxSpeedMps !== undefined ? `max ${z.maxSpeedMps} m/s` : '',
+      z.allowRoles ? `only: ${z.allowRoles.join(', ')}` : '',
+      z.denyRoles ? `never: ${z.denyRoles.join(', ')}` : '',
+    ].filter(Boolean);
+    lines.push(`- **${z.name}** (\`${z.zoneId}\`) — ${z.kind.replace('_', '-')}${extras.length ? `, ${extras.join('; ')}` : ''}`);
   }
   lines.push('', '## Roles', '');
   for (const r of ruleSet.roles) {
@@ -160,19 +180,55 @@ export function renderDomainRules(ruleSet: DomainRuleSet): string {
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export function validateTime(value: string, field: string): void {
-  if (!TIME.test(value)) throw new DomainRulesError(`${field} must be "HH:MM" (24h), got "${value}".`);
+/** Is the value a "HH:MM" 24-hour time string? */
+export function isValidTime(value: unknown): value is string {
+  return typeof value === 'string' && TIME.test(value);
 }
 
-function validateZones(zones: DomainZone[]): DomainZone[] {
+export function validateTime(value: string, field: string): void {
+  if (!isValidTime(value)) throw new DomainRulesError(`${field} must be "HH:MM" (24h), got "${value}".`);
+}
+
+function validateZones(zones: DomainZone[], roleIds: Set<string>): DomainZone[] {
   if (zones.length === 0) throw new DomainRulesError('Declare at least one zone.');
   const seen = new Set<string>();
   for (const z of zones) {
     if (seen.has(z.zoneId)) throw new DomainRulesError(`Zone "${z.zoneId}" is declared twice.`);
     seen.add(z.zoneId);
     if (z.maxSpeedMps !== undefined && !(z.maxSpeedMps >= 0)) throw new DomainRulesError(`Zone "${z.zoneId}" maxSpeedMps must be 0 or more.`);
+    for (const [field, list] of [['allowRoles', z.allowRoles], ['denyRoles', z.denyRoles]] as const) {
+      if (list === undefined) continue;
+      if (!Array.isArray(list)) throw new DomainRulesError(`Zone "${z.zoneId}" ${field} must be a list of role IDs.`);
+      for (const roleId of list) {
+        if (!roleIds.has(roleId)) throw new DomainRulesError(`Zone "${z.zoneId}" ${field} names unknown role "${roleId}". Known: ${[...roleIds].join(', ')}`);
+      }
+    }
+    const both = (z.allowRoles ?? []).filter(r => z.denyRoles?.includes(r));
+    if (both.length) throw new DomainRulesError(`Zone "${z.zoneId}" lists ${both.map(r => `"${r}"`).join(', ')} in both allowRoles and denyRoles.`);
   }
-  return zones.map(z => ({ ...z }));
+  return zones.map(z => clone(z));
+}
+
+// ─── Copying and freezing ────────────────────────────────────────────────────
+
+/** Deep copy of plain data (objects, arrays, primitives). */
+function clone<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(clone) as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = clone(v);
+    return out as T;
+  }
+  return value;
+}
+
+/** Freeze an object and everything inside it. */
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v);
+  }
+  return value;
 }
 
 /** Resolve inheritance so every role carries its full action list. */
@@ -206,7 +262,7 @@ function resolveRoles(roles: DomainRole[]): DomainRole[] {
     return actions;
   };
 
-  return roles.map(r => ({ ...r, actions: resolve(r.roleId, []) }));
+  return roles.map(r => ({ ...clone(r), actions: resolve(r.roleId, []) }));
 }
 
 // ─── Fingerprint ─────────────────────────────────────────────────────────────

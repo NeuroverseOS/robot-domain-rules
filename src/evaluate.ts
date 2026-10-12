@@ -17,9 +17,21 @@
  * `command_robot`, evaluate the glasses wearer's command here, then evaluate
  * the robot's resulting action as its own request — a command never
  * bypasses the robot's rules.
+ *
+ * Order of checks (the first BLOCK ends the trace; otherwise all run):
+ *   1. request shape, declared zone, declared role   (required_facts, zone_declared, role_declared)
+ *   2. the facts the decision needs                  (required_facts)
+ *   3. zone role limits                               (zone_role_limits)
+ *   4. emergency                                      (emergency_stop)
+ *   5. unknown action, or the role lists the action   (unknown_actions, role_permits_action)
+ *   6. zone and situation rules                       (hours, zone kind, people, speed, capture, commands)
+ *
+ * Missing or invalid facts are never permission: they BLOCK with
+ * `required_facts`. Fundamental restrictions (emergency, hours, zone kind,
+ * people) apply to every action, including an approved unknown one.
  */
 
-import { captureLevel, validateTime } from './compile';
+import { captureLevel, isValidTime } from './compile';
 import type {
   DomainCheck,
   DomainDecision,
@@ -35,20 +47,19 @@ const MOVEMENT: readonly string[] = ['move', 'enter_zone', 'dock'] satisfies Rob
 
 export function evaluateDomainAction(ruleSet: DomainRuleSet, request: DomainRequest): DomainDecision {
   const { policy } = ruleSet;
-  const { participant, action, facts } = request;
   const trace: DomainCheck[] = [];
   const check = (ruleId: string, status: DomainDecisionStatus, reason: string) => { trace.push({ ruleId, status, reason }); };
-  const needsApproval = (ruleId: string, what: string) => {
-    if (facts.approvedBy) check(ruleId, 'ALLOW', `${what} — approved by ${facts.approvedBy}.`);
-    else check(ruleId, 'PAUSE', `${what} — needs a person's approval.`);
-  };
   let limits: DomainDecision['limits'];
   let then: DomainDecision['then'];
   const decide = () => finish(trace, ruleSet.fingerprint, limits, then);
 
-  validateTime(facts.localTime, 'facts.localTime');
-
-  // 1. Zone and role must be declared.
+  // 1. The request must have a shape we can govern, and name a declared zone and role.
+  const shape = shapeProblems(request);
+  if (shape.length) {
+    check('required_facts', 'BLOCK', `The request is incomplete: ${shape.join('; ')}.`);
+    return decide();
+  }
+  const { participant, action } = request;
   const zone = ruleSet.zones.find(z => z.zoneId === request.zoneId);
   if (!zone) {
     check('zone_declared', 'BLOCK', `Zone "${request.zoneId}" is not declared for ${ruleSet.site.name}.`);
@@ -60,24 +71,29 @@ export function evaluateDomainAction(ruleSet: DomainRuleSet, request: DomainRequ
     return decide();
   }
 
-  // 2. Actions nobody wrote a rule for.
-  const known = participant.kind === 'robot'
-    ? (ROBOT_ACTIONS as readonly string[]).includes(action)
-    : (GLASSES_ACTIONS as readonly string[]).includes(action);
-  if (!known) {
-    if (policy.unknownActions === 'block') check('unknown_actions', 'BLOCK', `No rule covers "${action}" for a ${participant.kind}.`);
-    else needsApproval('unknown_actions', `No rule covers "${action}" for a ${participant.kind}`);
+  // 2. Every fact the decision needs must be supplied and valid. Missing is never permission.
+  const factProblems = factsProblems(request.facts);
+  if (factProblems.length) {
+    check('required_facts', 'BLOCK', `Facts missing or invalid: ${factProblems.join('; ')}.`);
+    return decide();
+  }
+  const facts = request.facts;
+  const needsApproval = (ruleId: string, what: string) => {
+    if (facts.approvedBy) check(ruleId, 'ALLOW', `${what} — approved by ${facts.approvedBy}.`);
+    else check(ruleId, 'PAUSE', `${what} — needs a person's approval.`);
+  };
+
+  // 3. The zone may limit which roles act in it. A role must be listed itself; inheritance does not count.
+  if (zone.denyRoles?.includes(role.roleId)) {
+    check('zone_role_limits', 'BLOCK', `${role.name} may never act in ${zone.name}.`);
+    return decide();
+  }
+  if (zone.allowRoles && !zone.allowRoles.includes(role.roleId)) {
+    check('zone_role_limits', 'BLOCK', `${zone.name} is limited to: ${zone.allowRoles.join(', ')}. ${role.name} is not listed.`);
     return decide();
   }
 
-  // 3. The role must list the action.
-  if (!(role.actions as string[]).includes(action)) {
-    check('role_permits_action', 'BLOCK', `${role.name} may not ${label(action)}.`);
-    return decide();
-  }
-  check('role_permits_action', 'ALLOW', `${role.name} may ${label(action)}.`);
-
-  // 4. Emergency.
+  // 4. Emergency. Robots stop (dock is the one exception with stop_then_dock); nobody commands robots.
   if (facts.emergency) {
     if (participant.kind === 'robot') {
       if (action === 'dock' && policy.emergency === 'stop_then_dock') {
@@ -93,6 +109,25 @@ export function evaluateDomainAction(ruleSet: DomainRuleSet, request: DomainRequ
     }
   }
 
+  // 5. Actions nobody wrote a rule for, or the role must list the action.
+  const known = participant.kind === 'robot'
+    ? (ROBOT_ACTIONS as readonly string[]).includes(action)
+    : (GLASSES_ACTIONS as readonly string[]).includes(action);
+  if (!known) {
+    if (policy.unknownActions === 'block') {
+      check('unknown_actions', 'BLOCK', `No rule covers "${action}" for a ${participant.kind}.`);
+      return decide();
+    }
+    // An approved unknown action still faces every zone and situation rule below.
+    needsApproval('unknown_actions', `No rule covers "${action}" for a ${participant.kind}`);
+  } else if (!(role.actions as string[]).includes(action)) {
+    check('role_permits_action', 'BLOCK', `${role.name} may not ${label(action)}.`);
+    return decide();
+  } else {
+    check('role_permits_action', 'ALLOW', `${role.name} may ${label(action)}.`);
+  }
+
+  // 6. Zone and situation rules.
   return participant.kind === 'robot' ? robot() : glasses();
 
   function robot(): DomainDecision {
@@ -119,7 +154,8 @@ export function evaluateDomainAction(ruleSet: DomainRuleSet, request: DomainRequ
       if (policy.robotScanNearPeople === 'never') check('robot_scan_near_people', 'BLOCK', `${facts.peopleInZone} people in ${zone!.name}; robots do not scan near people.`);
       else if (policy.robotScanNearPeople === 'pause') check('robot_scan_near_people', 'PAUSE', `${facts.peopleInZone} people in ${zone!.name}; wait until the zone is clear to scan.`);
     }
-    if (people && policy.robotsNearPeople === 'stop' && (MOVEMENT.includes(action) || action === 'manipulate')) {
+    // An unknown robot action counts as handling (like manipulate) for the people rule.
+    if (people && policy.robotsNearPeople === 'stop' && (MOVEMENT.includes(action) || action === 'manipulate' || !known)) {
       check('robots_near_people', 'PAUSE', `${facts.peopleInZone} people in ${zone!.name}; robots stop until they leave.`);
     }
 
@@ -174,6 +210,52 @@ function finish(
     trace,
     fingerprint,
   };
+}
+
+// ─── Required facts ──────────────────────────────────────────────────────────
+
+/** Problems with the request's shape, in plain words. Empty when it is fine. */
+function shapeProblems(request: DomainRequest): string[] {
+  const problems: string[] = [];
+  if (!request || typeof request !== 'object') return ['no request was given'];
+  const p = request.participant;
+  if (!p || typeof p !== 'object') problems.push('participant is missing');
+  else {
+    if (p.kind !== 'robot' && p.kind !== 'person') problems.push(`participant.kind must be "robot" or "person", got ${show(p.kind)}`);
+    if (!nonEmpty(p.roleId)) problems.push('participant.roleId must be a non-empty string');
+  }
+  if (!nonEmpty(request.zoneId)) problems.push('zoneId must be a non-empty string');
+  if (!nonEmpty(request.action)) problems.push('action must be a non-empty string');
+  if (!request.facts || typeof request.facts !== 'object') problems.push('facts are missing');
+  return problems;
+}
+
+/** Problems with the facts, in plain words. Empty when every needed fact is present and valid. */
+function factsProblems(facts: DomainRequest['facts']): string[] {
+  const problems: string[] = [];
+  if (!isCount(facts.peopleInZone)) problems.push(`peopleInZone is required and must be a whole number, 0 or more, got ${show(facts.peopleInZone)}`);
+  if (facts.staffInZone !== undefined && !isCount(facts.staffInZone)) problems.push(`staffInZone must be a whole number, 0 or more, got ${show(facts.staffInZone)}`);
+  if (!isValidTime(facts.localTime)) problems.push(`localTime is required and must be "HH:MM" (24h), got ${show(facts.localTime)}`);
+  if (facts.requestedSpeedMps !== undefined && !(typeof facts.requestedSpeedMps === 'number' && Number.isFinite(facts.requestedSpeedMps) && facts.requestedSpeedMps >= 0)) {
+    problems.push(`requestedSpeedMps must be a number, 0 or more, got ${show(facts.requestedSpeedMps)}`);
+  }
+  if (facts.emergency !== undefined && typeof facts.emergency !== 'boolean') problems.push(`emergency must be true or false when given, got ${show(facts.emergency)}`);
+  if (facts.approvedBy !== undefined && !nonEmpty(facts.approvedBy)) problems.push(`approvedBy must be a non-empty string when given, got ${show(facts.approvedBy)}`);
+  return problems;
+}
+
+function isCount(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0;
+}
+
+function nonEmpty(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0;
+}
+
+function show(v: unknown): string {
+  if (v === undefined) return 'nothing';
+  if (typeof v === 'number' && !Number.isFinite(v)) return String(v);
+  try { return JSON.stringify(v); } catch { return String(v); }
 }
 
 /** Is "HH:MM" within opening hours? Handles overnight hours; open === close means always open. */

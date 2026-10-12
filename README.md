@@ -1,8 +1,20 @@
 # robot-domain-rules
 
-**Rules for robots and people wearing smart glasses in one physical site. Your spatial system says where; this says what's allowed.**
+**A small governance core for physical spaces. Turn operator-defined constraints into a portable rule set, then evaluate proposed actions against trusted facts supplied by your application.**
 
 A site operator answers ten plain questions, declares zones and roles, and gets one rule set. Before every action, a robot (or a person's glasses) asks: *may I do this, here, now?* The answer is `ALLOW`, `LIMIT`, `PAUSE` or `BLOCK`, with the rules that decided it.
+
+An AI can propose an action; the core decides whether it's permitted. The core uses explicit rules only, so the same rules and facts always give the same answer.
+
+> Give us the rules, the proposed action and the required facts. We'll tell you what is permitted, under what constraints, and why.
+
+## Who does what
+
+| Your system | This core | Your robot controller |
+|---|---|---|
+| Supplies location, identity, observations and verified approvals | Checks permissions, returns constraints, explains decisions | Enforces the decision |
+
+The core trusts the facts it is given. It never guesses a fact it wasn't given: a required fact that is missing or invalid gives `BLOCK` (rule `required_facts`), never permission.
 
 ```
 your spatial system (e.g. posemesh)          this package
@@ -15,7 +27,7 @@ what time is it?       → "14:05"         ─┘        │
                                          robots_near_people: "2 people in Aisle 3…"
 ```
 
-**Location is not this package's job.** Your spatial system decides which zone each participant is in and how many people are there, and passes that in. This package only decides what is allowed there. It never guesses a fact it wasn't given.
+**Location is not this package's job.** Your spatial system decides which zone each participant is in and how many people are there, and passes that in. This package only decides what is allowed there.
 
 ## Run it (one minute)
 
@@ -24,7 +36,7 @@ git clone https://github.com/NeuroverseOS/robot-domain-rules
 cd robot-domain-rules
 npm install
 npm run demo      # prints the rules, then a day of decisions
-npm test          # 15 tests
+npm test          # 20 tests
 ```
 
 ## Use it
@@ -37,7 +49,8 @@ npm install @neuroverseos/robot-domain-rules
 import { compileDomain, evaluateDomainAction } from '@neuroverseos/robot-domain-rules';
 
 const rules = compileDomain(store);                 // store = { site, zones, roles, answers } — see examples/store.ts
-// rules is plain JSON: save it, version it, send it to every robot and pair of glasses.
+// rules is plain JSON, frozen: save it, version it, send it to every robot and pair of glasses.
+// On the receiving side: verifyFingerprint(JSON.parse(text)) === true before trusting it.
 
 const decision = evaluateDomainAction(rules, {
   participant: { id: 'robot-7', kind: 'robot', roleId: 'inventory_robot' },
@@ -58,8 +71,8 @@ No runtime dependencies. ESM and CommonJS, with types.
 
 | File | What it is |
 |---|---|
-| [`examples/store.ts`](examples/store.ts) | A complete example site: 6 zones, 3 robot roles, 2 person roles, all 10 answers. Copy it to start. |
-| [`examples/demo.ts`](examples/demo.ts) | Compiles the store and runs 17 requests through a day: people arriving, a restricted room, a fire alarm, after hours. |
+| [`examples/store.ts`](examples/store.ts) | A complete example site: 7 zones, 3 robot roles, 2 person roles, all 10 answers. Copy it to start. |
+| [`examples/demo.ts`](examples/demo.ts) | Compiles the store and runs 19 requests through a day: people arriving, a restricted room, a role-limited restroom, a fire alarm, after hours. |
 | [`src/types.ts`](src/types.ts) | Every type: zones, roles, actions, the request and the decision. Read this first. |
 | [`src/questions.ts`](src/questions.ts) | The 10 questions, their answers, and the rule each answer produces. |
 | [`src/compile.ts`](src/compile.ts) | Answers + zones + roles → rule set. Validation, inheritance, fingerprint, glasses bridge. |
@@ -75,9 +88,22 @@ No runtime dependencies. ESM and CommonJS, with types.
 |---|---|
 | `enter_zone`, `move`, `manipulate`, `scan`, `dock` | `camera_capture`, `record_audio`, `ai_overlay`, `share_location`, `command_robot` |
 
-**Zones** have a kind: `public`, `staff_only`, `restricted` or `dock`, and an optional speed cap. Use the zone IDs your spatial system reports.
+**Zones** have a kind: `public`, `staff_only`, `restricted` or `dock`, an optional speed cap, and optional role limits: `allowRoles` (only these role IDs may act here) and `denyRoles` (these never may). A role must be listed itself: inheriting a listed role's actions does not pass its zone permission. Use the zone IDs your spatial system reports.
 
-**Roles** list the actions they may take. A role can inherit another role of the same kind (inheritance only adds). Person roles can be `isStaff`; robot roles can be `afterHours`.
+**Roles** list the actions they may take. A role can inherit another role of the same kind (inheritance only adds actions, never zone permission). Person roles can be `isStaff`; robot roles can be `afterHours`.
+
+**Facts** come with every request. The core trusts them and never fills one in.
+
+| Fact | Required? | Valid when | If absent |
+|---|---|---|---|
+| `peopleInZone` | yes | whole number, 0 or more | `BLOCK` `required_facts` |
+| `localTime` | yes | `"HH:MM"` 24h | `BLOCK` `required_facts` |
+| `staffInZone` | no | whole number, 0 or more | treated as 0 (conservative) |
+| `requestedSpeedMps` | no | number, 0 or more | the decision carries the cap |
+| `emergency` | no | `true` or `false` | no emergency is active — the one fact with a default, because a site's emergency signal is an explicit event your system raises |
+| `approvedBy` | no | non-empty string | no approval |
+
+An invalid value (a negative count, `"2"`, `NaN`, `"9:00"`) is `BLOCK` `required_facts` with a reason naming the fact. The core never crashes on a bad request; only bad operator config (`compileDomain`) throws.
 
 **The ten questions** (safe default first):
 
@@ -101,7 +127,11 @@ No runtime dependencies. ESM and CommonJS, with types.
 - `LIMIT` carries `limits.maxSpeedMps`: the lowest of the site cap, the zone cap and the near-people cap.
 - In an emergency every robot action is `BLOCK`. With `stop_then_dock`, `dock` is the one thing allowed, and blocked moves carry `then: 'dock'`.
 
-**Fail closed.** An undeclared zone, an undeclared role, an action the role doesn't list, or an action no rule covers is blocked (or paused, if you answered `unknown_actions: pause`). Bad input to the compiler throws a `DomainRulesError` that says what to fix.
+**Fail closed.** A missing or invalid required fact, an undeclared zone, an undeclared role, a role the zone doesn't admit, an action the role doesn't list, or an action no rule covers is blocked (or paused, if you answered `unknown_actions: pause`). Bad input to the compiler throws a `DomainRulesError` that says what to fix.
+
+**Fundamental restrictions apply to every action.** Emergency, opening hours, zone kind, zone role limits and people-present rules run for every request, including an approved unknown action. Approval answers the `unknown_actions` question only; it never lifts an emergency stop or an after-hours block.
+
+**Rule sets are frozen.** `compileDomain` returns a deep copy, deep-frozen, so changing the input afterwards changes nothing and changing the rule set throws. `verifyFingerprint(ruleSet)` recomputes the fingerprint of a copy you received as JSON and tells you whether it still matches.
 
 ## Glasses enforce the same rules on-device
 
@@ -119,10 +149,12 @@ The output has the same shape as `ZoneRules` in [`@neuroverseos/governance/spati
 
 | Works today, tested | Not built |
 |---|---|
-| Compile, validate, inherit roles, fingerprint | Zone geometry (your spatial system owns this) |
+| Compile, validate, inherit roles, fingerprint, frozen rule sets, `verifyFingerprint` | Zone geometry (your spatial system owns this) |
 | Robot rules: zones, people, speed, hours, scanning, emergency | Signing a rule set (sign the JSON with your own key; the fingerprint only identifies it) |
 | Glasses rules: capture, robot commands, role limits | Per-zone overrides of the ten answers (one answer set per site today) |
-| Same input → same output; no clock, network or LLM | Live connection to any spatial system — you pass the facts in |
+| Per-zone role limits (`allowRoles`, `denyRoles`) | Live connection to any spatial system — you pass the facts in |
+| Required facts: missing or invalid is `BLOCK`, never permission | Location verification, identity, sensors — your system supplies these |
+| Same input → same output; no clock, network or LLM | |
 
 The fingerprint is a deterministic hash for citing which rule set decided. It is not a security signature.
 

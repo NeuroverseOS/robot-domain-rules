@@ -28,6 +28,8 @@ export {
   OPEN_ZONE_RULES,
   renderDomainRules,
   fingerprint,
+  verifyFingerprint,
+  isValidTime,
   DomainRulesError,
   SITE_RULES,
 } from './compile';
