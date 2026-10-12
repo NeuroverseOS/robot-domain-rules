@@ -11,11 +11,11 @@
  */
 
 import type {
-  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, FactDef, LimitDef, RoleDef, Rule, Rulebook, SiteDef, TrustedKey,
+  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, Effect, FactDef, LimitDef, PlanRule, RoleDef, Rule, Rulebook, SiteDef, TrustedKey,
 } from './types';
 import { isHexBytes } from './approvals';
 import {
-  DomainRulesError, authorityRank, constraintOn, isEmpty, isValidTime, validateCondition,
+  DomainRulesError, authorityRank, constraintOn, factProblem, isEmpty, isValidTime, validateCondition, validateHistoryCondition,
   validateFactDef, validateSelector, vocabularyOf, type Vocabulary,
 } from './vocabulary';
 import { checkRulebook } from './check';
@@ -43,6 +43,8 @@ export interface CompileDomainInput {
   answers?: Record<string, string>;
   /** Rules written or confirmed by the operator. Each must say who set it. */
   rules?: Rule[];
+  /** Rules about whole plans (checked by `evaluatePlan`). Each must say who set it. */
+  planRules?: PlanRule[];
   otherwise?: 'deny' | 'wait-for-approval';
   /** Keys whose signed approvals count. Declaring any means plain approvals no longer clear a wait. */
   trustedKeys?: TrustedKey[];
@@ -103,6 +105,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
   for (const a of actions) for (const req of a.requires ?? []) {
     if (!facts.some(f => f.id === req)) throw new DomainRulesError(`Action "${a.id}" requires unknown fact "${req}".`);
   }
+  for (const a of actions) if (a.effects !== undefined) validateEffects(a.id, a.effects, facts);
 
   const roles = resolveRoles(input.roles ?? [], actions, kinds);
   const areas = validateAreas(input.areas ?? [], new Set(roles.map(r => r.id)));
@@ -159,7 +162,64 @@ export function assemble(input: CompileDomainInput): RulebookBody {
     seen.add(r.id);
   }
   partial.rules = rules;
+  if (input.planRules !== undefined) {
+    if (!Array.isArray(input.planRules)) throw new DomainRulesError('planRules must be a list of plan rules.');
+    const planRules: PlanRule[] = [];
+    for (const r of input.planRules) {
+      if (!r || typeof r !== 'object') throw new DomainRulesError('Each plan rule must be an object { id, text, who, check, setBy }.');
+      const pr = { ...clone(r), source: r.source ?? { kind: 'manual' as const, ref: r.id } };
+      validatePlanRule(pr, vocab);
+      if (seen.has(pr.id)) throw new DomainRulesError(`Rule "${pr.id}" is declared twice.`);
+      seen.add(pr.id);
+      planRules.push(pr);
+    }
+    if (planRules.length) partial.planRules = planRules;
+  }
   return partial;
+}
+
+/** Effects name declared facts and fit their types; `move` names no fact. */
+function validateEffects(actionId: string, effects: Effect[], facts: FactDef[]): void {
+  if (!Array.isArray(effects)) throw new DomainRulesError(`Action "${actionId}": effects must be a list.`);
+  for (const e of effects) {
+    const where = `Action "${actionId}" effect`;
+    if (!e || typeof e !== 'object') throw new DomainRulesError(`${where}: each effect is { op: set|add|subtract, fact, value } or { op: move }.`);
+    if (e.op === 'move') { if (Object.keys(e).length !== 1) throw new DomainRulesError(`${where}: move takes no other fields.`); continue; }
+    if (e.op !== 'set' && e.op !== 'add' && e.op !== 'subtract') throw new DomainRulesError(`${where}: op must be set, add, subtract or move, got ${JSON.stringify((e as { op?: unknown }).op)}.`);
+    const def = facts.find(f => f.id === e.fact);
+    if (!def) throw new DomainRulesError(`${where}: names unknown fact "${String(e.fact)}". Known: ${facts.map(f => f.id).join(', ') || 'none'}.`);
+    if (e.op === 'set') { const p = factProblem(def, e.value); if (p) throw new DomainRulesError(`${where}: set value invalid: ${p}.`); continue; }
+    if (def.type !== 'number') throw new DomainRulesError(`${where}: ${e.op} applies to number facts; "${def.id}" is a ${def.type}.`);
+    if (typeof e.value !== 'number' || !Number.isFinite(e.value)) throw new DomainRulesError(`${where}: ${e.op} needs a finite number.`);
+    if (def.integer && !Number.isInteger(e.value)) throw new DomainRulesError(`${where}: "${def.id}" is a whole number; ${e.op} ${e.value} would make it a fraction.`);
+  }
+}
+
+/** Throws a DomainRulesError naming anything in the plan rule the site did not declare. */
+export function validatePlanRule(r: PlanRule, vocab: Vocabulary): void {
+  if (typeof r.id !== 'string' || r.id.length === 0) throw new DomainRulesError('A plan rule needs a non-empty id.');
+  const where = `Plan rule "${r.id}"`;
+  if (typeof r.text !== 'string' || r.text.length === 0) throw new DomainRulesError(`${where}: text (the rule in plain words) is required.`);
+  if (typeof r.setBy !== 'string' || r.setBy.length === 0) throw new DomainRulesError(`${where}: setBy is required — say which authority set this rule. Known: ${vocab.authorities.map(a => a.id).join(', ')}.`);
+  if (authorityRank(vocab, r.setBy) < 0) throw new DomainRulesError(`${where}: setBy names unknown authority "${r.setBy}". Known: ${vocab.authorities.map(a => a.id).join(', ')}.`);
+  validateSelector(r.who, 'who', vocab, where);
+  const c = r.check;
+  if (!c || typeof c !== 'object') throw new DomainRulesError(`${where}: check is required (ends_in, ends_with, before or at_most).`);
+  switch (c.kind) {
+    case 'ends_in': validateSelector(c.areas, 'where', vocab, `${where} ends_in`); break;
+    case 'ends_with': validateSelector(c.actions, 'does', vocab, `${where} ends_with`); break;
+    case 'before':
+      validateSelector(c.first, 'does', vocab, `${where} before.first`);
+      validateSelector(c.then, 'does', vocab, `${where} before.then`);
+      if (c.sameArea !== undefined && typeof c.sameArea !== 'boolean') throw new DomainRulesError(`${where}: before.sameArea must be true or false.`);
+      break;
+    case 'at_most':
+      validateSelector(c.actions, 'does', vocab, `${where} at_most`);
+      if (typeof c.count !== 'number' || !Number.isInteger(c.count) || c.count < 0) throw new DomainRulesError(`${where}: at_most.count must be a whole number, 0 or more.`);
+      break;
+    default: throw new DomainRulesError(`${where}: check.kind must be ends_in, ends_with, before or at_most, got ${JSON.stringify((c as { kind?: unknown }).kind)}.`);
+  }
+  if (!r.source || typeof r.source !== 'object' || !r.source.kind) throw new DomainRulesError(`${where}: source { kind, ref } is required.`);
 }
 
 /** Throws a DomainRulesError naming anything in the rule the site did not declare, or any impossible condition. */
@@ -179,6 +239,10 @@ export function validateRule(r: Rule, vocab: Vocabulary): void {
       // Conditions on one fact must leave something possible.
       if (isEmpty(constraintOn(r.when, factId, vocab))) throw new DomainRulesError(`${where}: its conditions on "${factId}" can never all be true at once.`);
     }
+  }
+  if (r.history !== undefined) {
+    if (!Array.isArray(r.history)) throw new DomainRulesError(`${where}: history must be a list of history conditions.`);
+    for (const h of r.history) validateHistoryCondition(h, vocab, where);
   }
   const t = r.then;
   if (!t || typeof t !== 'object') throw new DomainRulesError(`${where}: then is required (allow, limit, wait or deny).`);
@@ -228,11 +292,19 @@ export function validateRulebook(rulebook: unknown): string[] {
       roles: (rb.roles ?? []).map(r => ({ ...r, inherits: undefined })), otherwise: rb.otherwise, trustedKeys: rb.trustedKeys, rules: [],
     });
     const vocab = vocabularyOf(body);
+    const seen = new Set<string>();
     if (!Array.isArray(rb.rules)) problems.push('rules must be a list');
     else {
-      const seen = new Set<string>();
       for (const r of rb.rules) {
         try { validateRule(r, vocab); } catch (e) { problems.push(e instanceof Error ? e.message : String(e)); continue; }
+        if (seen.has(r.id)) problems.push(`Rule "${r.id}" is declared twice.`);
+        seen.add(r.id);
+      }
+    }
+    if (rb.planRules !== undefined) {
+      if (!Array.isArray(rb.planRules) || rb.planRules.length === 0) problems.push('planRules, when present, must be a non-empty list');
+      else for (const r of rb.planRules) {
+        try { validatePlanRule(r, vocab); } catch (e) { problems.push(e instanceof Error ? e.message : String(e)); continue; }
         if (seen.has(r.id)) problems.push(`Rule "${r.id}" is declared twice.`);
         seen.add(r.id);
       }

@@ -23,10 +23,10 @@ export const WAREHOUSE: Template = {
     { id: 'staff', name: 'Staff' },
   ],
   actions: [
-    { id: 'enter', name: 'enter an area', kinds: ['robot', 'person'], tags: ['movement'], synonyms: ['enter', 'go into', 'drive into'] },
+    { id: 'enter', name: 'enter an area', kinds: ['robot', 'person'], tags: ['movement'], synonyms: ['enter', 'go into', 'drive into'], effects: [{ op: 'move' }] },
     { id: 'move', name: 'move', kinds: ['robot'], tags: ['movement'], synonyms: ['drive', 'travel'] },
     { id: 'lift', name: 'lift a load', kinds: ['robot'], tags: ['handling'], synonyms: ['lift', 'carry', 'raise'] },
-    { id: 'dock', name: 'dock', kinds: ['robot'], tags: ['movement'], synonyms: ['dock', 'charge'] },
+    { id: 'dock', name: 'dock', kinds: ['robot'], tags: ['movement'], synonyms: ['dock', 'charge'], effects: [{ op: 'move' }] },
     { id: 'pick', name: 'pick an order', kinds: ['person'], synonyms: ['pick', 'pick orders'] },
     { id: 'camera_capture', name: 'take photos or video', kinds: ['person'], tags: ['capture'], synonyms: ['take photos', 'photograph', 'film', 'record video'] },
     { id: 'command_robot', name: 'command robots', kinds: ['person'], requires: ['targetRobotId'], synonyms: ['command robots', 'control robots'] },

@@ -43,9 +43,34 @@ export interface ActionDef {
   tags?: string[];
   /** Facts that must be present when this action is requested (on top of the always-required facts). */
   requires?: string[];
+  /**
+   * What this action does to the declared facts, as far as the rulebook is
+   * told. Used only when a whole plan is checked (`evaluatePlan`): each step
+   * is evaluated against the facts projected by applying the earlier steps'
+   * effects. Effects touch declared facts only; the single-action decision
+   * never applies them.
+   */
+  effects?: Effect[];
   /** Other words people use for it; used only by plain-text drafting. */
   synonyms?: string[];
 }
+
+/**
+ * One effect of an action on the projected facts of a plan:
+ *   set       — the fact becomes `value` (any declared type)
+ *   add       — a number fact goes up by `value`
+ *   subtract  — a number fact goes down by `value`
+ *   move      — after this step the participant is in the step's area
+ *               (the next step's area defaults to it)
+ * A projected value outside the fact's declared range is not clamped: the
+ * next step is BLOCK `required_facts`, which says the plan as described
+ * cannot be carried out.
+ */
+export type Effect =
+  | { op: 'set'; fact: string; value: FactValue }
+  | { op: 'add'; fact: string; value: number }
+  | { op: 'subtract'; fact: string; value: number }
+  | { op: 'move' };
 
 /** A place the spatial system can report. */
 export interface AreaDef {
@@ -166,6 +191,38 @@ export type Condition =
   /** Day set on a `day` fact. */
   | { fact: string; op: 'days'; days: Day[] };
 
+/**
+ * A condition over the participant's recent history, supplied by the caller
+ * (`request.history`). The count of entries whose action is in `actions`
+ * (and whose area is in `areas`, or is the request's own area when
+ * `sameArea`), within the last `withinMinutes` of the `clock` fact when a
+ * window is given, is compared with `value`. The core keeps no history and
+ * no clock: without `request.history` a rule that needs it is BLOCK
+ * `required_facts`.
+ */
+export interface HistoryCondition {
+  actions: Selector;
+  /** Only entries in these areas count. Default: any area. */
+  areas?: Selector;
+  /** Only entries in the request's own area count. */
+  sameArea?: boolean;
+  /** Only entries at most this many minutes before the `clock` fact count (minute-of-day arithmetic, wrapping at midnight). */
+  withinMinutes?: number;
+  /** The declared time fact that is "now" for the window. Required with `withinMinutes`. */
+  clock?: string;
+  op: CompareOp;
+  /** A whole number, 0 or more. */
+  value: number;
+}
+
+/** One thing the participant already did, as the caller reports it. */
+export interface HistoryEntry {
+  action: string;
+  areaId: string;
+  /** "HH:MM" local time. Required by rules that use a window. */
+  at?: string;
+}
+
 /** What a rule says when it matches. */
 export type Outcome =
   | { answer: 'allow' }
@@ -201,6 +258,8 @@ export interface Rule {
   where: Selector;
   /** Conditions over facts, AND-ed. Empty or absent = always. */
   when?: Condition[];
+  /** Conditions over the participant's recent history, AND-ed with `when`. */
+  history?: HistoryCondition[];
   then: Outcome;
   /** Plain-English reason shown in decisions. Defaults to `text`. */
   reason?: string;
@@ -209,6 +268,102 @@ export interface Rule {
   setBy: string;
   /** An invariant: checked first, nothing overrides it. Must have `then.answer === 'deny'`. */
   never?: boolean;
+}
+
+// ─── Plan rules: what a whole plan must look like ────────────────────────────
+
+/**
+ * A rule about the shape of a whole plan rather than one step. Checked only
+ * by `evaluatePlan`. A plan rule can only reject (deny): it carries the
+ * authority that set it like any rule, and is cited by ID in the result.
+ *
+ *   ends_in    the plan's last step must leave the participant in `areas`
+ *   ends_with  the plan's last action must be in `actions`
+ *   before     every step whose action is in `then` must be preceded (earlier
+ *              in the plan, or in the supplied history) by a step whose
+ *              action is in `first` — in the same area when `sameArea`
+ *   at_most    at most `count` steps whose action is in `actions`
+ */
+export type PlanCheck =
+  | { kind: 'ends_in'; areas: Selector }
+  | { kind: 'ends_with'; actions: Selector }
+  | { kind: 'before'; first: Selector; then: Selector; sameArea?: boolean }
+  | { kind: 'at_most'; actions: Selector; count: number };
+
+export interface PlanRule {
+  id: string;
+  text: string;
+  /** Which roles the plan rule binds. */
+  who: Selector;
+  check: PlanCheck;
+  reason?: string;
+  setBy: string;
+  source: RuleSource;
+}
+
+/** One step of a plan an agent proposes. */
+export interface PlanStep {
+  action: string;
+  /** The area of the step. Defaults to where the previous step left the participant. The first step must say. */
+  area?: string;
+  /** Facts the planner expects at this step (people counts, an approval), laid over the projected facts. */
+  facts?: Record<string, unknown>;
+  /** Free-form, carried into the result for the planner's own use. */
+  note?: string;
+}
+
+/** A whole plan: who, the steps in order, and the facts before the first step. */
+export interface Plan {
+  participant: { id: string; kind: string; roleId: string };
+  steps: PlanStep[];
+  initialFacts: Record<string, unknown>;
+  /** What the participant did before the plan starts. Seeds the history each step sees. */
+  history?: HistoryEntry[];
+  /** The declared time fact that advances as the plan runs. */
+  clock?: string;
+  /** "HH:MM" at the first step. With `clock` and `stepDurationSeconds`, later steps advance. */
+  startTime?: string;
+  stepDurationSeconds?: number;
+}
+
+export interface PlanStepResult {
+  index: number;
+  action: string;
+  areaId: string;
+  /** The facts this step was decided on: initial facts, projected effects, the step's own facts. */
+  facts: Record<string, unknown>;
+  decision: DomainDecision;
+  note?: string;
+}
+
+export interface PlanEvaluation {
+  /** The strictest status across the plan checks and the evaluated steps. */
+  status: DomainDecisionStatus;
+  /** Steps in order, up to and including the first BLOCK (nothing is projected past a refusal). */
+  steps: PlanStepResult[];
+  /** Every plan rule that applies, with its verdict. */
+  planChecks: PlanRuleCheck[];
+  /** The first BLOCK, by step. Absent when nothing blocks. */
+  firstViolation?: { stepIndex: number; ruleId: string; reason: string; setBy: string; from: 'step' | 'plan' };
+  /** Every approval a PAUSE step would need, so a planner can collect them up front. */
+  approvalRequests: ApprovalRequest[];
+  /** The projected facts after the last evaluated step. */
+  finalFacts: Record<string, unknown>;
+  /** Where the participant is after the last evaluated step. */
+  finalArea: string;
+  /** `fingerprint(plan)`: identifies the plan as described. */
+  planDigest: string;
+  /** The rulebook that decided. */
+  fingerprint: string;
+}
+
+/** A plan rule's verdict on a plan. `stepIndex` is the step where it was violated, when that is meaningful. */
+export interface PlanRuleCheck {
+  ruleId: string;
+  status: 'ALLOW' | 'BLOCK';
+  reason: string;
+  setBy: string;
+  stepIndex?: number;
 }
 
 // ─── Findings: rules at odds ─────────────────────────────────────────────────
@@ -227,13 +382,23 @@ export interface Finding {
   severity: 'conflict' | 'warning' | 'info';
   ruleIds: string[];
   /**
-   * 'certain': any request matching one rule matches the other (or both are unconditional).
-   * 'possible': both conditions can hold at once on paper; whether they ever do depends on
-   *             facts the rulebook does not control.
+   * 'certain': the analysis is exact and `witness` is a real request that matches both rules.
+   * 'possible': the overlap could not be decided exactly (one of the rules has history
+   *             conditions, which depend on what the caller supplies); no witness is given.
    * Rules that provably never match the same request produce no finding.
    */
   certainty: 'certain' | 'possible';
+  /** A concrete request that matches both rules. Present on every 'certain' finding between rules; a finding between two plan rules has none (it compares checks, not requests). */
+  witness?: Witness;
   message: string;
+}
+
+/** A request that triggers both rules of a finding. Facts the rules do not mention are at a valid sample value. */
+export interface Witness {
+  participant: { id: string; kind: string; roleId: string };
+  action: string;
+  areaId: string;
+  facts: Record<string, FactValue>;
 }
 
 // ─── The rulebook ────────────────────────────────────────────────────────────
@@ -280,6 +445,8 @@ export interface Rulebook {
   trustedKeys?: TrustedKey[];
   /** Every rule, never rules included (flagged `never: true`). */
   rules: Rule[];
+  /** Rules about whole plans (`evaluatePlan`). Omitted when there are none. */
+  planRules?: PlanRule[];
   builtin: BuiltinCheck[];
   /** What the conflict check found. Compile never hides these. */
   findings: Finding[];
@@ -374,6 +541,12 @@ export interface DomainRequest {
    * and never permission.
    */
   facts: Record<string, unknown>;
+  /**
+   * What this participant did recently, as the caller reports it. Needed only
+   * by rules with `history` conditions; a rule that needs it and does not get
+   * it is BLOCK `required_facts`.
+   */
+  history?: HistoryEntry[];
 }
 
 /**

@@ -33,7 +33,7 @@ export const builder = new DomainRulesBuilder({
   .area({ id: 'dock-a', name: 'Charging dock A', tags: ['dock'] })
 
   .role({ id: 'inventory_robot', name: 'Inventory robot', kind: 'robot', actions: ['enter_zone', 'move', 'scan', 'dock'] })
-  .role({ id: 'restock_robot', name: 'Restock robot', kind: 'robot', inherits: 'inventory_robot', actions: ['manipulate'] })
+  .role({ id: 'restock_robot', name: 'Restock robot', kind: 'robot', inherits: 'inventory_robot', actions: ['manipulate', 'place'] })
   .role({ id: 'cleaning_robot', name: 'Cleaning robot', kind: 'robot', actions: ['enter_zone', 'move', 'dock'], tags: ['after-hours'] })
   .role({ id: 'shopper', name: 'Shopper', kind: 'person', actions: ['ai_overlay', 'camera_capture', 'record_audio'] })
   .role({ id: 'staff', name: 'Staff', kind: 'person', inherits: 'shopper', actions: ['share_location', 'command_robot'], tags: ['staff'] })
@@ -69,6 +69,21 @@ builder.addRule({
   who: 'staff', does: 'record_audio', where: 'back-room',
   then: { answer: 'allow' },
 });
+
+// Rules a planner meets when it proposes a whole plan (evaluatePlan). The
+// template's actions declare their effects — manipulate sets `carrying`,
+// place clears it, enter_zone and dock move the robot — so a plan is checked
+// step by step on the facts the earlier steps leave behind.
+builder.addRule({
+  id: 'no_carrying_through_checkout',
+  text: 'Robots carrying stock do not enter the checkout.',
+  who: 'kind:robot', does: 'enter_zone', where: 'checkout',
+  when: [{ fact: 'carrying', op: '==', value: true }],
+  then: { answer: 'deny', instead: 'place' },
+  reason: 'Robots carrying stock do not enter the checkout; put it down first.',
+});
+builder.addPlanRule({ id: 'scan_before_restock', text: 'A robot scans a shelf before it restocks it.', who: 'kind:robot', check: { kind: 'before', first: 'scan', then: 'manipulate', sameArea: true }, reason: 'Scan the shelf before restocking it, so the plan works from what is actually there.' });
+builder.addPlanRule({ id: 'end_at_dock', text: 'Every robot plan ends at a charging dock.', who: 'kind:robot', check: { kind: 'ends_in', areas: 'tag:dock' }, reason: 'Every plan ends at a charging dock.' });
 
 export const rulebook = builder.compile();
 

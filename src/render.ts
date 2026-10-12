@@ -4,7 +4,7 @@
  */
 
 import type { FactDef, Rule, Rulebook, Selector } from './types';
-import { describeCondition, selectorEntries, vocabularyOf, type Vocabulary } from './vocabulary';
+import { describeCondition, describeHistoryCondition, selectorEntries, vocabularyOf, type Vocabulary } from './vocabulary';
 import { say } from './check';
 
 export function renderDomainRules(rb: Rulebook): string {
@@ -40,7 +40,10 @@ export function renderDomainRules(rb: Rulebook): string {
   }
 
   L.push('', '## Actions', '');
-  for (const a of rb.actions) L.push(`- \`${a.id}\` — ${a.name ?? a.id.replace(/_/g, ' ')} (${a.kinds.join(', ')}${a.tags?.length ? `; ${a.tags.join(', ')}` : ''}${a.requires?.length ? `; needs ${a.requires.join(', ')}` : ''})`);
+  for (const a of rb.actions) {
+    const effects = (a.effects ?? []).map(e => e.op === 'move' ? 'moves the participant to the step\'s area' : e.op === 'set' ? `${e.fact} := ${JSON.stringify(e.value)}` : `${e.fact} ${e.op === 'add' ? '+' : '-'}= ${e.value}`);
+    L.push(`- \`${a.id}\` — ${a.name ?? a.id.replace(/_/g, ' ')} (${a.kinds.join(', ')}${a.tags?.length ? `; ${a.tags.join(', ')}` : ''}${a.requires?.length ? `; needs ${a.requires.join(', ')}` : ''})${effects.length ? ` — in a plan: ${effects.join(', ')}` : ''}`);
+  }
 
   L.push('', '## Facts every request brings', '');
   for (const f of rb.facts) L.push(`- \`${f.id}\` — ${describeFact(f)}${f.description ? `. ${f.description}` : ''}`);
@@ -60,6 +63,11 @@ export function renderDomainRules(rb: Rulebook): string {
   if (!rules.length) L.push('- none');
   for (const r of rules) L.push(renderRule(r, vocab));
 
+  if (rb.planRules?.length) {
+    L.push('', '## Plan rules (checked on a whole plan)', '');
+    for (const r of rb.planRules) L.push(`- \`${r.id}\` — ${describeSelector(r.who, 'who', vocab)} · ${describePlanCheck(r)}  \n  ${r.text} _(set by ${r.setBy}; ${r.source.kind})_`);
+  }
+
   L.push('', '## Always checked', '');
   for (const b of rb.builtin) L.push(`- \`${b.id}\` — ${b.text}`);
 
@@ -70,8 +78,20 @@ export function renderDomainRules(rb: Rulebook): string {
   return L.join('\n');
 }
 
+export function describePlanCheck(r: Rule | { check: NonNullable<Rulebook['planRules']>[number]['check'] }): string {
+  const c = (r as { check: NonNullable<Rulebook['planRules']>[number]['check'] }).check;
+  const sel = (s: Selector) => (Array.isArray(s) ? s.join('/') : s);
+  switch (c.kind) {
+    case 'ends_in': return `the plan ends in ${sel(c.areas)}`;
+    case 'ends_with': return `the plan ends with ${sel(c.actions)}`;
+    case 'before': return `${sel(c.first)} before every ${sel(c.then)}${c.sameArea ? ' in the same area' : ''}`;
+    case 'at_most': return `at most ${c.count} × ${sel(c.actions)}`;
+  }
+}
+
 export function renderRule(r: Rule, vocab: Vocabulary): string {
-  const when = r.when?.length ? r.when.map(describeCondition).join(' and ') : 'always';
+  const conds = [...(r.when ?? []).map(describeCondition), ...(r.history ?? []).map(describeHistoryCondition)];
+  const when = conds.length ? conds.join(' and ') : 'always';
   const answer = say(r) + (r.then.answer === 'deny' && r.then.instead ? `, then ${r.then.instead}` : '');
   const from = r.source.kind === 'question' ? `question ${r.source.ref}` : r.source.kind === 'template' ? `template ${r.source.ref}` : r.source.kind === 'text' ? `written as "${r.source.ref}"` : r.source.kind === 'declaration' ? `declared (${r.source.ref})` : r.source.kind;
   return `- \`${r.id}\` — ${describeSelector(r.who, 'who', vocab)} · ${describeSelector(r.does, 'does', vocab)} · ${describeSelector(r.where, 'where', vocab)} · ${when} → **${answer}**  \n  ${r.text} _(set by ${r.setBy}; ${from})_`;

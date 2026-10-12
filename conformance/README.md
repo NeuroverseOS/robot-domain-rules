@@ -13,6 +13,8 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | `p7-conflicts.json` | Every finding kind, certainty, and provable disjointness |
 | `p8-one-law.json` | Robots, people and agents through one path; selectors; area role limits |
 | `p9-boundary.json` | Facts are trusted; time is a fact; a limit is a ceiling |
+| `plans.json` | Whole plans: effects projected step by step, the first BLOCK, plan rules, approvals collected, malformed plans, effect and plan-rule validation |
+| `history.json` | History conditions: counts in a window of a clock fact, same-area, missing history is a refusal, validation |
 | `fingerprint.json` | Canonical JSON and the FNV-1a fingerprint, byte for byte; `requestDigest` |
 | `approvals.json` | Ed25519 test vectors (TEST ONLY keys), verification, binding, rulebook signatures |
 
@@ -34,7 +36,8 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | Expectation | Inputs | Your implementation must |
 |---|---|---|
 | `decision` | `rulebook`, `request` | `evaluate(rulebook, request)` and match as below |
-| `findings` | `rulebook` | `check(rulebook)` and report exactly these findings, in any order |
+| `plan` | `rulebook`, `plan` | `evaluatePlan(rulebook, plan)` and match as below |
+| `findings` | `rulebook` | `check(rulebook)` and report exactly these findings, in any order, each with a valid witness where the reference has one |
 | `error: true` | `rulebook` | reject the rulebook at validation (any message; `note` shows the reference's) |
 | `canonical`, `fingerprint` | `value` | produce exactly this canonical JSON text and this fingerprint |
 | `requestDigest` | `request` | produce exactly this digest |
@@ -55,7 +58,9 @@ The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY 
 - `approvalRequests` — ordered list compared on `ruleId`, `by` (absent means absent), `requestDigest`, `rulebookFingerprint`, `setBy`. `reason` is free-form.
 - `fingerprint` — exact.
 
-**Findings.** Compare as a multiset of `{ kind, severity, ruleIds, certainty }`. `ruleIds` keeps its order (the reference puts the looser or narrower rule first, as the spec says). `message` is free-form.
+**Plan.** `status`, `finalArea`, `finalFacts` (deep), `planDigest`, `fingerprint` — exact. `steps` — ordered, each on `index`, `action`, `areaId` and its `decision` compared as above (the step's `facts` and `note` are not compared). `planChecks` — ordered, on `ruleId`, `status`, `setBy`, `stepIndex`. `firstViolation` — on `stepIndex`, `ruleId`, `setBy`, `from`; absent means absent. `approvalRequests` — as for a decision.
+
+**Findings.** Compare as a multiset of `{ kind, severity, ruleIds, certainty }` plus whether a `witness` is present. `ruleIds` keeps its order (the reference puts the looser or narrower rule first, as the spec says). `message` is free-form. A **witness** is judged for validity, not equality: the runner calls your `matches(rulebook, witness)` — the matching relation of SPEC.md § 6 step 4 on its own, returning the IDs of every rule the request matches — and both of the finding's rules must be in it. If you do not provide `matches`, your witness must equal the reference's exactly (SPEC.md § 7.4 says how the reference chooses).
 
 **Error.** Validation must fail; the reason is yours.
 
@@ -68,7 +73,9 @@ for each file in conformance/*.json (alphabetical):
   for each case in file:
     rulebook = case.rulebook, or read case.rulebookRef relative to conformance/
     if   case.expect.decision:  compare project(evaluate(rulebook, case.request)) with case.expect.decision
-    elif case.expect.findings:  compare sort(project(check(rulebook))) with sort(case.expect.findings)
+    elif case.expect.plan:      compare project(evaluatePlan(rulebook, case.plan)) with case.expect.plan
+    elif case.expect.findings:  compare sort(project(check(rulebook))) with sort(case.expect.findings);
+                                for each finding with a witness: assert both ruleIds ∈ matches(rulebook, witness)
     elif case.expect.error:     assert validate(rulebook) reports at least one problem
     elif case.expect.canonical: assert canonical(case.value) == expect.canonical and fingerprint(case.value) == expect.fingerprint
     elif case.expect.requestDigest: assert requestDigest(case.request) == expect.requestDigest

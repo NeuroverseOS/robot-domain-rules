@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/common.schema.json",
-  "title": "robot-domain-rules/1 — shared definitions",
+  "title": "robot-domain-rules/2 — shared definitions",
   "$defs": {
     "id": { "type": "string", "minLength": 1, "pattern": "^[^\\s*!:]+$", "description": "An identifier: non-empty, no whitespace, no * ! or :." },
     "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "32 bytes as lowercase hex." },
@@ -36,6 +36,71 @@
         { "properties": { "answer": { "const": "deny" }, "instead": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
       ]
     },
+    "historyCondition": {
+      "type": "object",
+      "description": "SPEC.md § 3.4: the count of recent entries (caller-supplied) whose action is in `actions`, compared with `value`.",
+      "required": ["actions", "op", "value"],
+      "properties": {
+        "actions": { "$ref": "#/$defs/selector" },
+        "areas": { "$ref": "#/$defs/selector" },
+        "sameArea": { "type": "boolean" },
+        "withinMinutes": { "type": "number", "minimum": 1, "maximum": 1440 },
+        "clock": { "$ref": "#/$defs/id", "description": "A declared time fact; required with withinMinutes." },
+        "op": { "enum": ["==", "!=", ">", ">=", "<", "<="] },
+        "value": { "type": "integer", "minimum": 0 }
+      },
+      "dependentRequired": { "withinMinutes": ["clock"], "clock": ["withinMinutes"] }
+    },
+    "historyEntry": {
+      "type": "object",
+      "required": ["action", "areaId"],
+      "properties": { "action": { "type": "string", "minLength": 1 }, "areaId": { "type": "string", "minLength": 1 }, "at": { "$ref": "#/$defs/time" } }
+    },
+    "effect": {
+      "type": "object",
+      "description": "SPEC.md § 2.1: what an action does to the facts when a plan is projected.",
+      "required": ["op"],
+      "oneOf": [
+        { "properties": { "op": { "const": "set" }, "fact": { "$ref": "#/$defs/id" }, "value": { "$ref": "#/$defs/factValue" } }, "required": ["fact", "value"], "additionalProperties": false },
+        { "properties": { "op": { "enum": ["add", "subtract"] }, "fact": { "$ref": "#/$defs/id" }, "value": { "type": "number" } }, "required": ["fact", "value"], "additionalProperties": false },
+        { "properties": { "op": { "const": "move" } }, "additionalProperties": false }
+      ]
+    },
+    "planCheck": {
+      "type": "object",
+      "required": ["kind"],
+      "oneOf": [
+        { "properties": { "kind": { "const": "ends_in" }, "areas": { "$ref": "#/$defs/selector" } }, "required": ["areas"], "additionalProperties": false },
+        { "properties": { "kind": { "const": "ends_with" }, "actions": { "$ref": "#/$defs/selector" } }, "required": ["actions"], "additionalProperties": false },
+        { "properties": { "kind": { "const": "before" }, "first": { "$ref": "#/$defs/selector" }, "then": { "$ref": "#/$defs/selector" }, "sameArea": { "type": "boolean" } }, "required": ["first", "then"], "additionalProperties": false },
+        { "properties": { "kind": { "const": "at_most" }, "actions": { "$ref": "#/$defs/selector" }, "count": { "type": "integer", "minimum": 0 } }, "required": ["actions", "count"], "additionalProperties": false }
+      ]
+    },
+    "planRule": {
+      "type": "object",
+      "description": "SPEC.md § 3.5: a rule about the shape of a whole plan. It can only reject.",
+      "required": ["id", "text", "who", "check", "setBy", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "who": { "$ref": "#/$defs/selector" },
+        "check": { "$ref": "#/$defs/planCheck" },
+        "reason": { "type": "string" },
+        "setBy": { "$ref": "#/$defs/id" },
+        "source": { "type": "object", "required": ["kind", "ref"], "properties": { "kind": { "enum": ["template", "question", "declaration", "manual", "text", "agent", "system", "builtin"] }, "ref": { "type": "string" } } }
+      }
+    },
+    "witness": {
+      "type": "object",
+      "description": "SPEC.md § 7.4: a request that matches both rules of a finding.",
+      "required": ["participant", "action", "areaId", "facts"],
+      "properties": {
+        "participant": { "type": "object", "required": ["id", "kind", "roleId"], "properties": { "id": { "type": "string" }, "kind": { "type": "string" }, "roleId": { "type": "string" } } },
+        "action": { "type": "string" },
+        "areaId": { "type": "string" },
+        "facts": { "type": "object", "additionalProperties": { "$ref": "#/$defs/factValue" } }
+      }
+    },
     "rule": {
       "type": "object",
       "required": ["id", "text", "who", "does", "where", "then", "setBy", "source"],
@@ -46,6 +111,7 @@
         "does": { "$ref": "#/$defs/selector" },
         "where": { "$ref": "#/$defs/selector" },
         "when": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "history": { "type": "array", "items": { "$ref": "#/$defs/historyCondition" } },
         "then": { "$ref": "#/$defs/outcome" },
         "reason": { "type": "string" },
         "setBy": { "$ref": "#/$defs/id" },

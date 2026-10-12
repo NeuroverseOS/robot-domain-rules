@@ -2,7 +2,7 @@
 
 ## What it is
 
-Task- and permission-level authorization for robots, AI agents and people wearing glasses in a shared physical space. One question in — *may this participant do this action, in this area, given these facts?* — and one answer out: `ALLOW`, `LIMIT` (with the ceilings), `PAUSE` (for a person, or for the situation to change) or `BLOCK`, with the rules that decided, the authority behind each, and the fingerprint of the rulebook that was in force.
+Task- and permission-level authorization for robots, AI agents and people wearing glasses in a shared physical space. One question in — *may this participant do this action, in this area, given these facts?* — and one answer out: `ALLOW`, `LIMIT` (with the ceilings), `PAUSE` (for a person, or for the situation to change) or `BLOCK`, with the rules that decided, the authority behind each, and the fingerprint of the rulebook that was in force. The same question over a whole plan: every step checked on the facts the earlier steps leave behind, as far as the site declared what its actions do, plus the rules the site set about plans as a whole.
 
 It sits between the thing that proposes an action (a planner, an agent, a wearer, a fleet manager) and the thing that executes it (a robot controller, a glasses runtime, an agent harness). It is called before the action, with facts the surrounding system already knows.
 
@@ -11,11 +11,12 @@ It sits between the thing that proposes an action (a planner, an agent, a wearer
 - **Not motion control.** It never computes a path, a velocity or a stop. A `LIMIT` is a ceiling the controller enforces; a `BLOCK` is a refusal the controller honours. How the robot slows or stops is the controller's business.
 - **Not a safety system.** It is not a safety PLC, not a safety-rated stop, not a navigation stack, and it does not replace ISO 10218, ISO 3691-4, ISO 13482 or any certified safety function. Those stay in charge of physical safety and act whether or not this layer is consulted. This layer decides *permission*; a correct permission does not make an unsafe motion safe.
 - **Not a sensor, a map or a clock.** It does not locate anything, count anyone, or know what time it is. Every fact arrives in the request.
-- **Not a model.** No AI is inside the decision. Models may draft rules and explain decisions outside it.
+- **Not a model.** No AI is inside the decision. Models may draft rules, propose plans and explain decisions outside it.
+- **Not a planner.** It checks the plan it is handed and predicts only the declared effects; it does not search for a plan, re-order steps, or know what an action does beyond what the site wrote down.
 
 ## What it trusts
 
-- **The facts in the request.** Where the participant is, how many people are there, whether an alarm is active, what time it is: the layer takes these as true. Whoever assembles the request — the spatial system, the fleet manager — is the trusted fact source.
+- **The facts in the request.** Where the participant is, how many people are there, whether an alarm is active, what time it is: the layer takes these as true. Whoever assembles the request — the spatial system, the fleet manager — is the trusted fact source. The same for `history` (what the participant did recently) and, in a plan, for the planner's description of the steps and the facts it expects.
 - **The rulebook it was handed.** It checks the rulebook's structure and fingerprint, and can verify a signature with a key you pin outside the rulebook. It cannot know whether the rulebook is the one the space meant to be in force; that is deployment's job.
 - **Verified approvals.** When a rulebook declares `trustedKeys`, the caller verifies an approval's Ed25519 signature *before* evaluation and passes the verified approval in. The evaluator checks that it is marked verified, bound to this request's digest and this rulebook's fingerprint, and holds what the rule names. It does not re-verify the signature (evaluation is synchronous and pure) and it does not check `issuedAt` (it has no clock) — age limits are the caller's.
 
@@ -50,5 +51,7 @@ It sits between the thing that proposes an action (a planner, an agent, a wearer
 | Is this rulebook the one in force? Is it unaltered? | Deployment: `validateRulebook`, `verifyFingerprint`, `verifyRulebookSignature` with a pinned key | When a rulebook is loaded |
 | Is this approval genuine? | Caller: `verifyApproval` against `trustedKeys` | Before evaluation, on each approval |
 | Is this approval too old? | Caller, from `issuedAt` | Before evaluation |
+| What did this participant do recently? | Caller: `request.history` | Before evaluation |
 | May this participant do this, here, now? | This layer: `evaluateDomainAction` | Before the action |
+| May this whole plan run, step by step? | This layer: `evaluatePlan` | Before the first step; then each step again with `evaluateDomainAction` as it comes up, on real facts |
 | Did the robot actually obey? | Controller and your audit of the decision log | After |

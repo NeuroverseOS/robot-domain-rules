@@ -503,10 +503,24 @@
             "h_deny"
           ],
           "certainty": "certain",
-          "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "7223ff55a0467c00"
+      "fingerprint": "378a8f7d4f8ec110"
     },
     "expect": {
       "findings": [
@@ -517,7 +531,21 @@
             "l_allow",
             "h_deny"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -708,10 +736,24 @@
             "h_deny"
           ],
           "certainty": "certain",
-          "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "7223ff55a0467c00"
+      "fingerprint": "378a8f7d4f8ec110"
     },
     "request": {
       "participant": {
@@ -754,7 +796,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "7223ff55a0467c00"
+        "fingerprint": "378a8f7d4f8ec110"
       }
     }
   },
@@ -944,10 +986,24 @@
             "l_deny"
           ],
           "certainty": "certain",
-          "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "eb36af3d9a2a6c68"
+      "fingerprint": "06d74df24bb771f8"
     },
     "expect": {
       "findings": [
@@ -958,7 +1014,21 @@
             "h_allow",
             "l_deny"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -1149,10 +1219,24 @@
             "l_deny"
           ],
           "certainty": "certain",
-          "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "eb36af3d9a2a6c68"
+      "fingerprint": "06d74df24bb771f8"
     },
     "request": {
       "participant": {
@@ -1195,7 +1279,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "eb36af3d9a2a6c68"
+        "fingerprint": "06d74df24bb771f8"
       }
     }
   },
@@ -1392,10 +1476,24 @@
             "h_cap"
           ],
           "certainty": "certain",
-          "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "e87f938004c81b85"
+      "fingerprint": "3bf8a25971470019"
     },
     "expect": {
       "findings": [
@@ -1406,7 +1504,21 @@
             "l_cap",
             "h_cap"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -1603,10 +1715,24 @@
             "h_cap"
           ],
           "certainty": "certain",
-          "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "e87f938004c81b85"
+      "fingerprint": "3bf8a25971470019"
     },
     "request": {
       "participant": {
@@ -1653,7 +1779,7 @@
         "limits": {
           "speed": 0.5
         },
-        "fingerprint": "e87f938004c81b85"
+        "fingerprint": "3bf8a25971470019"
       }
     }
   },
@@ -1844,10 +1970,24 @@
             "inv"
           ],
           "certainty": "certain",
-          "message": "`h_allow` (set by high) tries to allow what the never rule `inv` (set by low) forbids. Both apply to every role · every action · Yard, always. Nothing overrides a never rule, so `h_allow` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`h_allow` (set by high) tries to allow what the never rule `inv` (set by low) forbids. Both apply to every role · every action · Yard, always. Nothing overrides a never rule, so `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "1aec4489da8df499"
+      "fingerprint": "68455b81eef932a7"
     },
     "request": {
       "participant": {
@@ -1880,7 +2020,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "1aec4489da8df499"
+        "fingerprint": "68455b81eef932a7"
       }
     }
   },
@@ -4426,10 +4566,24 @@
             "agent_cap"
           ],
           "certainty": "certain",
-          "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "71dcc9cad4da2d71"
+      "fingerprint": "f53444a98064b931"
     },
     "request": {
       "participant": {
@@ -4476,7 +4630,7 @@
         "limits": {
           "speed": 0.4
         },
-        "fingerprint": "71dcc9cad4da2d71"
+        "fingerprint": "f53444a98064b931"
       }
     }
   },
@@ -4678,10 +4832,24 @@
             "agent_cap"
           ],
           "certainty": "certain",
-          "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "71dcc9cad4da2d71"
+      "fingerprint": "f53444a98064b931"
     },
     "expect": {
       "findings": [
@@ -4692,7 +4860,21 @@
             "manager_cap",
             "agent_cap"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -4889,10 +5071,24 @@
             "manager_no_yard"
           ],
           "certainty": "certain",
-          "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "87a112244585aebe"
+      "fingerprint": "2120fd2a0a209b04"
     },
     "expect": {
       "findings": [
@@ -4903,7 +5099,21 @@
             "agent_allows_yard",
             "manager_no_yard"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -5099,10 +5309,24 @@
             "manager_no_yard"
           ],
           "certainty": "certain",
-          "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "87a112244585aebe"
+      "fingerprint": "2120fd2a0a209b04"
     },
     "request": {
       "participant": {
@@ -5145,7 +5369,7 @@
             "setBy": "agent"
           }
         ],
-        "fingerprint": "87a112244585aebe"
+        "fingerprint": "2120fd2a0a209b04"
       }
     }
   },

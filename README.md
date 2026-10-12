@@ -4,19 +4,20 @@
 
 **[▶ Try it live](https://neuroverseos.github.io/robot-domain-rules/)** · **[PRINCIPLES](PRINCIPLES.md)** · **[SPEC](SPEC.md)** · **[BOUNDARY](BOUNDARY.md)** · [Related work](RELATED-WORK.md)
 
-One rulebook for a physical space, written under authority the space declares, applied the same way to every robot, every person wearing glasses and every AI agent in it. Before acting, a participant asks and gets **yes / slower / wait / no**, with the rules that decided, who set each one, and the fingerprint of the rulebook in force. Pure TypeScript, zero dependencies, no clock, no network, no model inside the decision.
+One rulebook for a physical space, written under authority the space declares, applied the same way to every robot, every person wearing glasses and every AI agent in it. Before acting, a participant asks and gets **yes / slower / wait / no**, with the rules that decided, who set each one, and the fingerprint of the rulebook in force. An AI planner can ask about a **whole plan** and get the same answer step by step, on the facts each step leaves behind. Pure TypeScript, zero dependencies, no clock, no network, no model inside the decision.
 
 ## Where AI fits
 
-AI writes rules — from a manager's plain words, from documents, from a policy system — at whatever authority the space has granted it. AI proposes actions and plans tasks. AI explains decisions. The final "may I?" check is none of those: it is deterministic, takes microseconds, gives the same answer every time, and cannot be talked out of a rule. This is the pattern the industry is settling on for agents — AI authors policy, a deterministic engine decides (AWS AgentCore Policy compiles natural-language policies to [Cedar](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy-natural-language.html) and evaluates them without a model) — and the reason is plain: rules that a model interprets at runtime can be talked around. [RoboGuard](https://arxiv.org/pdf/2503.07885) reports that without its guardrail, attacked LLM-controlled robots executed unsafe plans more than 92% of the time. Here the model is upstream of the decision, never inside it. See [RELATED-WORK.md](RELATED-WORK.md) for how this sits next to Cedar, ASIMOV, RoboGuard and Open-RMF.
+AI writes rules — from a manager's plain words, from documents, from a policy system — at whatever authority the space has granted it. AI proposes actions and plans tasks. AI explains decisions. The final "may I?" check is none of those: it is deterministic, takes microseconds, gives the same answer every time, and cannot be talked out of a rule. The same check runs over a whole plan before any step runs: each step on the facts the earlier steps project (the site declares what its actions do), plus rules about the plan as a whole — where it must end, what must come before what, how many of something. The planner proposes; the rulebook checks; it never writes the plan. This is the pattern the industry is settling on for agents — AI authors policy, a deterministic engine decides (AWS AgentCore Policy compiles natural-language policies to [Cedar](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy-natural-language.html) and evaluates them without a model) — and the reason is plain: rules that a model interprets at runtime can be talked around. [RoboGuard](https://arxiv.org/pdf/2503.07885) reports that without its guardrail, attacked LLM-controlled robots executed unsafe plans more than 92% of the time. Here the model is upstream of the decision, never inside it. See [RELATED-WORK.md](RELATED-WORK.md) for how this sits next to Cedar, ASIMOV, RoboGuard and Open-RMF.
 
 ## For engineers, and the agents that work with you
 
 You will not adopt this package; you will take the principles, the format and the tests. That is the point.
 
 1. **Read [PRINCIPLES.md](PRINCIPLES.md)** (5 minutes): nine rules for spaces shared by people, robots and AI, each one enforced by named conformance cases.
-2. **Read [SPEC.md](SPEC.md)** (15 minutes): the rulebook, request, decision, finding and approval formats; the decision algorithm as numbered pseudocode; the conflict analysis; canonical JSON and the fingerprint, byte for byte; signed approvals. JSON Schemas in [`spec/`](spec/).
-3. **Run [`conformance/`](conformance/) against your implementation** — 144 language-neutral JSON cases, one line each saying what it proves, with fixed Ed25519 test vectors. The loop is ten lines; [`conformance/README.md`](conformance/README.md) gives the exact comparison rules. The reference passes its own suite in both [`test/conformance.test.ts`](test/conformance.test.ts) and the framework-free [`conformance/run-node.mjs`](conformance/run-node.mjs).
+2. **Read [SPEC.md](SPEC.md)** (20 minutes): the rulebook, request, decision, plan, finding and approval formats; the decision and plan algorithms as numbered pseudocode; the exact conflict analysis and its witnesses; canonical JSON and the fingerprint, byte for byte; signed approvals. JSON Schemas in [`spec/`](spec/).
+3. **Run [`conformance/`](conformance/) against your implementation** — 181 language-neutral JSON cases, one line each saying what it proves, with fixed Ed25519 test vectors. The loop is twelve lines; [`conformance/README.md`](conformance/README.md) gives the exact comparison rules. The reference passes its own suite in both [`test/conformance.test.ts`](test/conformance.test.ts) and the framework-free [`conformance/run-node.mjs`](conformance/run-node.mjs).
+4. **Trust the conflict analysis, or check it.** It is exact for the rule language: two rules are reported as able to meet if and only if some request matches both, and every finding carries a witness request that triggers both rules. [`test/z3-crosscheck.test.ts`](test/z3-crosscheck.test.ts) encodes generated rulebooks into the Z3 SMT solver and asserts agreement on every pair — 306 seeded rulebooks, 1,836 pairs (1,115 overlapping, 721 disjoint), 1,115 witnesses, in about 6 s. z3-solver is a devDependency only; nothing of it ships.
 
 Or use this package directly:
 
@@ -43,11 +44,23 @@ const decision = evaluateDomainAction(rulebook, {
 });
 // decision.status → 'LIMIT'; decision.limits → { maxSpeedMps: 0.3 }
 // decision.reasons → [{ ruleId: 'robots_near_people', status: 'LIMIT', setBy: 'law-and-safety', reason: '…' }, …]
+
+const verdict = evaluatePlan(rulebook, {                                // a planner's whole plan, checked before any step runs
+  participant: { id: 'robot-9', kind: 'robot', roleId: 'restock_robot' },
+  initialFacts: { localTime: '09:30', peopleInZone: 0, requestedSpeedMps: 0.5 },
+  clock: 'localTime', startTime: '09:30', stepDurationSeconds: 120,
+  steps: [{ action: 'enter_zone', area: 'aisle-3' }, { action: 'manipulate' }, { action: 'enter_zone', area: 'checkout' }],
+});
+// verdict.status → 'BLOCK'; verdict.firstViolation → { stepIndex: 1, ruleId: 'scan_before_restock', setBy: 'site-manager', from: 'plan', … }
+// verdict.steps[2].facts.carrying → true (manipulate's declared effect); verdict.approvalRequests → every approval the plan would need
 ```
 
 - **An agent asks before it acts:** [`examples/mcp/`](examples/mcp/) is a ~100-line stdio MCP server with `may_i` and `explain_rulebook`. The MCP SDK is a dependency there only.
+- **An AI planner's plan, rejected, revised, approved, accepted:** [`examples/harness/plan-replay.ts`](examples/harness/plan-replay.ts) checks two versions of a restock plan: v1 skips the shelf scan, carries stock into the checkout and ends away from the dock, and is rejected at step 2 with the rule, the reason and the authority; v2 passes every step but one, which needs a person — the manager signs that one approval and v2 is accepted. Readable transcript plus `plan-decisions.jsonl`. `npx tsx examples/harness/plan-replay.ts`.
 - **Your spatial vocabulary:** [`examples/harness/`](examples/harness/) maps a semantic-volumes collection (the shape `aukilabs/domain-harness` describes) onto rulebook areas and replays an event stream — an AI planner proposing tasks, poses and people counts arriving, a manager signing one approval, an alarm starting and clearing — into an append-only decision log. `npx tsx examples/harness/replay.ts`.
+- **Rules that count what happened:** a rule may condition on the participant's recent `history` ("at most five scans an hour", "not within ten minutes of a lift"); the caller supplies it with the request, the clock is a declared time fact, and a rule that needs history and does not get it refuses.
 - **Signed approvals:** declare `trustedKeys` on the rulebook and only an Ed25519-signed approval, verified by you before evaluation and bound to the request digest and the rulebook fingerprint, clears a wait. `signApproval`, `verifyApproval`, `signRulebook`, `verifyRulebookSignature`. Without `trustedKeys`, plain approvals work (development only).
+- **Already on Cedar?** [`adapters/cedar/`](adapters/cedar/) exports the deny/permit subset as Cedar policies and a schema, resolving authority first and listing every rule it cannot carry (limits, waits, history, plan rules). Tested against Cedar's own engine on every example request. Lossy, and says so.
 
 ## For operators
 
@@ -55,38 +68,47 @@ const decision = evaluateDomainAction(rulebook, {
 
 [![The switchboard: rulebook, situation, decision](docs/switchboard.jpg)](https://neuroverseos.github.io/robot-domain-rules/)
 
-Start from the grocery store, the warehouse, the clinic or an empty site. Answer the template's questions and watch the rules change. Write a rule in plain words, read the draft, confirm it as a chosen authority. Set who is asking, the action, the area, every fact, the emergency switch and an approval — or pick a scenario — and see **YES / SLOWER / WAIT / NO** with the limits, the reasons, the authority chain and the full trace, next to what would happen with no rules at all. The "Rules at odds" panel shows every conflict live. Export the rulebook as JSON or readable text; import one (fingerprint verified); copy the code that asks it.
+Start from the grocery store, the warehouse, the clinic or an empty site. Answer the template's questions and watch the rules change. Write a rule in plain words, read the draft, confirm it as a chosen authority. Set who is asking, the action, the area, every fact, the emergency switch and an approval — or pick a scenario — and see **YES / SLOWER / WAIT / NO** with the limits, the reasons, the authority chain and the full trace, next to what would happen with no rules at all. Switch to **Plan** and load a planner's plan (the replay's v1 and v2 are presets), step through it on the projected facts, and see the first violation, every step's verdict, the plan rules and where it ends. The "Rules at odds" panel shows every conflict live, each with an example request that triggers both rules — one click puts it in the situation. Export the rulebook as JSON or readable text; import one (fingerprint verified); copy the code that asks it.
 
 ## Why not Cedar or OPA?
 
-Cedar and OPA/Rego are mature, general policy languages with real tooling, and Cedar has formal analysis this project does not. If they fit your stack, use them. What this project does that they do not, out of the box: rules authored from plain answers and plain words by whoever the space grants authority; a declared authority order where a lower level can only tighten, reported at compile time and enforced at decision time; two kinds of waiting (a person must approve, signed and bound to the request, versus the situation must change); one rulebook and one decision path for robots, people and AI agents; and decisions that name the authority behind every rule. Nothing here prevents compiling this spec's rulebook to Cedar or Rego for evaluation; the conformance cases would tell you whether the compilation is faithful.
+Cedar and OPA/Rego are mature, general policy languages with real tooling, and Cedar's analysis covers a richer language than this one. If they fit your stack, use them. What this project does that they do not, out of the box: rules authored from plain answers and plain words by whoever the space grants authority; a declared authority order where a lower level can only tighten, reported at compile time and enforced at decision time; two kinds of waiting (a person must approve, signed and bound to the request, versus the situation must change); one rulebook and one decision path for robots, people and AI agents; whole-plan checking on projected facts; and decisions that name the authority behind every rule. [`adapters/cedar/`](adapters/cedar/) compiles the deny/permit subset to Cedar and lists what it drops; the conformance cases are how you would check any such compilation for faithfulness.
+
+## Roadmap: rules that learn from evidence
+
+Rules should learn from what actually happens. Bevia, in development by the same author, reads decision logs and real-world evidence — rules that stall work for no reason, near-misses, conflicts that keep recurring — and proposes rule changes at an authority the space grants it. People or systems with higher authority accept them. Bevia never loosens a rule on its own, and every suggestion cites the evidence behind it.
+
+Out of scope, on purpose: plan *synthesis*. Planners propose; this checks.
 
 ## Repo map
 
 | Path | What it is |
 |---|---|
 | [`PRINCIPLES.md`](PRINCIPLES.md), [`SPEC.md`](SPEC.md), [`BOUNDARY.md`](BOUNDARY.md), [`RELATED-WORK.md`](RELATED-WORK.md) | The principles, the normative spec, what this is and is not, how it compares. |
-| [`spec/`](spec/) | JSON Schemas (draft 2020-12) for rulebook, request, decision, findings, approvals. |
-| [`conformance/`](conformance/) | 144 language-neutral cases by principle, shared rulebooks, Ed25519 test vectors, a framework-free runner, and the generator that produced them. |
-| [`src/`](src/) | The core. Zero runtime dependencies. `types.ts` first; then `compile.ts`, `evaluate.ts`, `check.ts`, `approvals.ts`, `canonical.ts`, `draft.ts`. |
-| [`src/templates/`](src/templates/) | The template contract and the two shipped templates (`grocery-store`, `warehouse`). |
-| [`examples/`](examples/) | A grocery store (two manager rules deliberately at odds), a warehouse, a clinic with no template, `demo.ts`; [`harness/`](examples/harness/) the semantic-volumes adapter and agent replay; [`mcp/`](examples/mcp/) the `may_i` server. |
-| [`site/`](site/) | The switchboard. Its own package, built from `src/`; not published to npm. |
-| [`test/`](test/) | Core tests (one per behaviour, plus the seeded conflict-analysis soundness test) and the conformance runner. |
+| [`spec/`](spec/) | JSON Schemas (draft 2020-12) for rulebook, request, decision, plan, plan evaluation, findings, approvals. |
+| [`conformance/`](conformance/) | 181 language-neutral cases by principle (plus plans and history), shared rulebooks, Ed25519 test vectors, a framework-free runner, and the generator that produced them. |
+| [`src/`](src/) | The core. Zero runtime dependencies. `types.ts` first; then `compile.ts`, `evaluate.ts`, `plan.ts`, `check.ts`, `approvals.ts`, `canonical.ts`, `draft.ts`. |
+| [`src/templates/`](src/templates/) | The template contract and the two shipped templates (`grocery-store`, `warehouse`), whose actions declare their effects. |
+| [`examples/`](examples/) | A grocery store (two manager rules deliberately at odds, two plan rules), a warehouse, a clinic with no template, `demo.ts`; [`harness/`](examples/harness/) the semantic-volumes adapter, the agent replay and the planner replay; [`mcp/`](examples/mcp/) the `may_i` server. |
+| [`adapters/cedar/`](adapters/cedar/) | The Cedar export. Its own package; lossy and says so; tested against Cedar's engine. |
+| [`site/`](site/) | The switchboard, with Ask and Plan modes. Its own package, built from `src/`; not published to npm. |
+| [`test/`](test/) | Core tests (one per behaviour, plus the seeded exactness test), the Z3 cross-check, and the conformance runner. |
 | [`AGENTS.md`](AGENTS.md) | Invariants and working rules for people and coding agents. [`CHANGELOG.md`](CHANGELOG.md) for what changed. |
 
 ```bash
 git clone https://github.com/NeuroverseOS/robot-domain-rules && cd robot-domain-rules && npm install
-npm test                                  # core tests + every conformance case
+npm test                                  # core tests + the Z3 cross-check + every conformance case
 npm run build && node conformance/run-node.mjs
 npm run demo                              # three rulebooks in plain text, their findings, a day of decisions each
 npx tsx examples/harness/replay.ts        # the agent replay
+npx tsx examples/harness/plan-replay.ts   # the planner replay: rejected, revised, approved, accepted
 npm run site                              # the switchboard locally (cd site && npm install first)
+npm run cedar:test                        # the Cedar adapter against cedar-wasm (cd adapters/cedar && npm install first)
 ```
 
 ## Stability
 
-0.x: the API may still change between minor versions, and breaking changes will be batched rather than trickled. The specification is versioned separately (`robot-domain-rules/1`, see [SPEC.md § 11](SPEC.md)); a change that alters any decision, finding, fingerprint or signature for an existing valid rulebook bumps the spec version and ships with new conformance cases. The 0.2 input shape is still accepted and decides identically.
+0.x: the API may still change between minor versions, and breaking changes will be batched rather than trickled. The specification is versioned separately (`robot-domain-rules/2`, see [SPEC.md § 11](SPEC.md)); a change that alters any decision, finding, fingerprint or signature for an existing valid rulebook bumps the spec version and ships with new conformance cases — 0.5.0 did, for the exact conflict analysis. Decisions for existing rulebooks did not change. The 0.2 input shape is still accepted and decides identically.
 
 ## License
 

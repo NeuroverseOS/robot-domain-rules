@@ -17,11 +17,11 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import {
-  compileDomain, evaluateDomainAction, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest,
+  compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest,
   publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature,
-  type CompileDomainInput, type DomainRequest, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
+  type CompileDomainInput, type DomainRequest, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
 } from '../src/index';
-import { projectDecision, projectFindings } from './compare.mjs';
+import { projectDecision, projectFindings, projectPlan } from './compare.mjs';
 import * as grocery from '../examples/grocery-store';
 
 const OUT = join(import.meta.dirname, '.');
@@ -81,6 +81,10 @@ const as = (kind: string, roleId: string, id = `${kind}-1`) => ({ id, kind, role
 
 interface Want {
   status?: string;
+  /** Plan expectations: the step statuses in order, the first violation as "ruleId@setBy#stepIndex:from", plan checks as "ruleId:status". */
+  steps?: string[];
+  firstViolation?: string;
+  planChecks?: string[];
   /** Reasons as "ruleId" or "ruleId@setBy". */
   reasons?: string[];
   limits?: Record<string, number>;
@@ -101,6 +105,7 @@ interface Spec {
   /** A valid compiled rulebook, mutated after the fact (for error cases). */
   tamper?: (rb: Rulebook) => void;
   request?: DomainRequest;
+  plan?: Plan;
   want: Want;
 }
 
@@ -134,7 +139,30 @@ function add(file: string, s: Spec) {
     const got = checkRulebook(rulebook as Rulebook);
     const kinds = got.map(f => `${f.kind}:${f.certainty}:${f.ruleIds.join('+')}`).sort();
     if (JSON.stringify(kinds) !== JSON.stringify([...w.findings].sort())) fail(s.id, `findings: want ${JSON.stringify(w.findings)}, got ${JSON.stringify(kinds)}`);
+    for (const f of got) {
+      // Every certain finding between rules carries a witness, and the witness really matches both rules.
+      const betweenRules = f.ruleIds.every(id => (rulebook as Rulebook).rules.some(r => r.id === id));
+      if (f.certainty === 'certain' && betweenRules && !f.witness) fail(s.id, `finding ${f.ruleIds.join('+')} is certain but has no witness`);
+      if (f.certainty === 'possible' && f.witness) fail(s.id, `finding ${f.ruleIds.join('+')} is possible but has a witness`);
+      if (f.witness) {
+        const hit = matchingRules(rulebook as Rulebook, f.witness);
+        if (!f.ruleIds.every(id => hit.includes(id))) fail(s.id, `witness of ${f.ruleIds.join('+')} matches ${JSON.stringify(hit)}: ${JSON.stringify(f.witness)}`);
+      }
+    }
     out.expect = { findings: projectFindings(got) };
+  } else if (s.plan) {
+    out.plan = s.plan;
+    const p = evaluatePlan(rulebook as Rulebook, s.plan);
+    if (p.status !== w.status) fail(s.id, `plan status: want ${w.status}, got ${p.status}`);
+    const steps = p.steps.map(x => x.decision.status);
+    if (JSON.stringify(steps) !== JSON.stringify(w.steps ?? [])) fail(s.id, `plan steps: want ${JSON.stringify(w.steps)}, got ${JSON.stringify(steps)}`);
+    const fv = p.firstViolation ? `${p.firstViolation.ruleId}@${p.firstViolation.setBy}#${p.firstViolation.stepIndex}:${p.firstViolation.from}` : undefined;
+    if (fv !== w.firstViolation) fail(s.id, `plan firstViolation: want ${w.firstViolation}, got ${fv}`);
+    const checks = p.planChecks.map(c => `${c.ruleId}:${c.status}`);
+    if (JSON.stringify(checks) !== JSON.stringify(w.planChecks ?? [])) fail(s.id, `plan checks: want ${JSON.stringify(w.planChecks)}, got ${JSON.stringify(checks)}`);
+    const asks = p.approvalRequests.map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
+    if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `plan approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
+    out.expect = { plan: projectPlan(p) };
   } else {
     if (!s.request) fail(s.id, 'needs a request');
     out.request = s.request;
@@ -371,8 +399,8 @@ function p7() {
     add(f, { id, principle: [7], description, input: tiny(rules, extra), want: { findings } });
   pair('p7-contradiction-certain', 'An allow and a deny at the same authority where every request matching one matches the other: a certain contradiction.',
     [rule('yes', { answer: 'allow' }), rule('no', { answer: 'deny' }, { where: 'yard' })], ['contradiction:certain:yes+no']);
-  pair('p7-contradiction-possible', 'Conditions on two independent facts can both hold on paper: a possible contradiction, never a certain one.',
-    [rule('yes', { answer: 'allow' }, { when: [{ fact: 'people', op: '==', value: 0 }] }), rule('wait', { answer: 'wait', for: 'condition' }, { when: [{ fact: 'load', op: '>', value: 0 }] })], ['contradiction:possible:yes+wait']);
+  pair('p7-contradiction-partial-overlap', 'Conditions on two independent facts (people == 0, load > 0) can both hold: the analysis is exact, so the contradiction is certain, with a witness request that matches both.',
+    [rule('yes', { answer: 'allow' }, { when: [{ fact: 'people', op: '==', value: 0 }] }), rule('wait', { answer: 'wait', for: 'condition' }, { when: [{ fact: 'load', op: '>', value: 0 }] })], ['contradiction:certain:yes+wait']);
   pair('p7-shadowed', 'A looser rule fully covered by a stricter one at the same authority can never change a decision: shadowed.',
     [rule('big', { answer: 'deny' }), rule('small', { answer: 'wait', for: 'approval' }, { where: 'yard', when: [{ fact: 'people', op: '>', value: 2 }] })], ['shadowed:certain:small+big']);
   pair('p7-duplicate-same-scope', 'Two rules with the same scope and the same answer: duplicate.',
@@ -380,7 +408,7 @@ function p7() {
   pair('p7-duplicate-covered', 'A rule whose scope lies inside another with the same answer adds nothing: duplicate, narrower rule first.',
     [rule('a', { answer: 'deny' }), rule('b', { answer: 'deny' }, { does: 'look', where: 'yard' })], ['duplicate:certain:b+a']);
   pair('p7-limit-disagreement', 'Two limits on the same name whose scopes partly overlap with different values: limit_disagreement; the lower applies where both match.',
-    [rule('fast', { answer: 'limit', limits: { speed: 1 } }, { where: 'floor', when: [{ fact: 'people', op: '<', value: 5 }] }), rule('slow', { answer: 'limit', limits: { speed: 0.5 } }, { when: [{ fact: 'people', op: '>', value: 2 }] })], ['limit_disagreement:possible:fast+slow']);
+    [rule('fast', { answer: 'limit', limits: { speed: 1 } }, { where: 'floor', when: [{ fact: 'people', op: '<', value: 5 }] }), rule('slow', { answer: 'limit', limits: { speed: 0.5 } }, { when: [{ fact: 'people', op: '>', value: 2 }] })], ['limit_disagreement:certain:fast+slow']);
   pair('p7-refinement-is-not-a-finding', 'A stricter special case of a looser limit is normal layering: no finding.',
     [rule('site', { answer: 'limit', limits: { speed: 1 } }), rule('near', { answer: 'limit', limits: { speed: 0.3 } }, { when: [{ fact: 'people', op: '>', value: 0 }] })], []);
   pair('p7-restrictions-layer', 'A deny and a condition wait that overlap are one restriction on another, not a conflict: no finding.',
@@ -391,8 +419,13 @@ function p7() {
     [rule('inv', { answer: 'deny' }, { never: true }), rule('no', { answer: 'deny' })], []);
   pair('p7-approval-named-vs-unnamed', 'An approval wait naming nobody is looser than one naming an approver; fully covered, it is shadowed.',
     [rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }), rule('ask_any', { answer: 'wait', for: 'approval' }, { where: 'yard' })], ['shadowed:certain:ask_any+ask_high']);
-  pair('p7-touching-boundary-overlaps', 'people <= 3 and people >= 3 share the value 3: the overlap is real and reported.',
-    [rule('a', { answer: 'allow' }, { when: [{ fact: 'people', op: '<=', value: 3 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'people', op: '>=', value: 3 }] })], ['contradiction:possible:a+b']);
+  pair('p7-touching-boundary-overlaps', 'people <= 3 and people >= 3 share the value 3: the overlap is real, certain, and the witness carries people = 3.',
+    [rule('a', { answer: 'allow' }, { when: [{ fact: 'people', op: '<=', value: 3 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'people', op: '>=', value: 3 }] })], ['contradiction:certain:a+b']);
+  pair('p7-witness-on-every-shape', 'A witness is found through every constraint shape at once: an integer range, a real range, a time window, a day set, an enum and a boolean.',
+    [rule('a', { answer: 'allow' }, { when: [{ fact: 'people', op: '>', value: 2 }, { fact: 'load', op: '>=', value: 1.5 }, { fact: 'time', op: 'between', from: '22:00', to: '06:00' }, { fact: 'day', op: 'days', days: ['sat', 'sun'] }] }),
+     rule('b', { answer: 'deny' }, { when: [{ fact: 'people', op: '<=', value: 4 }, { fact: 'load', op: '<', value: 3 }, { fact: 'time', op: '<', value: '08:00' }, { fact: 'day', op: '!=', value: 'sat' }, { fact: 'mode', op: 'in', values: ['b', 'c'] }, { fact: 'alarm', op: '==', value: true }] })], ['contradiction:certain:a+b']);
+  pair('p7-history-rule-is-possible-without-witness', 'A rule that conditions on history is not analysed: the overlap on facts is real, the certainty is "possible", and no witness is given.',
+    [rule('yes', { answer: 'allow' }), rule('too_many', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', op: '>=', value: 5 }] })], ['contradiction:possible:yes+too_many']);
   // Provable disjointness: no finding, for every shape of constraint.
   const disjoint: Array<[string, string, Rule['when'], Rule['when']]> = [
     ['p7-disjoint-number-ranges', 'people < 3 and people >= 3 can never both hold: no finding.', [{ fact: 'people', op: '<', value: 3 }], [{ fact: 'people', op: '>=', value: 3 }]],
@@ -405,7 +438,10 @@ function p7() {
     ['p7-disjoint-boolean', 'true and false are disjoint.', [{ fact: 'alarm', op: '==', value: true }], [{ fact: 'alarm', op: '==', value: false }]],
     ['p7-disjoint-enum', 'Disjoint enum sets, and != vs ==, are disjoint.', [{ fact: 'mode', op: '!=', value: 'a' }], [{ fact: 'mode', op: '==', value: 'a' }]],
     ['p7-disjoint-on-one-shared-fact', 'Two rules sharing a day but disagreeing on a count are disjoint because of the count.', [{ fact: 'day', op: 'days', days: ['sat'] }, { fact: 'people', op: '>=', value: 3 }], [{ fact: 'day', op: 'days', days: ['sat'] }, { fact: 'people', op: '<', value: 3 }]],
+    ['p7-disjoint-integer-all-excluded', 'An integer range whose every whole number is excluded (1..2 minus 1 and 2) is empty: no finding.', [{ fact: 'people', op: '>=', value: 1 }, { fact: 'people', op: '<=', value: 2 }, { fact: 'people', op: '!=', value: 1 }], [{ fact: 'people', op: '!=', value: 2 }]],
   ];
+  pair('p7-real-gap-is-not-empty', 'A real range is never emptied by excluded points: 1 < load < 2 and load != 1.5 still meet, and the witness avoids 1.5.',
+    [rule('a', { answer: 'allow' }, { when: [{ fact: 'load', op: '>', value: 1 }, { fact: 'load', op: '<', value: 2 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'load', op: '!=', value: 1.5 }] })], ['contradiction:certain:a+b']);
   for (const [id, description, a, b] of disjoint) pair(id, description, [rule('a', { answer: 'allow' }, { when: a }), rule('b', { answer: 'deny' }, { when: b })], []);
   pair('p7-disjoint-selectors', 'Rules on different areas never meet: no finding, whatever their answers.',
     [rule('a', { answer: 'allow' }, { where: 'floor' }), rule('b', { answer: 'deny' }, { where: 'yard' })], []);
@@ -457,6 +493,123 @@ function p9() {
     request: req('go', 'floor', { time: '03:00' }), want: { status: 'BLOCK', reasons: ['night@high'] } });
   add(f, { id: 'p9-limit-is-a-ceiling-not-control', principle: [9], description: 'A LIMIT says the ceiling; the controller enforces it. The decision does not say what speed to drive.',
     input: site, request: req('go', 'floor', { speedAsked: 1.4 }), want: { status: 'LIMIT', reasons: ['cap@high'], limits: { speed: 1 } } });
+}
+
+// ─── Plans: a whole plan on projected facts (principles 3, 4, 5) ────────────
+
+function plans() {
+  const f = 'plans.json';
+  const planRule = (id: string, check: PlanRule['check'], patch: Partial<PlanRule> = {}): PlanRule => ({ id, text: id, who: '*', check, setBy: 'high', source: { kind: 'manual', ref: id }, ...patch });
+  const site = (planRules: PlanRule[] = [], rules: Draft[] = []): CompileDomainInput => tiny([
+    rule('no_load_in_yard', { answer: 'deny', instead: 'drop' }, { does: 'go', where: 'yard', when: [{ fact: 'loaded', op: '==', value: true }] }),
+    rule('ask_before_look', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'look' }),
+    ...rules,
+  ], {
+    actions: [
+      { id: 'go', kinds: ['robot'], tags: ['movement'], effects: [{ op: 'move' }] },
+      { id: 'look', kinds: ['robot'] },
+      { id: 'pick', kinds: ['robot'], effects: [{ op: 'set', fact: 'loaded', value: true }, { op: 'add', fact: 'people', value: 1 }] },
+      { id: 'drop', kinds: ['robot'], effects: [{ op: 'set', fact: 'loaded', value: false }] },
+    ],
+    facts: [
+      { id: 'people', type: 'number', integer: true, min: 0, max: 2, required: true },
+      { id: 'load', type: 'number', min: 0, default: 0 },
+      { id: 'time', type: 'time', required: true },
+      { id: 'mode', type: 'enum', values: ['a', 'b', 'c'], default: 'a' },
+      { id: 'alarm', type: 'boolean', default: false },
+      { id: 'day', type: 'day', required: true },
+      { id: 'speedAsked', type: 'number', min: 0 },
+      { id: 'loaded', type: 'boolean', default: false },
+    ],
+    roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['go', 'look', 'pick', 'drop'] }],
+    ...(planRules.length ? { planRules } : {}),
+  });
+  const bot = { id: 'b-1', kind: 'robot', roleId: 'bot' };
+  const start = { people: 0, time: '10:00', day: 'mon' };
+  const ok = { approvedBy: { id: 'ann', authority: 'high' } };
+  const plan = (steps: Plan['steps'], patch: Partial<Plan> = {}): Plan => ({ participant: bot, initialFacts: start, steps, ...patch });
+  const shaped = site([planRule('end_in_floor', { kind: 'ends_in', areas: 'floor' }), planRule('look_before_pick', { kind: 'before', first: 'look', then: 'pick', sameArea: true }, { setBy: 'low', who: 'bot' }), planRule('one_pick', { kind: 'at_most', actions: 'pick', count: 1 }, { setBy: 'low' }), planRule('end_with_drop_or_go', { kind: 'ends_with', actions: ['drop', 'go'] })]);
+
+  add(f, { id: 'plan-effects-project-and-first-block-rejects', principle: [3, 4, 5], description: 'Each step is decided on facts projected by the earlier steps\' declared effects: pick sets loaded, so the move to the yard is refused at step 3 by the rule, its reason, its authority and its instead hint; nothing is projected past it.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'go', area: 'yard' }, { action: 'drop' }]),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'BLOCK'], firstViolation: 'no_load_in_yard@high#2:step' } });
+  add(f, { id: 'plan-accepted-with-final-facts', principle: [3, 5], description: 'A plan every step of which passes is ALLOW, with the projected facts and the area it ends in.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'yard' }, { action: 'go', area: 'floor' }]),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
+  add(f, { id: 'plan-area-defaults-to-where-the-last-move-left-it', principle: [3], description: 'A step without an area happens where the previous move left the participant; a step without a move effect does not move it.',
+    input: site(), plan: plan([{ action: 'go', area: 'yard' }, { action: 'drop' }, { action: 'look', area: 'floor', facts: ok }, { action: 'drop' }]),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
+  add(f, { id: 'plan-pause-collects-approvals', principle: [6, 3], description: 'A step that waits for approval is PAUSE; the plan result lists every approval request so a planner can collect them up front, and later steps are still checked.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor' }, { action: 'pick' }, { action: 'drop' }]),
+    want: { status: 'PAUSE', steps: ['PAUSE', 'ALLOW', 'ALLOW'], asks: ['ask_before_look@high'] } });
+  add(f, { id: 'plan-rules-judge-the-whole-plan', principle: [3, 5], description: 'Plan rules: ends_in, before (same area), at_most and ends_with each name the step where the plan breaks them, with the authority that set each; the first violation is the earliest by step.',
+    input: shaped, plan: plan([{ action: 'pick', area: 'floor' }, { action: 'drop' }, { action: 'look', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'look', area: 'yard', facts: ok }]),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'], planChecks: ['end_in_floor:ALLOW', 'look_before_pick:BLOCK', 'one_pick:BLOCK', 'end_with_drop_or_go:BLOCK'], firstViolation: 'look_before_pick@low#0:plan' } });
+  add(f, { id: 'plan-rules-pass', principle: [3], description: 'The same plan rules, satisfied: a look before the only pick in the same area, ending with a move onto the floor.',
+    input: shaped, plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'yard' }, { action: 'go', area: 'floor' }]),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'], planChecks: ['end_in_floor:ALLOW', 'look_before_pick:ALLOW', 'one_pick:ALLOW', 'end_with_drop_or_go:ALLOW'] } });
+  add(f, { id: 'plan-history-counts-for-before', principle: [3], description: 'What the participant did before the plan (plan.history) counts for a "before" plan rule.',
+    input: shaped, plan: plan([{ action: 'pick', area: 'floor' }, { action: 'drop' }], { history: [{ action: 'look', areaId: 'floor' }] }),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW'], planChecks: ['end_in_floor:ALLOW', 'look_before_pick:ALLOW', 'one_pick:ALLOW', 'end_with_drop_or_go:ALLOW'] } });
+  add(f, { id: 'plan-rule-binds-by-role', principle: [8], description: 'A plan rule binds the roles its who selector names and no others: one on ["*", "!bot"] does not apply to the bot, so it is not even checked.',
+    input: site([planRule('no_picks', { kind: 'at_most', actions: 'pick', count: 0 }, { who: ['*', '!bot'] })]), plan: plan([{ action: 'pick', area: 'floor' }, { action: 'drop' }]),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW'] } });
+  add(f, { id: 'plan-projected-fact-out-of-range-is-a-refusal', principle: [4], description: 'An effect that pushes a fact outside its declared range (people max 2) is not clamped: the next step is BLOCK required_facts.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'pick' }, { action: 'drop' }, { action: 'pick' }], { initialFacts: { ...start, people: 1 } }),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'BLOCK'], firstViolation: 'required_facts@builtin#4:step' } });
+  add(f, { id: 'plan-clock-advances-per-step', principle: [9, 3], description: 'With clock, startTime and stepDurationSeconds, the named time fact advances per step (whole minutes, wrapping at midnight); there is still no clock in the engine.',
+    input: site([], [rule('no_night', { answer: 'deny' }, { when: [{ fact: 'time', op: 'between', from: '22:00', to: '06:00' }] })]),
+    plan: plan([{ action: 'drop', area: 'floor' }, { action: 'drop' }, { action: 'drop' }], { clock: 'time', startTime: '21:58', stepDurationSeconds: 90 }),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'BLOCK'], firstViolation: 'no_night@high#2:step' } });
+  add(f, { id: 'plan-without-steps-is-block', principle: [4], description: 'A plan with no steps is BLOCK required_facts, never a throw and never permission.',
+    input: site(), plan: plan([]), want: { status: 'BLOCK', firstViolation: 'required_facts@builtin#0:plan' } });
+  add(f, { id: 'plan-first-step-needs-an-area', principle: [4], description: 'The first step must say where it is; a plan that does not is BLOCK required_facts.',
+    input: site(), plan: plan([{ action: 'drop' }]), want: { status: 'BLOCK', firstViolation: 'required_facts@builtin#0:plan' } });
+  add(f, { id: 'plan-unknown-clock-is-block', principle: [4], description: 'A plan naming a clock that is not a declared time fact is BLOCK required_facts.',
+    input: site(), plan: plan([{ action: 'drop', area: 'floor' }], { clock: 'people', startTime: '10:00' }), want: { status: 'BLOCK', firstViolation: 'required_facts@builtin#0:plan' } });
+  add(f, { id: 'plan-same-plan-same-answer', principle: [3], description: 'A plan is decided by the rulebook and the plan alone: a note on a step and facts the rules do not mention change nothing.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok, note: 'anything' }, { action: 'pick' }, { action: 'go', area: 'yard', facts: { mode: 'c', weather: 'rain' } }]),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'BLOCK'], firstViolation: 'no_load_in_yard@high#2:step' } });
+  add(f, { id: 'plan-effect-on-unknown-fact-rejected', principle: [4], description: 'An action whose effect names a fact the site did not declare makes the rulebook invalid.',
+    input: site(), tamper: rb => { rb.actions.find(a => a.id === 'pick')!.effects = [{ op: 'set', fact: 'nope', value: 1 }]; }, want: { error: true } });
+  add(f, { id: 'plan-effect-wrong-type-rejected', principle: [4], description: 'An add effect on a boolean fact makes the rulebook invalid.',
+    input: site(), tamper: rb => { rb.actions.find(a => a.id === 'pick')!.effects = [{ op: 'add', fact: 'loaded', value: 1 }]; }, want: { error: true } });
+  add(f, { id: 'plan-rule-without-setby-rejected', principle: [1, 2], description: 'A plan rule that does not say who set it is rejected, like any rule.',
+    input: shaped, tamper: rb => { delete (rb.planRules![0] as Partial<PlanRule>).setBy; }, want: { error: true } });
+  add(f, { id: 'plan-rule-unknown-area-rejected', principle: [4], description: 'A plan rule naming an undeclared area is rejected.',
+    input: shaped, tamper: rb => { rb.planRules![0].check = { kind: 'ends_in', areas: 'roof' }; }, want: { error: true } });
+  add(f, { id: 'plan-rule-duplicate-finding', principle: [7], description: 'Two plan rules that make the same check for roles in common are a duplicate finding (plan rules only reject, so they never disagree).',
+    input: site([planRule('one_pick', { kind: 'at_most', actions: 'pick', count: 1 }), planRule('one_pick_again', { kind: 'at_most', actions: 'pick', count: 1 }, { setBy: 'low' })]), want: { findings: ['duplicate:certain:one_pick+one_pick_again'] } });
+}
+
+// ─── History: what the participant did recently (principles 4, 9) ───────────
+
+function history() {
+  const f = 'history.json';
+  const site = tiny([
+    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 'time', op: '>=', value: 5 }] }),
+    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 10, clock: 'time', op: '>=', value: 1 }] }),
+    rule('three_yard_visits', { answer: 'wait', for: 'approval' }, { does: 'go', where: 'yard', history: [{ actions: 'go', areas: 'yard', op: '>=', value: 3 }] }),
+  ]);
+  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'floor', at: `${String(Math.floor((from + i) / 60)).padStart(2, '0')}:${String((from + i) % 60).padStart(2, '0')}` }));
+  const h = (id: string, principle: number[], description: string, request: DomainRequest, want: Want) => add(f, { id, principle, description, input: site, request, want });
+  h('history-under-the-count-allows', [4, 9], 'Four looks in the hour: the rule needs five, so ALLOW.', { ...req('look'), history: looks(4) }, { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-at-the-count-denies', [4, 9], 'Five looks in the hour before the time fact: the rule matches and denies.', { ...req('look'), history: looks(5) }, { status: 'BLOCK', reasons: ['five_looks_an_hour@high'] });
+  h('history-outside-the-window-does-not-count', [9], 'Only entries within the window before the clock fact count: at 10:05 the 09:00 look is out, four remain, ALLOW.', { ...req('look', 'floor', { time: '10:05' }), history: looks(5) }, { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-window-wraps-midnight', [9], 'The window is minute-of-day arithmetic that wraps: a go at 23:55 is eight minutes before 00:03.', { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'floor', at: '23:55' }] }, { status: 'PAUSE', reasons: ['not_right_after_go@high'] });
+  h('history-same-area-only', [9], 'sameArea counts only entries in the request\'s own area: the go was in the yard, so no wait.', { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'yard', at: '23:55' }] }, { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-areas-selector-without-window', [9], 'A history condition without a window needs no times: three earlier goes into the yard make the next one wait for approval.', { ...req('go', 'yard'), history: [{ action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'floor' }, { action: 'go', areaId: 'yard' }] }, { status: 'PAUSE', reasons: ['three_yard_visits@high'], asks: ['three_yard_visits'] });
+  h('history-missing-is-required-facts', [4], 'A rule in scope that counts history, with no history supplied, is BLOCK required_facts: the engine keeps no history and never guesses.', req('look'), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-entry-without-time-is-required-facts', [4], 'When a rule in scope uses a window, an entry without "at" is incomplete: BLOCK required_facts.', { ...req('look'), history: [{ action: 'look', areaId: 'floor' }] }, { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-malformed-entry-is-required-facts', [4], 'An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.', { ...req('look'), history: [{ action: 'look' } as unknown as { action: string; areaId: string }] }, { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-not-needed-out-of-scope', [4], 'A request no history rule reaches (go on the floor) needs no history at all.', req('go'), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-empty-list-is-history', [4], 'An empty list is a history (nothing happened): the count is zero.', { ...req('look'), history: [] }, { status: 'ALLOW', reasons: ['role_permits_action'] });
+  add(f, { id: 'history-unknown-action-rejected', principle: [4], description: 'A history condition naming an undeclared action makes the rulebook invalid.',
+    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'fly', op: '>=', value: 1 }]; }, want: { error: true } });
+  add(f, { id: 'history-window-without-clock-rejected', principle: [4, 9], description: 'A window without a clock fact is rejected: the engine has no clock of its own.',
+    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, op: '>=', value: 5 }]; }, want: { error: true } });
+  add(f, { id: 'history-clock-must-be-time-fact', principle: [4], description: 'A clock that is not a declared time fact is rejected.',
+    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, clock: 'people', op: '>=', value: 5 }]; }, want: { error: true } });
 }
 
 // ─── Canonical JSON and the fingerprint ──────────────────────────────────────
@@ -577,6 +730,7 @@ async function main() {
   for (const [name, rb] of Object.entries(bases)) writeFileSync(join(OUT, 'rulebooks', `${name}.json`), JSON.stringify(rb, null, 2) + '\n');
 
   p1(); p2(); p3(); p4(); p5(); p6(); p7(); p8(); p9();
+  plans(); history();
   fingerprintCases();
   await approvals();
 

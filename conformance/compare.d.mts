@@ -6,6 +6,7 @@ export interface ConformanceCase {
   rulebook?: unknown;
   rulebookRef?: string;
   request?: unknown;
+  plan?: unknown;
   value?: unknown;
   approval?: unknown;
   trustedKeys?: unknown;
@@ -16,7 +17,10 @@ export interface ConformanceCase {
 export interface LoadedCase { file: string; case: ConformanceCase; rulebook: unknown }
 export interface Impl {
   evaluate: (rulebook: never, request: never) => unknown;
+  evaluatePlan: (rulebook: never, plan: never) => unknown;
   check: (rulebook: never) => unknown;
+  /** Optional: when given, a finding's witness is judged by whether it matches both rules; when absent, it must equal the reference's. */
+  matches?: (rulebook: never, request: never) => string[];
   validate: (rulebook: unknown) => string[];
   canonical: (value: unknown) => string;
   fingerprint: (value: unknown) => string;
@@ -26,6 +30,7 @@ export interface Impl {
 }
 export function projectDecision(d: unknown): unknown;
 export function projectFindings(findings: unknown): unknown;
+export function projectPlan(p: unknown): unknown;
 export function deepEqual(a: unknown, b: unknown): boolean;
 export function runCase(c: ConformanceCase, impl: Impl, rulebook: unknown): Promise<string | null>;
 export function loadCases(fs: unknown, path: unknown, dir: string): Promise<LoadedCase[]>;

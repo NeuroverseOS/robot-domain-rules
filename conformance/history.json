@@ -1,0 +1,3835 @@
+[
+  {
+    "id": "history-under-the-count-allows",
+    "principle": [
+      4,
+      9
+    ],
+    "description": "Four looks in the hour: the rule needs five, so ALLOW.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:00"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:01"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:02"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:03"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-at-the-count-denies",
+    "principle": [
+      4,
+      9
+    ],
+    "description": "Five looks in the hour before the time fact: the rule matches and denies.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:00"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:01"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:02"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:03"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:04"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "five_looks_an_hour",
+            "status": "BLOCK",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "five_looks_an_hour",
+            "status": "BLOCK",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-outside-the-window-does-not-count",
+    "principle": [
+      9
+    ],
+    "description": "Only entries within the window before the clock fact count: at 10:05 the 09:00 look is out, four remain, ALLOW.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:05",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:00"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:01"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:02"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:03"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:04"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-window-wraps-midnight",
+    "principle": [
+      9
+    ],
+    "description": "The window is minute-of-day arithmetic that wraps: a go at 23:55 is eight minutes before 00:03.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "00:03",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "floor",
+          "at": "23:55"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-same-area-only",
+    "principle": [
+      9
+    ],
+    "description": "sameArea counts only entries in the request's own area: the go was in the yard, so no wait.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "00:03",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "yard",
+          "at": "23:55"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-areas-selector-without-window",
+    "principle": [
+      9
+    ],
+    "description": "A history condition without a window needs no times: three earlier goes into the yard make the next one wait for approval.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "yard"
+        },
+        {
+          "action": "go",
+          "areaId": "yard"
+        },
+        {
+          "action": "go",
+          "areaId": "floor"
+        },
+        {
+          "action": "go",
+          "areaId": "yard"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "three_yard_visits",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "three_yard_visits",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "three_yard_visits",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "1e23af27d90edba8",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-missing-is-required-facts",
+    "principle": [
+      4
+    ],
+    "description": "A rule in scope that counts history, with no history supplied, is BLOCK required_facts: the engine keeps no history and never guesses.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-entry-without-time-is-required-facts",
+    "principle": [
+      4
+    ],
+    "description": "When a rule in scope uses a window, an entry without \"at\" is incomplete: BLOCK required_facts.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-malformed-entry-is-required-facts",
+    "principle": [
+      4
+    ],
+    "description": "An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-not-needed-out-of-scope",
+    "principle": [
+      4
+    ],
+    "description": "A request no history rule reaches (go on the floor) needs no history at all.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-empty-list-is-history",
+    "principle": [
+      4
+    ],
+    "description": "An empty list is a history (nothing happened): the count is zero.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "time",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "1e23af27d90edba8"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": []
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "1e23af27d90edba8"
+      }
+    }
+  },
+  {
+    "id": "history-unknown-action-rejected",
+    "principle": [
+      4
+    ],
+    "description": "A history condition naming an undeclared action makes the rulebook invalid.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "fly",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "e7f1d832e4a23a6b"
+    },
+    "expect": {
+      "error": true,
+      "note": "Rule \"five_looks_an_hour\" history: does names unknown action \"fly\". Known: go, look."
+    }
+  },
+  {
+    "id": "history-window-without-clock-rejected",
+    "principle": [
+      4,
+      9
+    ],
+    "description": "A window without a clock fact is rejected: the engine has no clock of its own.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "6a44214395c12923"
+    },
+    "expect": {
+      "error": true,
+      "note": "Rule \"five_looks_an_hour\": history.withinMinutes needs clock: the time fact that is \"now\"."
+    }
+  },
+  {
+    "id": "history-clock-must-be-time-fact",
+    "principle": [
+      4
+    ],
+    "description": "A clock that is not a declared time fact is rejected.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "clock": "people",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 10,
+              "clock": "time",
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "e26fd2924b03a552"
+    },
+    "expect": {
+      "error": true,
+      "note": "Rule \"five_looks_an_hour\": history.clock \"people\" is not a declared time fact."
+    }
+  }
+]

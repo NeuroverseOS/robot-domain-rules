@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0
+
+Whole-plan checking for AI planners, an exact conflict analysis cross-checked with Z3, a Cedar export, and a planner replay. Spec `robot-domain-rules/2`.
+
+### Added
+
+- **Whole plans.** `evaluatePlan(rulebook, plan)`: a planner proposes `{ participant, steps, initialFacts, history?, clock?, startTime?, stepDurationSeconds? }`; each step is decided with the single-action evaluator on the facts PROJECTED from the earlier steps' declared effects; the result is `{ status, steps (each with its decision and facts), planChecks, firstViolation?, approvalRequests, finalFacts, finalArea, planDigest, fingerprint }`. Nothing is projected past the first BLOCK; a PAUSE lists every approval the plan needs so a planner can collect them up front; a projected fact out of range is `required_facts`, never a clamp; a malformed plan is BLOCK, never a throw. SPEC.md § 12, `spec/plan.schema.json`, `spec/plan-evaluation.schema.json`.
+- **Effects.** An action may declare `effects`: `{ op: 'set' | 'add' | 'subtract', fact, value }` or `{ op: 'move' }` (the participant is in the step's area afterwards). Validated against the declared facts. The grocery template's `enter_zone` and `dock` move, `manipulate` sets the new `carrying` fact and the new `place` action clears it; the warehouse template's `enter` and `dock` move. SPEC.md § 2.1.
+- **Plan rules.** `rulebook.planRules`: `ends_in`, `ends_with`, `before` (optionally same area; the plan's `history` counts), `at_most`; each with `who`, `setBy`, `source`, `reason`; they can only reject and name the step where the plan breaks them. `DomainRulesBuilder.addPlanRule`, `validatePlanRule`. The grocery example gained `scan_before_restock` and `end_at_dock`, and a `no_carrying_through_checkout` rule. SPEC.md § 3.5.
+- **History conditions.** A rule may carry `history: [{ actions, areas?, sameArea?, withinMinutes?, clock?, op, value }]` over `request.history` (`[{ action, areaId, at? }]`, caller-supplied). Windows use minute-of-day arithmetic on a declared time fact and wrap at midnight. A rule in scope that needs history and does not get it is `required_facts`. SPEC.md § 3.4.
+- **Exact conflict analysis with witnesses.** `checkRulebook` is complete for the rule language: two rules are reported if and only if some request matches both, and every `certain` finding carries `witness`, a concrete request that triggers both rules (the smallest values in every overlap; SPEC.md § 7.4). Integer ranges are exact (closed on whole numbers; every-whole-number-excluded is empty). `certainty: 'possible'` now means only "a rule here has history conditions, which are not modelled"; it no longer means "partial overlap". `rulesOverlap(rulebook, idA, idB)` and `matchingRules(rulebook, request)` are exported. The switchboard's "Rules at odds" shows the witness with a "try it" button.
+- **Z3 cross-check** (`test/z3-crosscheck.test.ts`, runs in `npm test`): hundreds of seeded rulebooks are encoded into the Z3 SMT solver and the checker must agree on every pair, and every witness must satisfy both formulas — 306 rulebooks, 1,836 pairs, 1,115 witnesses, ~6 s. `z3-solver` is a devDependency only.
+- **Cedar export** (`adapters/cedar/`, its own package): `toCedar(rulebook) → { policies, schema, notExported, droppedByAuthority }`; authority resolved first; roles' action lists and allow rules → `permit`, deny and never rules → `forbid` with `when` clauses over `context`; LIMIT, both WAIT kinds, approvals, history and plan rules listed as not exported. Tested against `@cedar-policy/cedar-wasm` (strict validation; Cedar's decisions agree with ours on the exported subset for every example request).
+- **Planner replay** (`examples/harness/plan-replay.ts`, `plans.jsonl` → `plan-decisions.jsonl`): v1 rejected at step 2, v2 pauses for one approval, Dana signs it (Ed25519, TEST ONLY key), v2 accepted. Readable transcript.
+- **Switchboard Plan mode**: load a preset plan (the replay's v1 and v2 among them) or build one, step through it on projected facts, see the first violation, every step's decision, the plan rules, the approvals and where it ends. The mode and the plan travel in the link.
+- Conformance: `plans.json` (19 cases) and `history.json` (14 cases); witnesses on every certain finding; `p7` gains every-shape and integer-exclusion cases; `compare.mjs` judges witnesses by validity through `impl.matches` and compares plan evaluations. 181 cases.
+- Docs: SPEC.md § 2.1, § 3.4, § 3.5, § 7 (exact), § 7.4, § 7.5, § 12; PRINCIPLES.md (plans under 3, history under 4, exactness under 7); RELATED-WORK.md (whole-plan row, "layers, not competitors"); README roadmap ("rules that learn from evidence"; plan synthesis out of scope).
+
+### Changed
+
+- **Spec `robot-domain-rules/2`.** The exact analysis changed the certainty of some findings (`possible` → `certain` with a witness) and, through the `witness` member, the fingerprint of any rulebook that has findings. Decisions for existing rulebooks did not change. The rulebook `format` string stays `neuroverse-domain-rules/2`: every new member is optional and a rulebook without findings or plan rules keeps its fingerprint.
+- Template actions now declare effects and the grocery template declares `carrying` and `place`, so rulebooks built from the templates (and the example fingerprints) changed. `inputFromRulebook` in the switchboard carries `planRules`.
+- The published package adds `adapters/cedar/` (source, README, package.json) and the planner replay; still no runtime dependencies.
+
 ## 0.4.0
 
 The release for engineers who will build their own: principles, a language-neutral spec with conformance tests, signed approvals, and a harness replay.

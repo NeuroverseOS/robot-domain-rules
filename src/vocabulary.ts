@@ -9,7 +9,7 @@
  */
 
 import type {
-  ActionDef, AreaDef, AuthorityDef, Condition, Day, FactDef, FactValue, LimitDef, RoleDef, Rulebook, Selector,
+  ActionDef, AreaDef, AuthorityDef, Condition, Day, FactDef, FactValue, HistoryCondition, HistoryEntry, LimitDef, RoleDef, Rulebook, Selector,
 } from './types';
 import { DAYS } from './types';
 
@@ -292,6 +292,61 @@ export function describeCondition(c: Condition): string {
   }
 }
 
+// ─── History conditions ──────────────────────────────────────────────────────
+
+export function validateHistoryCondition(h: HistoryCondition, vocab: Vocabulary, where: string): void {
+  if (!h || typeof h !== 'object') throw new DomainRulesError(`${where}: each history condition needs { actions, op, value }.`);
+  validateSelector(h.actions, 'does', vocab, `${where} history`);
+  if (h.areas !== undefined) validateSelector(h.areas, 'where', vocab, `${where} history`);
+  if (h.sameArea !== undefined && typeof h.sameArea !== 'boolean') throw new DomainRulesError(`${where}: history.sameArea must be true or false.`);
+  if (!(COMPARE_OPS as readonly string[]).includes(h.op)) throw new DomainRulesError(`${where}: history op must be one of ${COMPARE_OPS.join(', ')}.`);
+  if (typeof h.value !== 'number' || !Number.isInteger(h.value) || h.value < 0) throw new DomainRulesError(`${where}: history value must be a whole number, 0 or more.`);
+  if (h.withinMinutes !== undefined) {
+    if (typeof h.withinMinutes !== 'number' || !Number.isFinite(h.withinMinutes) || h.withinMinutes <= 0 || h.withinMinutes > 1440) throw new DomainRulesError(`${where}: history.withinMinutes must be between 1 and 1440.`);
+    if (typeof h.clock !== 'string') throw new DomainRulesError(`${where}: history.withinMinutes needs clock: the time fact that is "now".`);
+    const def = vocab.facts.get(h.clock);
+    if (!def || def.type !== 'time') throw new DomainRulesError(`${where}: history.clock "${h.clock}" is not a declared time fact.`);
+    if (!factAlwaysPresent(def)) throw new DomainRulesError(`${where}: history.clock "${h.clock}" is optional with no default; make it required or give it a default.`);
+  } else if (h.clock !== undefined) throw new DomainRulesError(`${where}: history.clock only applies with withinMinutes.`);
+}
+
+/** Problems with a supplied history, in plain words (empty when it is usable). `needTimes`: some matching rule uses a window. */
+export function historyProblems(history: unknown, needTimes: boolean): string[] {
+  if (!Array.isArray(history)) return ['history must be a list of { action, areaId, at? }'];
+  const problems: string[] = [];
+  history.forEach((e: HistoryEntry, i) => {
+    if (!e || typeof e !== 'object' || typeof e.action !== 'string' || !e.action || typeof e.areaId !== 'string' || !e.areaId) problems.push(`history[${i}] must be { action, areaId, at? }`);
+    else if (e.at !== undefined && !isValidTime(e.at)) problems.push(`history[${i}].at must be "HH:MM", got ${show(e.at)}`);
+    else if (needTimes && e.at === undefined) problems.push(`history[${i}] needs "at" because a rule counts within a time window`);
+  });
+  return problems;
+}
+
+/** Does the history condition hold for this request? History and facts are validated here. */
+export function historyConditionHolds(h: HistoryCondition, history: HistoryEntry[], areaId: string, facts: Record<string, FactValue>, vocab: Vocabulary): boolean {
+  const actions = resolveSelector(h.actions, 'does', vocab);
+  const areas = h.areas !== undefined ? resolveSelector(h.areas, 'where', vocab) : null;
+  const now = h.withinMinutes !== undefined ? minutesOf(facts[h.clock!] as string) : null;
+  let count = 0;
+  for (const e of history) {
+    if (!actions.has(e.action)) continue;
+    if (h.sameArea && e.areaId !== areaId) continue;
+    if (areas && !areas.has(e.areaId)) continue;
+    if (now !== null) {
+      const ago = (now - minutesOf(e.at!) + 1440) % 1440;
+      if (ago > h.withinMinutes!) continue;
+    }
+    count++;
+  }
+  return compare(h.op, count, h.value);
+}
+
+export function describeHistoryCondition(h: HistoryCondition): string {
+  const window = h.withinMinutes !== undefined ? ` in the last ${h.withinMinutes} min` : '';
+  const where = h.sameArea ? ' in the same area' : h.areas !== undefined ? ` in ${Array.isArray(h.areas) ? h.areas.join('/') : h.areas}` : '';
+  return `history: ${Array.isArray(h.actions) ? h.actions.join('/') : h.actions}${where}${window} ${h.op} ${h.value}`;
+}
+
 // ─── Constraints: conditions as sets, for exact comparison ───────────────────
 //
 // Every condition language form maps to one of three set shapes over one fact:
@@ -302,20 +357,29 @@ export function describeCondition(c: Condition): string {
 // and implication is sound.
 
 export type Constraint =
-  | { shape: 'range'; lo: number; hi: number; loOpen: boolean; hiOpen: boolean; excluded: number[] }
+  | { shape: 'range'; lo: number; hi: number; loOpen: boolean; hiOpen: boolean; excluded: number[]; integer?: boolean }
   | { shape: 'finite'; values: number[] }
   | { shape: 'values'; values?: FactValue[]; excluded: FactValue[] }
   | { shape: 'minutes'; bits: boolean[] };
 
 function universeConstraint(def: FactDef): Constraint {
   switch (def.type) {
-    case 'number': return { shape: 'range', lo: def.min ?? -Infinity, hi: def.max ?? Infinity, loOpen: false, hiOpen: false, excluded: [] };
+    case 'number': return normaliseRange({ shape: 'range', lo: def.min ?? -Infinity, hi: def.max ?? Infinity, loOpen: false, hiOpen: false, excluded: [] }, def.integer === true);
     case 'time': return { shape: 'minutes', bits: new Array(1440).fill(true) };
     case 'boolean': return { shape: 'values', values: [true, false], excluded: [] };
     case 'day': return { shape: 'values', values: [...DAYS], excluded: [] };
     case 'enum': return { shape: 'values', values: [...(def.values ?? [])], excluded: [] };
     case 'string': return { shape: 'values', excluded: [] };
   }
+}
+
+/** Integer ranges are kept closed on whole numbers, so emptiness and witnesses are exact. */
+function normaliseRange(r: Extract<Constraint, { shape: 'range' }>, int: boolean): Extract<Constraint, { shape: 'range' }> {
+  if (!int) return r;
+  let lo = r.lo, hi = r.hi;
+  if (lo !== -Infinity) lo = r.loOpen ? Math.floor(lo) + 1 : Math.ceil(lo);
+  if (hi !== Infinity) hi = r.hiOpen ? Math.ceil(hi) - 1 : Math.floor(hi);
+  return { shape: 'range', lo, hi, loOpen: false, hiOpen: false, excluded: r.excluded.filter(Number.isInteger), integer: true };
 }
 
 function conditionConstraint(c: Condition, def: FactDef): Constraint {
@@ -338,10 +402,10 @@ function conditionConstraint(c: Condition, def: FactDef): Constraint {
     switch (c.op) {
       case '==': return { shape: 'finite', values: [v] };
       case '!=': r.excluded = [v]; return r;
-      case '>': if (int) { r.lo = Math.max(r.lo, v + 1); } else { r.lo = Math.max(r.lo, v); r.loOpen = r.lo === v; } return r;
-      case '>=': r.lo = Math.max(r.lo, v); return r;
-      case '<': if (int) { r.hi = Math.min(r.hi, v - 1); } else { r.hi = Math.min(r.hi, v); r.hiOpen = r.hi === v; } return r;
-      case '<=': r.hi = Math.min(r.hi, v); return r;
+      case '>': r.lo = Math.max(r.lo, v); r.loOpen = r.lo === v; return normaliseRange(r, int);
+      case '>=': r.lo = Math.max(r.lo, v); return normaliseRange(r, int);
+      case '<': r.hi = Math.min(r.hi, v); r.hiOpen = r.hi === v; return normaliseRange(r, int);
+      case '<=': r.hi = Math.min(r.hi, v); return normaliseRange(r, int);
     }
   }
   // boolean, enum, day, string
@@ -372,7 +436,8 @@ export function intersect(a: Constraint, b: Constraint): Constraint {
     const lo = Math.max(a.lo, b.lo), hi = Math.min(a.hi, b.hi);
     const loOpen = (a.lo === lo && a.loOpen) || (b.lo === lo && b.loOpen);
     const hiOpen = (a.hi === hi && a.hiOpen) || (b.hi === hi && b.hiOpen);
-    return { shape: 'range', lo, hi, loOpen, hiOpen, excluded: [...new Set([...a.excluded, ...b.excluded])] };
+    const int = a.integer === true || b.integer === true;
+    return normaliseRange({ shape: 'range', lo, hi, loOpen, hiOpen, excluded: [...new Set([...a.excluded, ...b.excluded])] }, int);
   }
   if (a.shape === 'values' && b.shape === 'values') {
     const excluded = [...new Set([...a.excluded, ...b.excluded])];
@@ -392,8 +457,58 @@ export function isEmpty(c: Constraint): boolean {
     case 'range': {
       if (c.lo > c.hi) return true;
       if (c.lo === c.hi) return c.loOpen || c.hiOpen || c.excluded.includes(c.lo);
-      return false;
+      // A real interval with lo < hi is never emptied by finitely many excluded points.
+      if (!c.integer) return false;
+      // An integer interval is empty only when every whole number in it is excluded.
+      if (c.hi - c.lo + 1 > c.excluded.length) return false;
+      for (let v = c.lo; v <= c.hi; v++) if (!c.excluded.includes(v)) return false;
+      return true;
     }
+  }
+}
+
+/**
+ * One concrete value inside the constraint, or undefined when it is empty.
+ * Deterministic: the smallest or earliest value that fits, so a witness is
+ * the same every time.
+ */
+export function witnessValue(c: Constraint, def: FactDef): FactValue | undefined {
+  if (isEmpty(c)) return undefined;
+  switch (c.shape) {
+    case 'minutes': { const t = c.bits.findIndex(Boolean); return t < 0 ? undefined : hhmm(t); }
+    case 'finite': return [...c.values].sort((a, b) => a - b)[0];
+    case 'values': {
+      if (c.values) return [...c.values].sort()[0];
+      // "everything except": the first short string not excluded (string facts only).
+      for (let i = 0; ; i++) { const v = i === 0 ? 'x' : `x${i}`; if (!c.excluded.includes(v)) return v; }
+    }
+    case 'range': {
+      const ex = new Set(c.excluded);
+      if (c.integer) {
+        const start = c.lo === -Infinity ? (c.hi === Infinity ? 0 : Math.min(0, c.hi)) : c.lo;
+        for (let v = start; v <= c.hi; v++) if (!ex.has(v)) return v;
+        return undefined;
+      }
+      // Real interval: the lower end when it is closed and not excluded, else move inwards by halves.
+      if (c.lo !== -Infinity && !c.loOpen && !ex.has(c.lo)) return c.lo;
+      if (c.lo === -Infinity && c.hi === Infinity) { for (let v = 0; ; v++) if (!ex.has(v)) return v; }
+      if (c.lo === -Infinity) { for (let v = c.hiOpen || ex.has(c.hi) ? c.hi - 1 : c.hi; ; v -= 1) if (!ex.has(v)) return v; }
+      if (c.hi === Infinity) { for (let v = c.lo + 1; ; v += 1) if (!ex.has(v)) return v; }
+      for (let k = 2; ; k *= 2) { const v = c.lo + (c.hi - c.lo) / k; if (!ex.has(v)) return v; }
+    }
+  }
+}
+
+/** A valid value of the fact's type that no rule needs to be special: the declared default, else the smallest or first value. */
+export function sampleValue(def: FactDef): FactValue {
+  if (def.default !== undefined) return def.default;
+  switch (def.type) {
+    case 'number': return def.min ?? 0;
+    case 'boolean': return false;
+    case 'time': return '00:00';
+    case 'day': return 'mon';
+    case 'enum': return (def.values ?? [])[0];
+    case 'string': return 'x';
   }
 }
 

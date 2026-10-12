@@ -7,14 +7,16 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  evaluateDomainAction, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest, verifyApproval, verifyRulebookSignature,
+  evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest, verifyApproval, verifyRulebookSignature,
   type Rulebook,
 } from '../src/index';
 import { loadCases, runCase } from '../conformance/compare.mjs';
 
 const impl = {
   evaluate: evaluateDomainAction,
+  evaluatePlan,
   check: (rb: Rulebook) => checkRulebook(rb),
+  matches: matchingRules,
   validate: validateRulebook,
   canonical: canonicalJson,
   fingerprint,

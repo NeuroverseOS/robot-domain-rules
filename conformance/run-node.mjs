@@ -17,7 +17,9 @@ import * as core from '../dist/index.js';
 
 const impl = {
   evaluate: core.evaluateDomainAction,
+  evaluatePlan: core.evaluatePlan,
   check: core.checkRulebook,
+  matches: core.matchingRules,
   validate: core.validateRulebook,
   canonical: core.canonicalJson,
   fingerprint: core.fingerprint,

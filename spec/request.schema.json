@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/request.schema.json",
-  "title": "Request (robot-domain-rules/1)",
+  "title": "Request (robot-domain-rules/2)",
   "description": "One question: may this participant do this action in this area, given these facts? SPEC.md § Request.",
   "type": "object",
   "required": ["participant", "action", "facts"],
@@ -12,6 +12,7 @@
     "areaId": { "type": "string", "minLength": 1 },
     "zoneId": { "type": "string", "minLength": 1, "deprecated": true, "description": "0.2 name for areaId." },
     "targetRobotId": { "type": "string", "deprecated": true, "description": "0.2 field; copied into facts.targetRobotId when absent there." },
+    "history": { "type": "array", "description": "What this participant did recently, as the caller reports it. Needed only by rules with history conditions.", "items": { "$ref": "common.schema.json#/$defs/historyEntry" } },
     "facts": {
       "type": "object",
       "description": "The declared facts by ID, plus the built-in approvedBy.",

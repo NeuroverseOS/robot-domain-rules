@@ -113,7 +113,7 @@ export function SituationPanel({ situation, rulebook, presets, onChange }: Props
   }
 }
 
-function FactControl({ def, value, onSet, onDrop }: { def: FactDef; value: unknown; onSet: (v: unknown) => void; onDrop: () => void }) {
+export function FactControl({ def, value, onSet, onDrop }: { def: FactDef; value: unknown; onSet: (v: unknown) => void; onDrop: () => void }) {
   const present = value !== undefined;
   const optional = !def.required;
   const label = (

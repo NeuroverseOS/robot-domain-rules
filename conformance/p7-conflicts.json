@@ -185,10 +185,24 @@
             "no"
           ],
           "certainty": "certain",
-          "message": "`yes` (set by high) says allow; `no` (set by high) says deny. Both apply to every role · every action · Yard, always. The strictest answer wins, so `yes` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`yes` (set by high) says allow; `no` (set by high) says deny. Both apply to every role · every action · Yard, always. The strictest answer wins, so `yes` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "473f29a880cdf870"
+      "fingerprint": "2c452c728f718f2e"
     },
     "expect": {
       "findings": [
@@ -199,17 +213,31 @@
             "yes",
             "no"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
   },
   {
-    "id": "p7-contradiction-possible",
+    "id": "p7-contradiction-partial-overlap",
     "principle": [
       7
     ],
-    "description": "Conditions on two independent facts can both hold on paper: a possible contradiction, never a certain one.",
+    "description": "Conditions on two independent facts (people == 0, load > 0) can both hold: the analysis is exact, so the contradiction is certain, with a witness request that matches both.",
     "rulebook": {
       "format": "neuroverse-domain-rules/2",
       "site": {
@@ -404,11 +432,26 @@
             "yes",
             "wait"
           ],
-          "certainty": "possible",
-          "message": "`yes` (set by high) says allow; `wait` (set by high) says wait for the situation to change. Both apply to every role · every action · everywhere, when people in 0 and load > 0. The strictest answer wins, so `yes` never takes effect there. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 0,
+              "load": 1
+            }
+          },
+          "message": "`yes` (set by high) says allow; `wait` (set by high) says wait for the situation to change. Both apply to every role · every action · everywhere, when people in 0 and load > 0. The strictest answer wins, so `yes` never takes effect there. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=0, load=1."
         }
       ],
-      "fingerprint": "e8129c28af0a4fb8"
+      "fingerprint": "a04f0546e35ec419"
     },
     "expect": {
       "findings": [
@@ -419,7 +462,22 @@
             "yes",
             "wait"
           ],
-          "certainty": "possible"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 0,
+              "load": 1
+            }
+          }
         }
       ]
     }
@@ -618,10 +676,24 @@
             "big"
           ],
           "certainty": "certain",
-          "message": "`small` (set by high) is fully covered by the stricter `big` (set by high): `small` (set by high) says wait for approval; `big` (set by high) says deny. `small` can never change a decision."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          },
+          "message": "`small` (set by high) is fully covered by the stricter `big` (set by high): `small` (set by high) says wait for approval; `big` (set by high) says deny. `small` can never change a decision. For example: bot does go in yard with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "5ac66c22847dde5f"
+      "fingerprint": "2c3c24076bd3bfdb"
     },
     "expect": {
       "findings": [
@@ -632,7 +704,21 @@
             "small",
             "big"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          }
         }
       ]
     }
@@ -823,10 +909,24 @@
             "b"
           ],
           "certainty": "certain",
-          "message": "`a` (set by high) and `b` (set by high) cover the same ground and say the same thing (deny): every role · look · everywhere, always. One of them can go."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`a` (set by high) and `b` (set by high) cover the same ground and say the same thing (deny): every role · look · everywhere, always. One of them can go. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "31e1b2a195eb35d4"
+      "fingerprint": "0bad7135a9255c94"
     },
     "expect": {
       "findings": [
@@ -837,7 +937,21 @@
             "a",
             "b"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -1028,10 +1142,24 @@
             "a"
           ],
           "certainty": "certain",
-          "message": "`b` (set by high) is already covered by `a` (set by high), which says the same thing (deny) for every role · look · Yard, always. `b` adds nothing."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`b` (set by high) is already covered by `a` (set by high), which says the same thing (deny) for every role · look · Yard, always. `b` adds nothing. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "26a7156892e27e1c"
+      "fingerprint": "6b7bcd1c8804ecf0"
     },
     "expect": {
       "findings": [
@@ -1042,7 +1170,21 @@
             "b",
             "a"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -1252,11 +1394,25 @@
             "fast",
             "slow"
           ],
-          "certainty": "possible",
-          "message": "`fast` (set by high) and `slow` (set by high) both limit speed for every role · every action · Floor, when people >= 3 and <= 4: 1 and 0.5. The lower value, 0.5, applies where both match. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          },
+          "message": "`fast` (set by high) and `slow` (set by high) both limit speed for every role · every action · Floor, when people >= 3 and <= 4: 1 and 0.5. The lower value, 0.5, applies where both match. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "8bd2f8fbd3eb71e2"
+      "fingerprint": "1f3c37cd7e200fa0"
     },
     "expect": {
       "findings": [
@@ -1267,7 +1423,21 @@
             "fast",
             "slow"
           ],
-          "certainty": "possible"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          }
         }
       ]
     }
@@ -1855,10 +2025,25 @@
             "inv"
           ],
           "certainty": "certain",
-          "message": "`ok` (set by high) tries to allow what the never rule `inv` (set by high) forbids. Both apply to every role · go · everywhere, when alarm in true. Nothing overrides a never rule, so `ok` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon",
+              "alarm": true
+            }
+          },
+          "message": "`ok` (set by high) tries to allow what the never rule `inv` (set by high) forbids. Both apply to every role · go · everywhere, when alarm in true. Nothing overrides a never rule, so `ok` never takes effect there. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "c064b49dd1c4ad48"
+      "fingerprint": "d1c700ac1af31dcd"
     },
     "expect": {
       "findings": [
@@ -1869,7 +2054,22 @@
             "ok",
             "inv"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon",
+              "alarm": true
+            }
+          }
         }
       ]
     }
@@ -2248,10 +2448,24 @@
             "ask_high"
           ],
           "certainty": "certain",
-          "message": "`ask_any` (set by high) is fully covered by the stricter `ask_high` (set by high): `ask_any` (set by high) says wait for approval; `ask_high` (set by high) says wait for approval by high. `ask_any` can never change a decision."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`ask_any` (set by high) is fully covered by the stricter `ask_high` (set by high): `ask_any` (set by high) says wait for approval; `ask_high` (set by high) says wait for approval by high. `ask_any` can never change a decision. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "0c4df41f267d3f47"
+      "fingerprint": "7fe867a57169ed6b"
     },
     "expect": {
       "findings": [
@@ -2262,7 +2476,21 @@
             "ask_any",
             "ask_high"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }
@@ -2272,7 +2500,7 @@
     "principle": [
       7
     ],
-    "description": "people <= 3 and people >= 3 share the value 3: the overlap is real and reported.",
+    "description": "people <= 3 and people >= 3 share the value 3: the overlap is real, certain, and the witness carries people = 3.",
     "rulebook": {
       "format": "neuroverse-domain-rules/2",
       "site": {
@@ -2466,11 +2694,25 @@
             "a",
             "b"
           ],
-          "certainty": "possible",
-          "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 3. The strictest answer wins, so `a` never takes effect there. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          },
+          "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 3. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "22743441516d8292"
+      "fingerprint": "2fb5da4ea0cdb722"
     },
     "expect": {
       "findings": [
@@ -2481,7 +2723,787 @@
             "a",
             "b"
           ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 3
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-witness-on-every-shape",
+    "principle": [
+      7
+    ],
+    "description": "A witness is found through every constraint shape at once: an integer range, a real range, a time window, a day set, an enum and a boolean.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 2
+            },
+            {
+              "fact": "load",
+              "op": ">=",
+              "value": 1.5
+            },
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "22:00",
+              "to": "06:00"
+            },
+            {
+              "fact": "day",
+              "op": "days",
+              "days": [
+                "sat",
+                "sun"
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "<=",
+              "value": 4
+            },
+            {
+              "fact": "load",
+              "op": "<",
+              "value": 3
+            },
+            {
+              "fact": "time",
+              "op": "<",
+              "value": "08:00"
+            },
+            {
+              "fact": "day",
+              "op": "!=",
+              "value": "sat"
+            },
+            {
+              "fact": "mode",
+              "op": "in",
+              "values": [
+                "b",
+                "c"
+              ]
+            },
+            {
+              "fact": "alarm",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 3,
+              "load": 1.5,
+              "time": "00:00",
+              "day": "sun",
+              "mode": "b",
+              "alarm": true
+            }
+          },
+          "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 4 and load >= 1.5 and < 3 and time in 00:00–06:00 and day in sun and mode in b, c and alarm in true. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with people=3, load=1.5, time=\"00:00\", day=\"sun\", mode=\"b\", alarm=true."
+        }
+      ],
+      "fingerprint": "aad7bebda66762da"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 3,
+              "load": 1.5,
+              "time": "00:00",
+              "day": "sun",
+              "mode": "b",
+              "alarm": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-history-rule-is-possible-without-witness",
+    "principle": [
+      7
+    ],
+    "description": "A rule that conditions on history is not analysed: the overlap on facts is real, the certainty is \"possible\", and no witness is given.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "yes",
+          "text": "yes",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "yes"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "too_many",
+          "text": "too_many",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "too_many"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "too_many"
+          ],
+          "certainty": "possible",
+          "message": "`yes` (set by high) says allow; `too_many` (set by high) says deny. Both apply to every role · look · everywhere, always. The strictest answer wins, so `yes` never takes effect there. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "845040ba7ee4038d"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "too_many"
+          ],
           "certainty": "possible"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-real-gap-is-not-empty",
+    "principle": [
+      7
+    ],
+    "description": "A real range is never emptied by excluded points: 1 < load < 2 and load != 1.5 still meet, and the witness avoids 1.5.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "load",
+              "op": ">",
+              "value": 1
+            },
+            {
+              "fact": "load",
+              "op": "<",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "load",
+              "op": "!=",
+              "value": 1.5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon",
+              "load": 1.25
+            }
+          },
+          "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when load > 1 and < 2 and not 1.5. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\", load=1.25."
+        }
+      ],
+      "fingerprint": "08b036dd0334a08a"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon",
+              "load": 1.25
+            }
+          }
         }
       ]
     }
@@ -4500,6 +5522,214 @@
     }
   },
   {
+    "id": "p7-disjoint-integer-all-excluded",
+    "principle": [
+      7
+    ],
+    "description": "An integer range whose every whole number is excluded (1..2 minus 1 and 2) is empty: no finding.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">=",
+              "value": 1
+            },
+            {
+              "fact": "people",
+              "op": "<=",
+              "value": 2
+            },
+            {
+              "fact": "people",
+              "op": "!=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "!=",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "b893eb9681207301"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
     "id": "p7-disjoint-selectors",
     "principle": [
       7
@@ -4883,7 +6113,21 @@
             "shopper_photos_entrance",
             "glasses_capture"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "shopper-1",
+              "kind": "person",
+              "roleId": "shopper"
+            },
+            "action": "camera_capture",
+            "areaId": "entrance",
+            "facts": {
+              "peopleInZone": 0,
+              "localTime": "00:00",
+              "day": "mon"
+            }
+          }
         },
         {
           "kind": "contradiction",
@@ -4892,7 +6136,21 @@
             "staff_audio_back_room",
             "no_audio_back_room_lunch"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "staff-1",
+              "kind": "person",
+              "roleId": "staff"
+            },
+            "action": "record_audio",
+            "areaId": "back-room",
+            "facts": {
+              "peopleInZone": 0,
+              "day": "mon",
+              "localTime": "12:00"
+            }
+          }
         },
         {
           "kind": "tightening",
@@ -4901,7 +6159,21 @@
             "robot_speed",
             "checkout_speed"
           ],
-          "certainty": "certain"
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "inventory_robot-1",
+              "kind": "robot",
+              "roleId": "inventory_robot"
+            },
+            "action": "enter_zone",
+            "areaId": "checkout",
+            "facts": {
+              "peopleInZone": 0,
+              "localTime": "00:00",
+              "day": "mon"
+            }
+          }
         }
       ]
     }

@@ -237,10 +237,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -287,7 +301,7 @@
         "limits": {
           "speed": 0.3
         },
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },
@@ -529,10 +543,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -574,7 +602,7 @@
         "limits": {
           "speed": 1
         },
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },
@@ -817,10 +845,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -867,7 +909,7 @@
         "limits": {
           "speed": 1
         },
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },
@@ -1109,10 +1151,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -1156,7 +1212,7 @@
           }
         ],
         "then": "dock",
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },
@@ -1398,10 +1454,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -1444,7 +1514,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },
@@ -1686,10 +1756,24 @@
             "no_yard_night"
           ],
           "certainty": "certain",
-          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "look",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "day": "mon",
+              "time": "00:00"
+            }
+          },
+          "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "7055736b4d192d5f"
+      "fingerprint": "d2b7bdb807a4ba4b"
     },
     "request": {
       "participant": {
@@ -1722,7 +1806,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "7055736b4d192d5f"
+        "fingerprint": "d2b7bdb807a4ba4b"
       }
     }
   },

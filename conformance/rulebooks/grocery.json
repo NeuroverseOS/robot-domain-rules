@@ -51,6 +51,11 @@
         "go into",
         "go in",
         "drive into"
+      ],
+      "effects": [
+        {
+          "op": "move"
+        }
       ]
     },
     {
@@ -83,6 +88,36 @@
         "restock",
         "touch",
         "manipulate"
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "fact": "carrying",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": "place",
+      "name": "put things down",
+      "kinds": [
+        "robot"
+      ],
+      "tags": [
+        "handling"
+      ],
+      "synonyms": [
+        "put down",
+        "place",
+        "drop",
+        "shelve"
+      ],
+      "effects": [
+        {
+          "op": "set",
+          "fact": "carrying",
+          "value": false
+        }
       ]
     },
     {
@@ -113,6 +148,11 @@
         "dock",
         "charge",
         "return to dock"
+      ],
+      "effects": [
+        {
+          "op": "move"
+        }
       ]
     },
     {
@@ -268,7 +308,8 @@
         "move",
         "scan",
         "dock",
-        "manipulate"
+        "manipulate",
+        "place"
       ]
     },
     {
@@ -370,6 +411,17 @@
       "id": "targetRobotId",
       "type": "string",
       "description": "For command_robot: the robot being commanded."
+    },
+    {
+      "id": "carrying",
+      "type": "boolean",
+      "default": false,
+      "description": "True while a robot is carrying stock. In a plan, manipulate sets it and place clears it.",
+      "synonyms": [
+        "carrying",
+        "loaded",
+        "carrying stock"
+      ]
     },
     {
       "id": "day",
@@ -793,6 +845,30 @@
         "kind": "manual",
         "ref": "staff_audio_back_room"
       }
+    },
+    {
+      "id": "no_carrying_through_checkout",
+      "text": "Robots carrying stock do not enter the checkout.",
+      "who": "kind:robot",
+      "does": "enter_zone",
+      "where": "checkout",
+      "when": [
+        {
+          "fact": "carrying",
+          "op": "==",
+          "value": true
+        }
+      ],
+      "then": {
+        "answer": "deny",
+        "instead": "place"
+      },
+      "reason": "Robots carrying stock do not enter the checkout; put it down first.",
+      "setBy": "site-manager",
+      "source": {
+        "kind": "manual",
+        "ref": "no_carrying_through_checkout"
+      }
     }
   ],
   "builtin": [
@@ -817,6 +893,40 @@
       "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
     }
   ],
+  "planRules": [
+    {
+      "id": "scan_before_restock",
+      "text": "A robot scans a shelf before it restocks it.",
+      "who": "kind:robot",
+      "check": {
+        "kind": "before",
+        "first": "scan",
+        "then": "manipulate",
+        "sameArea": true
+      },
+      "reason": "Scan the shelf before restocking it, so the plan works from what is actually there.",
+      "setBy": "site-manager",
+      "source": {
+        "kind": "manual",
+        "ref": "scan_before_restock"
+      }
+    },
+    {
+      "id": "end_at_dock",
+      "text": "Every robot plan ends at a charging dock.",
+      "who": "kind:robot",
+      "check": {
+        "kind": "ends_in",
+        "areas": "tag:dock"
+      },
+      "reason": "Every plan ends at a charging dock.",
+      "setBy": "site-manager",
+      "source": {
+        "kind": "manual",
+        "ref": "end_at_dock"
+      }
+    }
+  ],
   "findings": [
     {
       "kind": "tightening",
@@ -826,7 +936,21 @@
         "checkout_speed"
       ],
       "certainty": "certain",
-      "message": "`checkout_speed` set by Site manager tightens `robot_speed` set by Law and safety: `robot_speed` (set by Law and safety) says limit maxSpeedMps 1; `checkout_speed` (set by Site manager) says limit maxSpeedMps 0.3. Both apply to Inventory robot, Restock robot, Cleaning robot · enter an area, move, dock · Checkout, always. A lower authority may tighten, so this is fine; `robot_speed` never takes effect there."
+      "witness": {
+        "participant": {
+          "id": "inventory_robot-1",
+          "kind": "robot",
+          "roleId": "inventory_robot"
+        },
+        "action": "enter_zone",
+        "areaId": "checkout",
+        "facts": {
+          "peopleInZone": 0,
+          "localTime": "00:00",
+          "day": "mon"
+        }
+      },
+      "message": "`checkout_speed` set by Site manager tightens `robot_speed` set by Law and safety: `robot_speed` (set by Law and safety) says limit maxSpeedMps 1; `checkout_speed` (set by Site manager) says limit maxSpeedMps 0.3. Both apply to Inventory robot, Restock robot, Cleaning robot · enter an area, move, dock · Checkout, always. A lower authority may tighten, so this is fine; `robot_speed` never takes effect there. For example: inventory_robot does enter_zone in checkout with peopleInZone=0, localTime=\"00:00\", day=\"mon\"."
     },
     {
       "kind": "authority-override",
@@ -836,7 +960,21 @@
         "glasses_capture"
       ],
       "certainty": "certain",
-      "message": "`shopper_photos_entrance` set by Site manager tries to loosen what `glasses_capture` set by Company sets: `shopper_photos_entrance` (set by Site manager) says allow; `glasses_capture` (set by Company) says deny. Both apply to Shopper · take photos or video · Entrance, always. A lower authority can only tighten, so `shopper_photos_entrance` never takes effect at all."
+      "witness": {
+        "participant": {
+          "id": "shopper-1",
+          "kind": "person",
+          "roleId": "shopper"
+        },
+        "action": "camera_capture",
+        "areaId": "entrance",
+        "facts": {
+          "peopleInZone": 0,
+          "localTime": "00:00",
+          "day": "mon"
+        }
+      },
+      "message": "`shopper_photos_entrance` set by Site manager tries to loosen what `glasses_capture` set by Company sets: `shopper_photos_entrance` (set by Site manager) says allow; `glasses_capture` (set by Company) says deny. Both apply to Shopper · take photos or video · Entrance, always. A lower authority can only tighten, so `shopper_photos_entrance` never takes effect at all. For example: shopper does camera_capture in entrance with peopleInZone=0, localTime=\"00:00\", day=\"mon\"."
     },
     {
       "kind": "contradiction",
@@ -846,8 +984,22 @@
         "no_audio_back_room_lunch"
       ],
       "certainty": "certain",
-      "message": "`staff_audio_back_room` (set by Site manager) says allow; `no_audio_back_room_lunch` (set by Site manager) says deny. Both apply to Staff · record audio · Back room, when localTime in 12:00–13:00. The strictest answer wins, so `staff_audio_back_room` never takes effect there."
+      "witness": {
+        "participant": {
+          "id": "staff-1",
+          "kind": "person",
+          "roleId": "staff"
+        },
+        "action": "record_audio",
+        "areaId": "back-room",
+        "facts": {
+          "peopleInZone": 0,
+          "day": "mon",
+          "localTime": "12:00"
+        }
+      },
+      "message": "`staff_audio_back_room` (set by Site manager) says allow; `no_audio_back_room_lunch` (set by Site manager) says deny. Both apply to Staff · record audio · Back room, when localTime in 12:00–13:00. The strictest answer wins, so `staff_audio_back_room` never takes effect there. For example: staff does record_audio in back-room with peopleInZone=0, day=\"mon\", localTime=\"12:00\"."
     }
   ],
-  "fingerprint": "5005e9ccb716f50f"
+  "fingerprint": "81aec41ac2e1e01d"
 }

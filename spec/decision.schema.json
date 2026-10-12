@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/decision.schema.json",
-  "title": "Decision (robot-domain-rules/1)",
+  "title": "Decision (robot-domain-rules/2)",
   "description": "The answer, with its working. SPEC.md § Decision.",
   "type": "object",
   "required": ["status", "reasons", "trace", "fingerprint"],

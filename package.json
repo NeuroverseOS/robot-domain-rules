@@ -1,7 +1,7 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.4.0",
-  "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, conflict detection, signed approvals, and a language-neutral spec with conformance tests.",
+  "version": "0.5.0",
+  "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, whole-plan checking for AI planners, exact conflict analysis with witnesses, signed approvals, and a language-neutral spec with conformance tests.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -22,6 +22,10 @@
     "examples/mcp/package.json",
     "examples/mcp/tsconfig.json",
     "examples/mcp/README.md",
+    "adapters/cedar/index.ts",
+    "adapters/cedar/package.json",
+    "adapters/cedar/tsconfig.json",
+    "adapters/cedar/README.md",
     "spec",
     "conformance/*.json",
     "conformance/rulebooks",
@@ -49,14 +53,17 @@
     "site:test": "npm --prefix site test",
     "conformance": "node conformance/run-node.mjs",
     "conformance:generate": "tsx conformance/generate.ts",
-    "replay": "tsx examples/harness/replay.ts"
+    "replay": "tsx examples/harness/replay.ts",
+    "plan-replay": "tsx examples/harness/plan-replay.ts",
+    "cedar:test": "npm --prefix adapters/cedar run typecheck && npm --prefix adapters/cedar test"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
     "tsup": "^8.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.3.0",
-    "vitest": "^2.0.0"
+    "vitest": "^2.0.0",
+    "z3-solver": "^5.2.0"
   },
   "keywords": [
     "robotics",
@@ -67,7 +74,9 @@
     "rules",
     "posemesh",
     "spatial-computing",
-    "conformance"
+    "conformance",
+    "plan-checking",
+    "cedar"
   ],
   "repository": {
     "type": "git",

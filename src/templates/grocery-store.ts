@@ -31,11 +31,12 @@ export const GROCERY_STORE: Template = {
   ],
   requires: ['hours'],
   actions: [
-    { id: 'enter_zone', name: 'enter an area', kinds: ['robot'], tags: ['movement'], synonyms: ['enter', 'go into', 'go in', 'drive into'] },
+    { id: 'enter_zone', name: 'enter an area', kinds: ['robot'], tags: ['movement'], synonyms: ['enter', 'go into', 'go in', 'drive into'], effects: [{ op: 'move' }] },
     { id: 'move', name: 'move', kinds: ['robot'], tags: ['movement'], synonyms: ['drive', 'navigate', 'travel'] },
-    { id: 'manipulate', name: 'pick up or handle things', kinds: ['robot'], tags: ['handling'], synonyms: ['pick up', 'handle', 'restock', 'touch', 'manipulate'] },
+    { id: 'manipulate', name: 'pick up or handle things', kinds: ['robot'], tags: ['handling'], synonyms: ['pick up', 'handle', 'restock', 'touch', 'manipulate'], effects: [{ op: 'set', fact: 'carrying', value: true }] },
+    { id: 'place', name: 'put things down', kinds: ['robot'], tags: ['handling'], synonyms: ['put down', 'place', 'drop', 'shelve'], effects: [{ op: 'set', fact: 'carrying', value: false }] },
     { id: 'scan', name: 'scan', kinds: ['robot'], tags: ['sensing'], synonyms: ['scan', 'take images', 'lidar'] },
-    { id: 'dock', name: 'dock', kinds: ['robot'], tags: ['movement'], synonyms: ['dock', 'charge', 'return to dock'] },
+    { id: 'dock', name: 'dock', kinds: ['robot'], tags: ['movement'], synonyms: ['dock', 'charge', 'return to dock'], effects: [{ op: 'move' }] },
     { id: 'camera_capture', name: 'take photos or video', kinds: ['person'], tags: ['capture'], synonyms: ['take photos', 'take pictures', 'photograph', 'film', 'record video', 'take a photo', 'take photo'] },
     { id: 'record_audio', name: 'record audio', kinds: ['person'], tags: ['capture'], synonyms: ['record audio', 'record sound', 'record', 'transcribe'] },
     { id: 'ai_overlay', name: 'show AI overlays', kinds: ['person'], synonyms: ['overlay', 'show overlays', 'ai overlay'] },
@@ -49,6 +50,7 @@ export const GROCERY_STORE: Template = {
     { id: 'requestedSpeedMps', type: 'number', min: 0, description: 'Requested speed in m/s for movement. Absent means "cap me".' },
     { id: 'emergency', type: 'boolean', default: false, description: 'True while a site emergency is active. The one fact with a default, because an emergency is an explicit event your system raises.', synonyms: ['emergency', 'alarm', 'fire alarm'] },
     { id: 'targetRobotId', type: 'string', description: 'For command_robot: the robot being commanded.' },
+    { id: 'carrying', type: 'boolean', default: false, description: 'True while a robot is carrying stock. In a plan, manipulate sets it and place clears it.', synonyms: ['carrying', 'loaded', 'carrying stock'] },
   ],
   limits: [
     { id: 'maxSpeedMps', name: 'top speed', unit: 'm/s', requestedFact: 'requestedSpeedMps', appliesTo: 'tag:movement', synonyms: ['speed', 'slow', 'slow down', 'top speed', 'max speed'] },

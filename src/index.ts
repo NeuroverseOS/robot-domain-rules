@@ -24,19 +24,20 @@
  */
 
 export * from './types';
-export { compileDomain, verifyFingerprint, validateRulebook, validateRule, BUILTIN_CHECKS, declarationAuthority } from './compile';
+export { compileDomain, verifyFingerprint, validateRulebook, validateRule, validatePlanRule, BUILTIN_CHECKS, declarationAuthority } from './compile';
 export { fingerprint, canonicalJson, requestDigest } from './canonical';
 export { generateSigningKeys, publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, signedText } from './approvals';
 export type { SigningKeys, VerifyResult, RulebookSignature } from './approvals';
 export type { CompileDomainInput, CompileOptions } from './compile';
-export { evaluateDomainAction } from './evaluate';
-export { checkRulebook } from './check';
+export { evaluateDomainAction, matchingRules } from './evaluate';
+export { evaluatePlan, applyEffects } from './plan';
+export { checkRulebook, rulesOverlap } from './check';
 export { renderDomainRules, renderRule, describeSelector } from './render';
 export { glassesZoneRules, OPEN_ZONE_RULES, GLASSES_ACTION_FIELDS } from './glasses';
 export type { GlassesBridgeOptions } from './glasses';
 export { draftRuleFromText, buildRuleDraftPrompt, parseRuleDraft } from './draft';
 export type { RuleDraft, DraftOptions, ParsedDraft } from './draft';
-export { DomainRulesError, isValidTime, isOpen, resolveSelector, describeCondition } from './vocabulary';
+export { DomainRulesError, isValidTime, isOpen, resolveSelector, describeCondition, describeHistoryCondition } from './vocabulary';
 export { mergeRules } from './zone-rules';
 export type { ZoneRules, ZoneCustomRule } from './zone-rules';
 export { TEMPLATES, GROCERY_STORE, WAREHOUSE, templateById, defaultAnswers } from './templates/index';
@@ -49,7 +50,7 @@ import { renderDomainRules } from './render';
 import { draftRuleFromText, type DraftOptions, type RuleDraft } from './draft';
 import { DomainRulesError } from './vocabulary';
 import { templateById, type Template } from './templates/index';
-import type { ActionDef, AreaDef, AuthorityDef, FactDef, Finding, LimitDef, RoleDef, Rule, Rulebook, SiteDef } from './types';
+import type { ActionDef, AreaDef, AuthorityDef, FactDef, Finding, LimitDef, PlanRule, RoleDef, Rule, Rulebook, SiteDef } from './types';
 
 /**
  * Step-by-step way to build a rulebook. Same result as calling compileDomain
@@ -116,6 +117,14 @@ export class DomainRulesBuilder {
     const setBy = rule.setBy ?? this.authority;
     if (!setBy) throw new DomainRulesError(`Rule "${rule.id}": say who sets it — pass setBy or call as(<authority>) first.`);
     (this.input.rules ??= []).push({ ...rule, setBy, source: rule.source ?? { kind: 'manual', ref: rule.id } });
+    return this;
+  }
+
+  /** Add a rule about whole plans (checked by `evaluatePlan`). `setBy` defaults to the authority chosen with `as()`. */
+  addPlanRule(rule: Omit<PlanRule, 'source' | 'setBy'> & { setBy?: string; source?: PlanRule['source'] }): this {
+    const setBy = rule.setBy ?? this.authority;
+    if (!setBy) throw new DomainRulesError(`Plan rule "${rule.id}": say who sets it — pass setBy or call as(<authority>) first.`);
+    (this.input.planRules ??= []).push({ ...rule, setBy, source: rule.source ?? { kind: 'manual', ref: rule.id } });
     return this;
   }
 

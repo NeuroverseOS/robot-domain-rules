@@ -1,0 +1,16 @@
+{
+  "name": "robot-domain-rules-cedar-adapter",
+  "private": true,
+  "version": "0.5.0",
+  "description": "Example adapter: export a rulebook's deny/permit subset as Cedar policies and a Cedar schema. Not part of the core; lossy, and says so.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cedar-policy/cedar-wasm": "^4.13.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.0.0"
+  }
+}

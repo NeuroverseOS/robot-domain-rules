@@ -2,19 +2,28 @@
  * Conflict check — which rules are at odds?
  *
  * Every selector resolves to a finite set of declared IDs, and every `when`
- * condition maps to an exact set over one fact (see vocabulary.ts). So for
- * any two rules the check can say, exactly:
+ * condition maps to an exact set over one fact (see vocabulary.ts). Facts
+ * are independent, so the set of requests matching a rule is a product of
+ * per-fact sets, and the overlap of two rules is the product of the per-fact
+ * intersections. Intersection, emptiness and subset are exact for every
+ * shape, so the analysis is complete for the rule language: for any two rules
+ * the check says, exactly,
  *
  *   disjoint  — no request can match both (different roles, actions, areas,
  *               or conditions on one fact that can never both hold). No finding.
- *   certain   — any request matching one matches the other (one rule's
- *               conditions imply the other's, or both are unconditional).
- *   possible  — both conditions can hold at once on paper; whether they ever
- *               do depends on facts the rulebook does not control (for
- *               example peopleInZone and staffInZone are declared as
- *               independent numbers; the rulebook cannot know they are not).
+ *   certain   — they can meet, and `witness` is a concrete request that
+ *               matches both (the smallest or earliest value in every
+ *               overlap, so it is the same every time).
+ *   possible  — only when a rule has history conditions, which depend on
+ *               what the caller supplies and are not analysed: the overlap
+ *               on facts is real, the history is unknown, and no witness is given.
  *
- * "Disjoint" is only ever claimed when it is provable. Soundness over recall.
+ * No enumeration is needed and no size bound applies: minutes are a 1440-bit
+ * set, integers are closed intervals with excluded points, reals are
+ * intervals, finite types are subsets, strings are "all but a finite set".
+ * The seeded tests in test/ attack both directions (a disjoint claim with
+ * generated requests; a witness by evaluating it), and test/z3-crosscheck
+ * agrees with an SMT solver on every generated pair.
  *
  * Authority: every rule says who set it. A lower authority may only tighten
  * a higher one. A looser rule set by a lower authority never takes effect
@@ -22,10 +31,10 @@
  * guarantees that at decision time; this check names it (`authority-override`).
  */
 
-import type { Condition, Finding, Outcome, Rule, Rulebook } from './types';
+import type { Condition, FactValue, Finding, Outcome, PlanRule, Rule, Rulebook, Witness } from './types';
 import {
   authorityName, authorityRank, constraintOn, describeConstraint, intersect, isEmpty, isSubset,
-  resolveSelector, vocabularyOf, type Vocabulary,
+  resolveSelector, sampleValue, vocabularyOf, witnessValue, type Vocabulary,
 } from './vocabulary';
 import { assemble, type CompileDomainInput } from './compile';
 import { isLegacyInput, fromLegacyInput, type LegacyCompileInput } from './legacy';
@@ -48,7 +57,24 @@ export function checkRulebook(input: CompileDomainInput | LegacyCompileInput | R
       if (f) findings.push(f);
     }
   }
+  findings.push(...checkPlanRules(body.planRules ?? [], vocab));
   return findings;
+}
+
+/**
+ * Can these two rules match one request? Exact: returns a witness request
+ * when they can, null when they provably cannot. `certainty` is 'possible'
+ * only when a rule has history conditions (not analysed); then the witness
+ * covers the facts and the history is left to the caller.
+ */
+export function rulesOverlap(rulebook: Rulebook, ruleIdA: string, ruleIdB: string): { witness: Witness; certainty: 'certain' | 'possible' } | null {
+  const vocab = vocabularyOf(rulebook);
+  const a = rulebook.rules.find(r => r.id === ruleIdA), b = rulebook.rules.find(r => r.id === ruleIdB);
+  if (!a || !b) return null;
+  const sa = scopeOf(a, vocab), sb = scopeOf(b, vocab);
+  if (sa.empty || sb.empty) return null;
+  const o = overlapOf(sa, sb, vocab);
+  return o ? { witness: o.witness, certainty: o.certainty } : null;
 }
 
 // ─── Scope ───────────────────────────────────────────────────────────────────
@@ -59,6 +85,8 @@ interface Scope {
   areas: Set<string>;
   when: Condition[];
   facts: string[];
+  /** The rule conditions on history, which the analysis does not model. */
+  history: boolean;
   empty: boolean;
 }
 
@@ -67,7 +95,7 @@ function scopeOf(r: Rule, vocab: Vocabulary): Scope {
   const actions = resolveSelector(r.does, 'does', vocab);
   const areas = resolveSelector(r.where, 'where', vocab);
   const when = r.when ?? [];
-  return { roles, actions, areas, when, facts: [...new Set(when.map(c => c.fact))], empty: roles.size === 0 || actions.size === 0 || areas.size === 0 };
+  return { roles, actions, areas, when, facts: [...new Set(when.map(c => c.fact))], history: (r.history?.length ?? 0) > 0, empty: roles.size === 0 || actions.size === 0 || areas.size === 0 };
 }
 
 const sub = (a: Set<string>, b: Set<string>) => [...a].every(x => b.has(x));
@@ -84,20 +112,46 @@ function scopeCovered(a: Scope, b: Scope, vocab: Vocabulary): boolean {
 
 interface Overlap {
   roles: Set<string>; actions: Set<string>; areas: Set<string>;
-  /** Facts both rules condition on, with the combined constraint. */
+  /** Facts either rule conditions on, with the combined constraint. */
   shared: string[];
   certainty: 'certain' | 'possible';
+  witness: Witness;
 }
 
+/**
+ * Exact overlap: the roles, actions and areas both rules cover, and for every
+ * fact either rule names, the intersection of their constraints. Non-empty
+ * everywhere means a request matching both exists, and the witness is built
+ * from the first ID (in declaration order) and the smallest value of each
+ * overlap, with every other fact the request needs at a sample value.
+ */
 function overlapOf(a: Scope, b: Scope, vocab: Vocabulary): Overlap | null {
   const roles = meet(a.roles, b.roles), actions = meet(a.actions, b.actions), areas = meet(a.areas, b.areas);
   if (!roles.size || !actions.size || !areas.size) return null;
   const facts = [...new Set([...a.facts, ...b.facts])];
+  const values: Record<string, FactValue> = {};
   for (const f of facts) {
-    if (isEmpty(intersect(constraintOn(a.when, f, vocab), constraintOn(b.when, f, vocab)))) return null;
+    const def = vocab.facts.get(f)!;
+    const v = witnessValue(intersect(constraintOn(a.when, f, vocab), constraintOn(b.when, f, vocab)), def);
+    if (v === undefined) return null;
+    values[f] = v;
   }
-  const certainty = implies(a, b, vocab) || implies(b, a, vocab) ? 'certain' : 'possible';
-  return { roles, actions, areas, shared: facts, certainty };
+  const roleId = first(roles, vocab.roles.keys()), action = first(actions, vocab.actions.keys()), areaId = first(areas, vocab.areas.keys());
+  const role = vocab.roles.get(roleId)!;
+  const witnessFacts: Record<string, FactValue> = {};
+  for (const def of vocab.facts.values()) {
+    if (def.id in values) continue;
+    if (def.required || vocab.actions.get(action)?.requires?.includes(def.id)) witnessFacts[def.id] = sampleValue(def);
+  }
+  Object.assign(witnessFacts, values);
+  const witness: Witness = { participant: { id: `${roleId}-1`, kind: role.kind, roleId }, action, areaId, facts: witnessFacts };
+  return { roles, actions, areas, shared: facts, certainty: a.history || b.history ? 'possible' : 'certain', witness };
+}
+
+/** The first of `ids` in declaration order. */
+function first(ids: Set<string>, order: Iterable<string>): string {
+  for (const id of order) if (ids.has(id)) return id;
+  return [...ids][0];
 }
 
 // ─── Comparing outcomes ──────────────────────────────────────────────────────
@@ -155,9 +209,9 @@ function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary):
   if (sameAnswer(a.then, b.then)) {
     // A never rule is an invariant kept for its own sake; it is never "redundant" with an ordinary rule.
     if (!!a.never !== !!b.never) return null;
-    if (aInB && bInA) return finding('duplicate', 'info', [a.id, b.id], overlap.certainty, `${idOf(a)} (${by(a)}) and ${idOf(b)} (${by(b)}) cover the same ground and say the same thing (${say(a)}): ${where}. One of them can go.`);
-    if (aInB) return finding('duplicate', 'info', [a.id, b.id], overlap.certainty, `${idOf(a)} (${by(a)}) is already covered by ${idOf(b)} (${by(b)}), which says the same thing (${say(a)}) for ${where}. ${idOf(a)} adds nothing.`);
-    if (bInA) return finding('duplicate', 'info', [b.id, a.id], overlap.certainty, `${idOf(b)} (${by(b)}) is already covered by ${idOf(a)} (${by(a)}), which says the same thing (${say(b)}) for ${where}. ${idOf(b)} adds nothing.`);
+    if (aInB && bInA) return finding('duplicate', 'info', [a.id, b.id], overlap, `${idOf(a)} (${by(a)}) and ${idOf(b)} (${by(b)}) cover the same ground and say the same thing (${say(a)}): ${where}. One of them can go.`);
+    if (aInB) return finding('duplicate', 'info', [a.id, b.id], overlap, `${idOf(a)} (${by(a)}) is already covered by ${idOf(b)} (${by(b)}), which says the same thing (${say(a)}) for ${where}. ${idOf(a)} adds nothing.`);
+    if (bInA) return finding('duplicate', 'info', [b.id, a.id], overlap, `${idOf(b)} (${by(b)}) is already covered by ${idOf(a)} (${by(a)}), which says the same thing (${say(b)}) for ${where}. ${idOf(b)} adds nothing.`);
     return null;
   }
 
@@ -177,34 +231,71 @@ function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary):
   // (deny vs wait, wait vs limit, ...) is one restriction layered on another: normal.
   const loosens = L.then.answer === 'allow' || limitName !== '';
   if (!loosens) {
-    if (covered) return finding('shadowed', 'warning', ids, overlap.certainty, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
+    if (covered) return finding('shadowed', 'warning', ids, overlap, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
     return null;
   }
   if (S.never && L.then.answer === 'allow') {
-    return finding('never_vs_rule', 'conflict', ids, overlap.certainty, `${idOf(L)} (${by(L)}) tries to allow what the never rule ${idOf(S)} (${by(S)}) forbids. ${scope}. Nothing overrides a never rule, so ${extent}.`);
+    return finding('never_vs_rule', 'conflict', ids, overlap, `${idOf(L)} (${by(L)}) tries to allow what the never rule ${idOf(S)} (${by(S)}) forbids. ${scope}. Nothing overrides a never rule, so ${extent}.`);
   }
   if (rL > rS) {
-    return finding('authority-override', 'conflict', ids, overlap.certainty, `${idOf(L)} ${by(L)} tries to loosen what ${idOf(S)} ${by(S)} sets: ${both}. ${scope}. A lower authority can only tighten, so ${extent}.`);
+    return finding('authority-override', 'conflict', ids, overlap, `${idOf(L)} ${by(L)} tries to loosen what ${idOf(S)} ${by(S)} sets: ${both}. ${scope}. A lower authority can only tighten, so ${extent}.`);
   }
   if (rL < rS) {
-    return finding('tightening', 'info', ids, overlap.certainty, `${idOf(S)} ${by(S)} tightens ${idOf(L)} ${by(L)}: ${both}. ${scope}. A lower authority may tighten, so this is fine; ${extent}.`);
+    return finding('tightening', 'info', ids, overlap, `${idOf(S)} ${by(S)} tightens ${idOf(L)} ${by(L)}: ${both}. ${scope}. A lower authority may tighten, so this is fine; ${extent}.`);
   }
   // Same authority.
   if (L.then.answer === 'allow') {
     const severity = S.then.answer === 'deny' ? 'conflict' : 'warning';
-    return finding('contradiction', severity, ids, overlap.certainty, `${both}. ${scope}. The strictest answer wins, so ${extent}.`);
+    return finding('contradiction', severity, ids, overlap, `${both}. ${scope}. The strictest answer wins, so ${extent}.`);
   }
   if (covered) {
-    return finding('shadowed', 'warning', ids, overlap.certainty, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
+    return finding('shadowed', 'warning', ids, overlap, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
   }
   if (refines) return null;
   const vL = (L.then as { limits: Record<string, number> }).limits[limitName], vS = (S.then as { limits: Record<string, number> }).limits[limitName];
-  return finding('limit_disagreement', 'info', ids, overlap.certainty, `${idOf(L)} (${by(L)}) and ${idOf(S)} (${by(S)}) both limit ${limitName} for ${where}: ${vL} and ${vS}. The lower value, ${vS}, applies where both match.`);
+  return finding('limit_disagreement', 'info', ids, overlap, `${idOf(L)} (${by(L)}) and ${idOf(S)} (${by(S)}) both limit ${limitName} for ${where}: ${vL} and ${vS}. The lower value, ${vS}, applies where both match.`);
 }
 
-function finding(kind: Finding['kind'], severity: Finding['severity'], ruleIds: string[], certainty: Finding['certainty'], message: string): Finding {
-  const tail = certainty === 'possible' ? ' (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)' : '';
-  return { kind, severity, ruleIds, certainty, message: `${message}${tail}` };
+function finding(kind: Finding['kind'], severity: Finding['severity'], ruleIds: string[], overlap: Pick<Overlap, 'certainty' | 'witness'>, message: string): Finding {
+  if (overlap.certainty === 'possible') {
+    return { kind, severity, ruleIds, certainty: 'possible', message: `${message} (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match ${describeWitness(overlap.witness)}.)` };
+  }
+  return { kind, severity, ruleIds, certainty: 'certain', witness: overlap.witness, message: `${message} For example: ${describeWitness(overlap.witness)}.` };
+}
+
+function describeWitness(w: Witness): string {
+  const facts = Object.entries(w.facts).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+  return `${w.participant.roleId} does ${w.action} in ${w.areaId}${facts ? ` with ${facts}` : ''}`;
+}
+
+// ─── Plan rules ──────────────────────────────────────────────────────────────
+
+/**
+ * Plan rules can only reject, so two of them never disagree; the one thing
+ * worth reporting is a plain duplicate: the same check, binding roles in
+ * common. Authority does not enter: a duplicate at any level is still a duplicate.
+ */
+function checkPlanRules(rules: PlanRule[], vocab: Vocabulary): Finding[] {
+  const out: Finding[] = [];
+  const key = (r: PlanRule) => {
+    const c = r.check;
+    const ids = (sel: Rule['who'], kind: 'does' | 'where') => [...resolveSelector(sel, kind, vocab)].sort().join(',');
+    switch (c.kind) {
+      case 'ends_in': return `ends_in:${ids(c.areas, 'where')}`;
+      case 'ends_with': return `ends_with:${ids(c.actions, 'does')}`;
+      case 'before': return `before:${ids(c.first, 'does')}>${ids(c.then, 'does')}:${c.sameArea ? 'same' : 'any'}`;
+      case 'at_most': return `at_most:${ids(c.actions, 'does')}:${c.count}`;
+    }
+  };
+  for (let i = 0; i < rules.length; i++) for (let j = i + 1; j < rules.length; j++) {
+    const a = rules[i], b = rules[j];
+    if (key(a) !== key(b)) continue;
+    const shared = meet(resolveSelector(a.who, 'who', vocab), resolveSelector(b.who, 'who', vocab));
+    if (!shared.size) continue;
+    const roleId = first(shared, vocab.roles.keys());
+    out.push({ kind: 'duplicate', severity: 'info', ruleIds: [a.id, b.id], certainty: 'certain', message: `Plan rules \`${a.id}\` (set by ${authorityName(vocab, a.setBy)}) and \`${b.id}\` (set by ${authorityName(vocab, b.setBy)}) make the same check for ${vocab.roles.get(roleId)?.name ?? roleId}${shared.size > 1 ? ` and ${shared.size - 1} more` : ''}. One of them can go.` });
+  }
+  return out;
 }
 
 // ─── Plain words ─────────────────────────────────────────────────────────────

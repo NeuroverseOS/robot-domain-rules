@@ -34,11 +34,11 @@
  */
 
 import type {
-  Approval, ApprovalRequest, DomainCheck, DomainDecision, DomainDecisionStatus, DomainRequest, FactValue, Rule, Rulebook,
+  Approval, ApprovalRequest, DomainCheck, DomainDecision, DomainDecisionStatus, DomainRequest, FactValue, HistoryEntry, Rule, Rulebook,
 } from './types';
 import { requestDigest } from './canonical';
 import {
-  authorityRank, conditionHolds, factProblem, resolveSelector, selectorExcludesId, selectorIsOpen, show, vocabularyOf,
+  authorityRank, conditionHolds, factProblem, historyConditionHolds, historyProblems, resolveSelector, selectorExcludesId, selectorIsOpen, show, vocabularyOf,
   type Vocabulary,
 } from './vocabulary';
 
@@ -75,17 +75,23 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
 
   // 2. Every fact the decision needs must be supplied and valid. Missing is never permission.
   const { problems, facts, approval } = validateFacts(rulebook, vocab, request, actionDef?.requires ?? []);
+  const inScope = (r: Rule) => selectorsMatch(r, role.id, action, actionDef !== undefined, area.id, vocab);
+  // A rule in scope that conditions on history needs the caller's history; a window also needs times.
+  const needHistory = rulebook.rules.filter(r => r.history?.length && inScope(r));
+  if (needHistory.length) {
+    const needTimes = needHistory.some(r => r.history!.some(h => h.withinMinutes !== undefined));
+    if (request.history === undefined) problems.push(`history is required (rule ${needHistory.map(r => `"${r.id}"`).join(', ')} counts what ${participant.id} did recently), got nothing`);
+    else problems.push(...historyProblems(request.history, needTimes));
+  }
   if (problems.length) {
     check('required_facts', 'BLOCK', `Facts missing or invalid: ${problems.join('; ')}.`);
     return decide();
   }
+  const history = (request.history ?? []) as HistoryEntry[];
 
-  const matches = (r: Rule) => {
-    if (!resolveSelector(r.who, 'who', vocab).has(role.id)) return false;
-    if (actionDef ? !resolveSelector(r.does, 'does', vocab).has(action) : !(selectorIsOpen(r.does) && !selectorExcludesId(r.does, action))) return false;
-    if (!resolveSelector(r.where, 'where', vocab).has(area.id)) return false;
-    return (r.when ?? []).every(c => conditionHolds(c, facts, vocab));
-  };
+  const matches = (r: Rule) => inScope(r)
+    && (r.when ?? []).every(c => conditionHolds(c, facts, vocab))
+    && (r.history ?? []).every(h => historyConditionHolds(h, history, area.id, facts, vocab));
   const reasonOf = (r: Rule) => r.reason ?? r.text;
 
   // 3. Never rules. Nothing overrides them.
@@ -157,6 +163,39 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
     }
   }
   return decide();
+}
+
+/** Do the rule's three selectors cover this role, action and area? (Conditions are checked separately.) */
+function selectorsMatch(r: Rule, roleId: string, action: string, actionDeclared: boolean, areaId: string, vocab: Vocabulary): boolean {
+  if (!resolveSelector(r.who, 'who', vocab).has(roleId)) return false;
+  if (actionDeclared ? !resolveSelector(r.does, 'does', vocab).has(action) : !(selectorIsOpen(r.does) && !selectorExcludesId(r.does, action))) return false;
+  return resolveSelector(r.where, 'where', vocab).has(areaId);
+}
+
+/**
+ * The IDs of every rule (never rules included) whose selectors and conditions
+ * hold for this request — the matching relation of SPEC.md § 6 step 4, on
+ * its own. Used to check a finding's witness; unlike `evaluateDomainAction`
+ * it does not stop at a never rule. An incomplete or invalid request matches nothing.
+ */
+export function matchingRules(rulebook: Rulebook, request: DomainRequest): string[] {
+  const vocab = vocabularyOf(rulebook);
+  if (shapeProblems(request, vocab).length) return [];
+  const areaId = request.areaId ?? request.zoneId!;
+  const area = vocab.areas.get(areaId);
+  const role = vocab.roles.get(request.participant.roleId);
+  if (!area || !role || role.kind !== request.participant.kind) return [];
+  const actionDef = vocab.actions.get(request.action);
+  const { problems, facts } = validateFacts(rulebook, vocab, request, actionDef?.requires ?? []);
+  if (problems.length) return [];
+  const history = Array.isArray(request.history) ? request.history as HistoryEntry[] : null;
+  return rulebook.rules.filter(r => {
+    if (!selectorsMatch(r, role.id, request.action, actionDef !== undefined, area.id, vocab)) return false;
+    if (!(r.when ?? []).every(c => conditionHolds(c, facts, vocab))) return false;
+    if (!r.history?.length) return true;
+    if (!history || historyProblems(history, r.history.some(h => h.withinMinutes !== undefined)).length) return false;
+    return r.history.every(h => historyConditionHolds(h, history, area.id, facts, vocab));
+  }).map(r => r.id);
 }
 
 function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string, number> | undefined, then: string | undefined, approvalRequests: ApprovalRequest[]): DomainDecision {

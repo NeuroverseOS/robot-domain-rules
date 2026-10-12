@@ -1,13 +1,15 @@
 # robot-domain-rules — specification
 
 ```
-spec: robot-domain-rules/1
+spec: robot-domain-rules/2
 rulebook format string: neuroverse-domain-rules/2
 ```
 
-This document is normative. It defines the rulebook, request, decision, finding and approval formats, the decision algorithm, the conflict analysis, authority, and the canonical encoding another implementation must reproduce byte for byte. The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Everything stated here is checked by the cases in [`conformance/`](conformance/); an implementation conforms when it passes them all. The TypeScript package in this repository is the reference implementation.
+This document is normative. It defines the rulebook, request, decision, plan, finding and approval formats, the decision algorithm, the plan algorithm, the conflict analysis, authority, and the canonical encoding another implementation must reproduce byte for byte. The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Everything stated here is checked by the cases in [`conformance/`](conformance/); an implementation conforms when it passes them all. The TypeScript package in this repository is the reference implementation.
 
-Out of scope, and deliberately so: how a rulebook is *built* (templates, questions, plain-text drafting, the builder) is tooling of the reference implementation. The rulebook is the portable artifact; an implementation needs only to validate it, decide with it, check it for conflicts, fingerprint it, and handle approvals. JSON Schemas for every format are in [`spec/`](spec/).
+Out of scope, and deliberately so: how a rulebook is *built* (templates, questions, plain-text drafting, the builder) is tooling of the reference implementation. The rulebook is the portable artifact; an implementation needs only to validate it, decide with it (one action or a whole plan), check it for conflicts, fingerprint it, and handle approvals. JSON Schemas for every format are in [`spec/`](spec/).
+
+What changed in `/2` (from `/1`): the conflict analysis is exact and every certain finding carries a `witness` (§ 7), which changes the certainty of some findings and the fingerprint of rulebooks that have findings; actions may declare `effects` (§ 2), rules may condition on `history` (§ 3.4), a rulebook may carry `planRules` (§ 3.5), a request may carry `history` (§ 4), and `evaluatePlan` (§ 12) checks a whole plan. A `/1` rulebook without findings is a valid `/2` rulebook with the same fingerprint and the same decisions.
 
 ## 1. Vocabulary
 
@@ -28,7 +30,7 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `template` | string | no | The template it was built from. Informational. |
 | `kinds` | string[] | yes | Participant kinds (`robot`, `person`, `agent`, …). MUST include every kind any role or action names. |
 | `authorities` | `{ id, name? }[]` | yes, ≥1 | **Highest first.** Unique IDs. |
-| `actions` | `{ id, name?, kinds (≥1), tags?, requires?, synonyms? }[]` | yes | `requires`: fact IDs that MUST be present when this action is requested. |
+| `actions` | `{ id, name?, kinds (≥1), tags?, requires?, effects?, synonyms? }[]` | yes | `requires`: fact IDs that MUST be present when this action is requested. `effects`: what the action does to the facts when a plan is projected (§ 2.1); unused by the single-action decision. |
 | `areas` | `{ id, name, tags?, allowRoles?, denyRoles?, synonyms? }[]` | yes, ≥1 | `allowRoles`/`denyRoles` are informational in a compiled rulebook: their effect is already present as never rules `area_role_limits:<area>` and `area_role_limits:<area>:deny`. |
 | `roles` | `{ id, name, kind, actions, inherits?, tags?, synonyms? }[]` | yes, ≥1 | `actions` is the **full** list (inheritance already resolved). Every listed action MUST declare the role's kind in its `kinds`. |
 | `facts` | `{ id, type, required?, default?, min?, max?, integer?, values?, description?, synonyms? }[]` | yes | `type` ∈ `number boolean time day enum string`. A fact MUST NOT be both `required` and have a `default`. `min/max/integer` only on numbers; `values` (≥1) required for enums. `default` MUST be valid for the type. The ID `approvedBy` is reserved and MUST NOT be declared. |
@@ -37,12 +39,26 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `answers` | `{ [questionId]: string }` | yes | Informational. |
 | `otherwise` | `"deny"` \| `"wait-for-approval"` | yes | What an undeclared action gets. |
 | `trustedKeys` | `{ keyId, publicKey, authority?, roleId? }[]` | no | See § 9. `publicKey` is 32 bytes lowercase hex; `authority`/`roleId` MUST be declared. Declaring any key (non-empty list) switches approvals to signed-only. |
-| `rules` | Rule[] | yes | § 3. IDs unique. |
+| `rules` | Rule[] | yes | § 3. IDs unique across `rules` and `planRules`. |
+| `planRules` | PlanRule[] | no | § 3.5. Present only when non-empty (so a rulebook without plan rules has the same fingerprint as before `/2`). |
 | `builtin` | `{ id, text }[]` | yes | MUST include `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`. |
 | `findings` | Finding[] | yes | § 7. What the conflict check found; MAY be empty; MUST NOT be hidden. |
 | `fingerprint` | 16 lowercase hex | yes | § 8, over everything above. |
 
-**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: unknown format; empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; a fingerprint that does not match. (Reference: `validateRulebook`; cases: every `expect.error` case.)
+### 2.1 Effects
+
+An effect is one of:
+
+| Effect | Meaning when a plan is projected (§ 12) |
+|---|---|
+| `{ op: "set", fact, value }` | the fact becomes `value`; `value` MUST be valid for the fact's type |
+| `{ op: "add", fact, value }` | a `number` fact goes up by `value` (finite; a whole number if the fact is `integer`) |
+| `{ op: "subtract", fact, value }` | a `number` fact goes down by `value` (same constraints) |
+| `{ op: "move" }` | after this step the participant is in the step's area |
+
+`fact` MUST be a declared fact. Effects are not clamped to the fact's range: a projected value outside it makes the next step BLOCK `required_facts`.
+
+**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: unknown format; empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; an effect on an undeclared fact or of the wrong type; a history condition that is malformed (§ 3.4); a plan rule that is malformed or shares an ID with a rule (§ 3.5); an empty `planRules` list; a fingerprint that does not match. (Reference: `validateRulebook`; cases: every `expect.error` case.)
 
 ## 3. Rule
 
@@ -64,6 +80,7 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `id`, `text` | yes | Stable ID cited in decisions; the rule in plain words. |
 | `who`, `does`, `where` | yes | Selectors (§ 3.1) over roles, actions, areas. |
 | `when` | no | Conditions (§ 3.2), AND-ed. Absent or empty = always. Each fact named MUST be required or have a default. |
+| `history` | no | History conditions (§ 3.4), AND-ed with `when`. |
 | `then` | yes | Outcome (§ 3.3). |
 | `reason` | no | Shown in decisions; defaults to `text`. |
 | `setBy` | yes | A declared authority ID. The level the space granted the author, whoever or whatever that is. |
@@ -106,6 +123,41 @@ Resolution to a set of IDs: trim entries and drop empty ones. Positives are entr
 | `{ answer: "wait", for: "condition" }` | the facts must change; no approval clears it |
 | `{ answer: "deny", instead? }` | no; `instead` is a hint ("dock") surfaced as `decision.then` |
 
+### 3.4 History conditions
+
+```json
+{ "actions": "scan", "areas": "tag:aisle", "sameArea": true, "withinMinutes": 60, "clock": "localTime", "op": ">=", "value": 5 }
+```
+
+| Field | Req | Meaning |
+|---|---|---|
+| `actions` | yes | Selector over actions (§ 3.1). Entries of the history whose action is in it count. |
+| `areas` | no | Selector over areas. Only entries in these areas count. |
+| `sameArea` | no | Only entries in the request's own area count. |
+| `withinMinutes` | no | 1–1440. Only entries whose `at` is at most this many minutes before the `clock` fact count, by minute-of-day arithmetic that wraps at midnight: `(now − at + 1440) mod 1440 ≤ withinMinutes`. |
+| `clock` | with `withinMinutes` | A declared `time` fact that is required or has a default: "now". MUST NOT be given without `withinMinutes`. |
+| `op`, `value` | yes | `op` ∈ `== != > >= < <=`; `value` a whole number ≥ 0. The condition holds when `count op value`. |
+
+History is what the caller supplies (§ 4); the engine keeps none. The conflict analysis does not model history conditions (§ 7.2).
+
+### 3.5 Plan rules
+
+A plan rule judges the shape of a whole plan (§ 12) and can only reject:
+
+```json
+{ "id": "end_at_dock", "text": "Every robot plan ends at a charging dock.", "who": "kind:robot",
+  "check": { "kind": "ends_in", "areas": "tag:dock" }, "setBy": "site-manager", "source": { "kind": "manual", "ref": "end_at_dock" } }
+```
+
+| `check.kind` | Fields | The plan breaks it when… |
+|---|---|---|
+| `ends_in` | `areas` (selector) | the area the last step leaves the participant in is not in `areas` |
+| `ends_with` | `actions` (selector) | the last step's action is not in `actions` |
+| `before` | `first`, `then` (selectors), `sameArea?` | some step whose action is in `then` has no earlier step (in the plan, or in `plan.history`) whose action is in `first` — in the same area, when `sameArea` |
+| `at_most` | `actions` (selector), `count` (whole number ≥ 0) | more than `count` steps have an action in `actions` |
+
+`id`, `text`, `who`, `setBy`, `source` and `reason` are as for a rule. `who` selects roles; a plan rule applies to a plan whose participant's role it selects. IDs are unique across rules and plan rules.
+
 ## 4. Request
 
 [`spec/request.schema.json`](spec/request.schema.json)
@@ -118,6 +170,8 @@ Resolution to a set of IDs: trim entries and drop empty ones. Positives are entr
 ```
 
 `zoneId` is accepted as a deprecated alias of `areaId`; a top-level `targetRobotId` is copied into `facts.targetRobotId` when that is absent. `facts` carries the declared facts by ID plus the built-in `approvedBy` (§ 9): a non-empty string (an unqualified approval) or an approval object. Undeclared facts are ignored. A request is never a reason to throw: every malformed request yields a BLOCK decision.
+
+`history` (optional) is a list of `{ action, areaId, at? }` — what this participant did recently, as the caller reports it; `at` is a time. It is needed only when a rule in scope has history conditions (§ 6 step 3).
 
 ## 5. Decision
 
@@ -165,6 +219,12 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
     (MUST be a declared role), verified (MUST be boolean), requestDigest,
     rulebookFingerprint, keyId, issuedAt, signature (MUST be strings); anything
     else → problem. Any other shape → problem.
+    History. Let N = the rules with a non-empty `history` whose three selectors
+    cover this request (the selector part of step 4). If N is non-empty:
+      if request.history is absent: problem "history is required"
+      else if it is not a list, or an entry is not { action, areaId, at? } with
+        non-empty strings and a valid time when `at` is given, or some rule in N
+        has withinMinutes and an entry lacks `at`: problem.
     If any problem: check("required_facts", BLOCK); stop.
 
  4. Matching. Rule R matches when:
@@ -172,7 +232,9 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
       if A exists: resolve(R.does, actions) contains action
       else: R.does is open and R.does does not contain the entry "!<action>", and
       resolve(R.where, areas) contains area.id, and
-      every condition in R.when holds for `facts` (§ 3.2).
+      every condition in R.when holds for `facts` (§ 3.2), and
+      every condition in R.history holds for request.history (§ 3.4; an absent
+      history counts as empty only when no rule needed it, which step 3 ensures).
 
  5. Never rules. For each rule with never == true, in rulebook order, that matches:
     check(R.id, BLOCK, R.reason ?? R.text, R.setBy); if R.then.instead and `then`
@@ -228,7 +290,9 @@ Consequences worth stating: a missing or invalid fact is never permission (step 
 
 ## 7. Conflict analysis
 
-`check(rulebook) → Finding[]` ([`spec/findings.schema.json`](spec/findings.schema.json)). A finding is `{ kind, severity, ruleIds: [first, second], certainty, message }` with kind ∈ `contradiction authority-override tightening shadowed duplicate limit_disagreement never_vs_rule`, severity ∈ `conflict warning info`, certainty ∈ `certain possible`. `message` is free-form and SHOULD name which rule wins and which never takes effect.
+`check(rulebook) → Finding[]` ([`spec/findings.schema.json`](spec/findings.schema.json)). A finding is `{ kind, severity, ruleIds: [first, second], certainty, witness?, message }` with kind ∈ `contradiction authority-override tightening shadowed duplicate limit_disagreement never_vs_rule`, severity ∈ `conflict warning info`, certainty ∈ `certain possible`. `message` is free-form and SHOULD name which rule wins and which never takes effect.
+
+The analysis is **complete for the rule language**: two rules are reported as overlapping if and only if some request matches both. `certainty` is `certain` when the overlap was decided exactly, and then `witness` (§ 7.4) is a request that matches both rules; it is `possible` only when a rule in the pair has history conditions, which depend on what a caller supplies and are not modelled — then the overlap on facts is real, the history is unknown, and there is no witness.
 
 ### 7.1 Scope and constraints
 
@@ -241,16 +305,16 @@ The **scope** of a rule is `(roles, actions, areas, when)` with the three select
 | boolean, day, enum | the finite value set | a finite subset |
 | string | all non-empty strings | "everything except" a finite set, or a finite set |
 
-Intersection and subset over these representations are exact, so **disjointness is sound**: two constraints are called disjoint only when their intersection is provably empty.
+For an integer fact every range is kept closed on whole numbers (`> v` becomes `≥ ⌊v⌋+1`, `< v` becomes `≤ ⌈v⌉−1`), and an integer range is empty when it is inverted or every whole number in it is excluded; a real range with `lo < hi` is never emptied by finitely many excluded points. Intersection, emptiness and subset over these representations are exact, so **overlap is decided exactly**: facts are independent, the requests matching a rule are a product of per-fact sets, and two rules can meet iff their selectors meet and every per-fact intersection is non-empty. No enumeration is needed and no size bound applies.
 
 ### 7.2 Overlap and certainty
 
 For rules `a`, `b` (every pair `i < j` in rulebook order):
 
-- **overlap** iff `roles_a ∩ roles_b`, `actions_a ∩ actions_b`, `areas_a ∩ areas_b` are all non-empty and, for every fact named by either rule, `constraint(a,f) ∩ constraint(b,f)` is non-empty. No overlap → no finding.
+- **overlap** iff `roles_a ∩ roles_b`, `actions_a ∩ actions_b`, `areas_a ∩ areas_b` are all non-empty and, for every fact named by either rule, `constraint(a,f) ∩ constraint(b,f)` is non-empty. No overlap → no finding. (History conditions are ignored here.)
 - `implies(a, b)` iff for every fact `f` named by `b`, `constraint(a,f) ⊆ constraint(b,f)`.
 - `covered(a, b)` ("every request matching a matches b") iff `roles_a ⊆ roles_b`, `actions_a ⊆ actions_b`, `areas_a ⊆ areas_b` and `implies(a, b)`.
-- **certainty** = `certain` if `implies(a,b)` or `implies(b,a)`, else `possible`.
+- **certainty** = `possible` if either rule has a non-empty `history`, else `certain` (with a witness, § 7.4).
 
 ### 7.3 Classification
 
@@ -283,6 +347,14 @@ else (same authority):
 ```
 
 An implementation MAY offer a strict mode that refuses a rulebook with any `conflict`-severity finding; the reference does (`compileDomain(input, { strict: true })`).
+
+### 7.4 Witness
+
+`witness` is `{ participant: { id, kind, roleId }, action, areaId, facts }`: a request that matches both rules (§ 6 step 4, selectors and conditions, ignoring never-rule stopping). An implementation MUST produce a witness on every `certain` finding between rules and MAY choose any request that matches both; the conformance cases judge a witness by validity (`conformance/README.md`). The reference chooses, deterministically: the first role, action and area in declaration order that both rules cover; for every fact either rule names, the smallest value of the intersection (the first minute of the day for a time, the first in sorted order for a finite set, the lower end of a range or the first whole number above it, `"x"`/`"x1"`/… for a string that is "everything except"); every other fact the request needs (required, or required by the action) at a sample value (the default, else the minimum / `false` / `"00:00"` / `"mon"` / the first enum value / `"x"`); `participant.id` is `<roleId>-1`.
+
+### 7.5 Plan rules
+
+Plan rules can only reject, so two of them never disagree. The check reports a `duplicate` (info, certain, no witness) for two plan rules with the same `check` (same kind, same resolved selectors, same `sameArea` / `count`) whose `who` selectors share a role. No other finding kind applies to plan rules, and a plan rule is never compared with a rule.
 
 ## 8. Canonical JSON, fingerprint, request digest
 
@@ -346,4 +418,73 @@ The `authorities` list is a total order, highest first; `rank(id)` is the index.
 
 ## 11. Versioning and conformance
 
-This specification is `robot-domain-rules/1`. The rulebook `format` string is `neuroverse-domain-rules/2` and changes only with the rulebook's shape. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
+This specification is `robot-domain-rules/2`. The rulebook `format` string is `neuroverse-domain-rules/2` and changes only with the rulebook's shape; `/2` of this document added optional members (`effects`, `history`, `planRules`, `witness`) and did not change it. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. (`/2` did: the exact analysis changed the certainty of some findings and, through `witness`, the fingerprint of rulebooks that have findings.) An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
+
+## 12. Plans
+
+`evaluatePlan(rulebook, plan) → PlanEvaluation` ([`spec/plan.schema.json`](spec/plan.schema.json), [`spec/plan-evaluation.schema.json`](spec/plan-evaluation.schema.json)). A plan is what a planner — an AI agent, a fleet manager, a person — proposes; the rulebook checks it and does not write it. Pure and synchronous, like § 6.
+
+```json
+{ "participant": { "id": "robot-9", "kind": "robot", "roleId": "restock_robot" },
+  "initialFacts": { "localTime": "09:30", "peopleInZone": 0 },
+  "steps": [ { "action": "enter_zone", "area": "aisle-3" }, { "action": "scan" }, { "action": "manipulate", "facts": { "peopleInZone": 2 }, "note": "…" } ],
+  "history": [ { "action": "dock", "areaId": "dock-a", "at": "09:00" } ],
+  "clock": "localTime", "startTime": "09:30", "stepDurationSeconds": 120 }
+```
+
+| Field | Req | Meaning |
+|---|---|---|
+| `participant` | yes | As in a request. |
+| `initialFacts` | yes | The facts before the first step; undeclared facts are ignored, as in a request. |
+| `steps` | yes, ≥1 | `{ action, area?, facts?, note? }`. The first step MUST have `area`. `facts` are laid over the projected facts for that step only, and persist into the projection after it. `note` is carried into the result. |
+| `history` | no | What the participant did before the plan; seeds each step's history and counts for `before` plan rules. |
+| `clock` | no | A declared `time` fact that advances. |
+| `startTime`, `stepDurationSeconds` | no | With `clock`: step *i* sees `clock = startTime + ⌊i · stepDurationSeconds / 60⌋` minutes, mod 1440. |
+
+```
+ 0. Shape. If the plan is not an object, has no participant, no steps, no initialFacts,
+    a step without an action, a first step without an area, a clock that is not a
+    declared time fact, a startTime that is not a time, or a history that is not a
+    list: status BLOCK, firstViolation { stepIndex 0, ruleId "required_facts",
+    setBy "builtin", from "plan" }, no steps, no planChecks; stop.
+
+ 1. Areas, as described. here = steps[0].area. For each step i:
+      areas[i] = step.area ?? here
+      if the step's action is declared and has a `move` effect: here = areas[i]
+      after[i] = here
+
+ 2. Plan rules. For each plan rule whose `who` selects the participant's role
+    (a role that is undeclared, or of another kind, is left to step 3), in order,
+    a PlanRuleCheck { ruleId, status, reason, setBy, stepIndex? }:
+      ends_in:   ALLOW iff after[n-1] ∈ resolve(areas); else BLOCK at n-1
+      ends_with: ALLOW iff steps[n-1].action ∈ resolve(actions); else BLOCK at n-1
+      before:    for each step i with action ∈ resolve(then): some entry of
+                 plan.history, or some step j < i, has action ∈ resolve(first)
+                 (and area == areas[i] when sameArea); the first i that fails
+                 → BLOCK at i; none → ALLOW
+      at_most:   BLOCK at the (count+1)-th step with action ∈ resolve(actions); else ALLOW
+
+ 3. Steps. facts = initialFacts; history = plan.history ?? []. For each step i:
+      if clock and startTime: facts[clock] = startTime + ⌊i · stepDurationSeconds / 60⌋ min (mod 1440)
+      stepFacts = facts ⊕ step.facts
+      decision = evaluate(rulebook, { participant, action: step.action, areaId: areas[i],
+                                      facts: stepFacts, history })             (§ 6)
+      record { index: i, action, areaId: areas[i], facts: stepFacts, decision, note? }
+      add each of decision.approvalRequests not already present (same ruleId and
+        requestDigest) to approvalRequests
+      if decision.status == BLOCK: facts = stepFacts; stop projecting
+      facts = stepFacts with the action's effects applied, in order: set → the
+        value; add/subtract → from the current value, or the fact's default when
+        the current value is not a number, or left untouched when neither exists
+      history += { action, areaId: areas[i], at: stepFacts[clock] if it is a string }
+
+ 4. Finish. status = the strictest of every plan check and every recorded step
+    decision. firstViolation = among the first recorded step with status BLOCK
+    (from "step", its first reason) and every plan check with status BLOCK (from
+    "plan", at its stepIndex), the one with the smallest stepIndex; at equal
+    index the step's. finalFacts = facts. finalArea = the last recorded step's
+    areaId if its decision is BLOCK, else after[last recorded index].
+    planDigest = fingerprint(plan) (§ 8.2). fingerprint = rulebook.fingerprint.
+```
+
+Consequences: nothing is projected past a refusal (the steps list is cut at the first BLOCK); a PAUSE does not stop projection, so a planner sees every approval the plan needs; the plan is judged on the effects the site declared and the facts the planner supplied, nothing else; approvals are bound per step, by that step's request digest, exactly as for a single request.

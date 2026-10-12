@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/approval.schema.json",
-  "title": "Approvals (robot-domain-rules/1)",
+  "title": "Approvals (robot-domain-rules/2)",
   "description": "What a PAUSE asks for, and what a person signs. SPEC.md § Approvals.",
   "$defs": {
     "approvalRequest": {

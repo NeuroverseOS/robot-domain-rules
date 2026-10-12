@@ -168,3 +168,25 @@ details.quiet > summary { color: var(--muted); font-weight: 500; }
 pre.code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px; max-height: 260px; overflow: auto; font-size: 12px; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ─── Plan mode (0.5) ─── */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg .btn { border: 0; border-radius: 0; }
+.seg .btn.on { background: var(--text); color: var(--bg); }
+.plan-steps { list-style: none; padding: 0; margin: 0 0 8px; }
+.plan-steps li { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; background: var(--panel); }
+.plan-steps li.selected { border-color: var(--text); }
+.plan-step-head { display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 6px; align-items: end; }
+.plan-step-head .field { margin: 0; }
+.plan-step-tools { display: inline-flex; gap: 2px; padding-bottom: 6px; }
+.plan-step-more .field { flex: 1; }
+.plan-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.plan-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.plan-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.plan-table tbody tr { cursor: pointer; }
+.plan-table tbody tr:hover { background: var(--panel-2); }
+.plan-table tr.selected td { background: var(--panel-2); }
+.plan-table tr.violation td { border-left: 3px solid var(--conflict); }
+.plan-table tr.violation td:first-child { font-weight: 700; }
+.mono { font-family: var(--mono); }
+.witness .mono { font-size: 11.5px; }

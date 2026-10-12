@@ -712,10 +712,24 @@
             "site_cap"
           ],
           "certainty": "certain",
-          "message": "`site_cap` set by low tightens `cap` set by high: `cap` (set by high) says limit speed 1; `site_cap` (set by low) says limit speed 0.5. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `cap` never takes effect there."
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`site_cap` set by low tightens `cap` set by high: `cap` (set by high) says limit speed 1; `site_cap` (set by low) says limit speed 0.5. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "493ca1bb28438732"
+      "fingerprint": "bf2c7601d84e2a64"
     },
     "request": {
       "participant": {
@@ -761,7 +775,7 @@
         "limits": {
           "speed": 0.5
         },
-        "fingerprint": "493ca1bb28438732"
+        "fingerprint": "bf2c7601d84e2a64"
       }
     }
   },

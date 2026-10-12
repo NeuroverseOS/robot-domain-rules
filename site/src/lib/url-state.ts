@@ -8,11 +8,15 @@
 
 import type { RulebookState } from './model';
 import type { Situation } from './situation';
+import type { PlanState } from './plan';
 
 export interface SharedState {
   v: 1;
   rulebook: RulebookState;
   situation: Situation;
+  /** Plan mode (0.5). Absent in links made before it existed. */
+  mode?: 'ask' | 'plan';
+  plan?: PlanState;
 }
 
 export const STORAGE_KEY = 'robot-domain-rules.switchboard.v1';

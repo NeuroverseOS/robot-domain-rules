@@ -9,6 +9,8 @@ import {
   evaluateDomainAction,
   glassesZoneRules,
   isOpen,
+  matchingRules,
+  evaluatePlan,
   parseRuleDraft,
   renderDomainRules,
   verifyFingerprint,
@@ -484,21 +486,33 @@ describe('generic rulebook: authority', () => {
 describe('generic rulebook: rules at odds', () => {
   const kinds = (input: CompileDomainInput) => checkRulebook(input).map(f => `${f.kind}:${f.certainty}:${f.ruleIds.join('+')}`);
 
-  it('finds a certain contradiction and a possible one at the same authority, and says who never takes effect', () => {
+  it('finds a contradiction at the same authority, says who never takes effect, and gives a witness request that matches both rules', () => {
     const certain = tiny([rule('yes', { answer: 'allow' }), rule('no', { answer: 'deny' }, { where: 'y' })]);
     expect(kinds(certain)).toEqual(['contradiction:certain:yes+no']);
     const f = checkRulebook(certain)[0];
     expect(f.severity).toBe('conflict');
     expect(f.message).toContain('`yes` never takes effect there');
     expect(f.message).toContain('every role · every action · Y, always');
-    // Conditions on two independent facts: the rulebook cannot know whether n == 0 and m > 0 ever hold at once.
-    const possible = tiny([
+    expect(f.witness).toEqual({ participant: { id: 'bot-1', kind: 'robot', roleId: 'bot' }, action: 'go', areaId: 'y', facts: { n: 0, t: '00:00', day: 'mon' } });
+    // Conditions on two independent facts (n == 0 and m > 0) can both hold: the analysis is exact, so it is certain, with the smallest values as the witness.
+    const partial = tiny([
       rule('yes', { answer: 'allow' }, { when: [{ fact: 'n', op: '==', value: 0 }] }),
       rule('wait', { answer: 'wait', for: 'condition' }, { when: [{ fact: 'm', op: '>', value: 0 }] }),
     ]);
-    expect(kinds(possible)).toEqual(['contradiction:possible:yes+wait']);
-    expect(checkRulebook(possible)[0].severity).toBe('warning');
-    expect(checkRulebook(possible)[0].message).toMatch(/possible, not certain/);
+    expect(kinds(partial)).toEqual(['contradiction:certain:yes+wait']);
+    const p = checkRulebook(partial)[0];
+    expect(p.severity).toBe('warning');
+    expect(p.message).toContain('`yes` never takes effect there');
+    expect(p.witness?.facts).toEqual({ n: 0, m: 1, t: '00:00', day: 'mon' });
+    expect(matchingRules(compileDomain(partial), p.witness!)).toEqual(['yes', 'wait']);
+    // A rule on history is not analysed: the overlap on facts is real, the certainty is "possible", and there is no witness.
+    const onHistory = tiny([
+      rule('yes', { answer: 'allow' }),
+      rule('too_many', { answer: 'deny' }, { history: [{ actions: 'look', op: '>=', value: 3 }] }),
+    ]);
+    expect(kinds(onHistory)).toEqual(['contradiction:possible:yes+too_many']);
+    expect(checkRulebook(onHistory)[0].witness).toBeUndefined();
+    expect(checkRulebook(onHistory)[0].message).toMatch(/possible, not proven/);
   });
 
   it('finds shadowed, duplicate and limit disagreements', () => {
@@ -509,8 +523,9 @@ describe('generic rulebook: rules at odds', () => {
       rule('fast', { answer: 'limit', limits: { speed: 1 } }, { where: 'x', when: [{ fact: 'n', op: '<', value: 5 }] }),
       rule('slow', { answer: 'limit', limits: { speed: 0.5 } }, { when: [{ fact: 'n', op: '>', value: 2 }] }),
     ]);
-    expect(kinds(limits)).toEqual(['limit_disagreement:possible:fast+slow']);
+    expect(kinds(limits)).toEqual(['limit_disagreement:certain:fast+slow']);
     expect(checkRulebook(limits)[0].message).toContain('The lower value, 0.5, applies');
+    expect(checkRulebook(limits)[0].witness?.facts.n).toBe(3);
     // A stricter special case of a looser rule is layering, not a finding.
     expect(kinds(tiny([rule('site', { answer: 'limit', limits: { speed: 1 } }), rule('near', { answer: 'limit', limits: { speed: 0.3 } }, { when: [{ fact: 'n', op: '>', value: 0 }] })]))).toEqual([]);
     expect(kinds(tiny([rule('deny', { answer: 'deny' }, { where: 'y' }), rule('wait', { answer: 'wait', for: 'condition' }, { when: [{ fact: 'n', op: '>', value: 0 }] })]))).toEqual([]);
@@ -542,9 +557,13 @@ describe('generic rulebook: rules at odds', () => {
     for (const [whenA, whenB] of pairs) {
       expect(kinds(tiny([rule('a', { answer: 'allow' }, { when: whenA }), rule('b', { answer: 'deny' }, { when: whenB })])), JSON.stringify([whenA, whenB])).toEqual([]);
     }
-    // Move one boundary and the overlap appears.
+    // Move one boundary and the overlap appears, with the shared value as the witness.
     const touching = tiny([rule('a', { answer: 'allow' }, { when: [{ fact: 'n', op: '<=', value: 3 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'n', op: '>=', value: 3 }] })]);
-    expect(kinds(touching)).toEqual(['contradiction:possible:a+b']);
+    expect(kinds(touching)).toEqual(['contradiction:certain:a+b']);
+    expect(checkRulebook(touching)[0].witness?.facts.n).toBe(3);
+    // Exactness on integers: every whole number in a range excluded is empty, and the gap between two reals is not.
+    expect(kinds(tiny([rule('a', { answer: 'allow' }, { when: [{ fact: 'n', op: '>=', value: 1 }, { fact: 'n', op: '<=', value: 2 }, { fact: 'n', op: '!=', value: 1 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'n', op: '!=', value: 2 }] })]))).toEqual([]);
+    expect(kinds(tiny([rule('a', { answer: 'allow' }, { when: [{ fact: 'm', op: '>', value: 1 }, { fact: 'm', op: '<', value: 2 }] }), rule('b', { answer: 'deny' }, { when: [{ fact: 'm', op: '!=', value: 1.5 }] })]))).toEqual(['contradiction:certain:a+b']);
     const compiled = compileDomain(touching);
     expect(compiled.findings).toEqual(checkRulebook(touching));
     expect(Object.isFrozen(compiled.findings)).toBe(true);
@@ -653,10 +672,153 @@ describe('generic rulebook: drafting from plain words', () => {
   });
 });
 
+// ─── 0.5: whole plans on projected facts, history conditions ────────────────
+
+describe('plans: an AI planner proposes, the rulebook checks every step on projected facts', () => {
+  // A tiny site with effects: `pick` loads the robot, `drop` unloads it, `go` moves it; a never rule and a plan rule.
+  const planSite = (extraRules: Array<Omit<Rule, 'source' | 'setBy'> & { setBy?: string }> = []): CompileDomainInput => tiny([
+    rule('no_load_in_y', { answer: 'deny', instead: 'drop' }, { does: 'go', where: 'y', when: [{ fact: 'loaded', op: '==', value: true }] }),
+    rule('ask_before_look', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'look' }),
+    ...extraRules,
+  ], {
+    actions: [
+      { id: 'go', kinds: ['robot'], tags: ['movement'], effects: [{ op: 'move' }] },
+      { id: 'look', kinds: ['robot'] },
+      { id: 'pick', kinds: ['robot'], effects: [{ op: 'set', fact: 'loaded', value: true }, { op: 'add', fact: 'n', value: 1 }] },
+      { id: 'drop', kinds: ['robot'], effects: [{ op: 'set', fact: 'loaded', value: false }] },
+    ],
+    facts: [
+      { id: 'n', type: 'number', integer: true, min: 0, max: 2, required: true },
+      { id: 'm', type: 'number', min: 0, default: 0 },
+      { id: 't', type: 'time', required: true },
+      { id: 'mode', type: 'enum', values: ['a', 'b', 'c'], default: 'a' },
+      { id: 'flag', type: 'boolean', default: false },
+      { id: 'day', type: 'day', required: true },
+      { id: 'loaded', type: 'boolean', default: false },
+    ],
+    roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['go', 'look', 'pick', 'drop'] }],
+    planRules: [
+      { id: 'end_in_x', text: 'Every plan ends in X.', who: '*', check: { kind: 'ends_in', areas: 'x' }, setBy: 'high', source: { kind: 'manual', ref: 'end_in_x' } },
+      { id: 'look_before_pick', text: 'Look before you pick, in the same area.', who: 'bot', check: { kind: 'before', first: 'look', then: 'pick', sameArea: true }, setBy: 'low', source: { kind: 'manual', ref: 'look_before_pick' } },
+      { id: 'one_pick', text: 'At most one pick per plan.', who: '*', check: { kind: 'at_most', actions: 'pick', count: 1 }, setBy: 'low', source: { kind: 'manual', ref: 'one_pick' } },
+    ],
+  });
+  const bot = { id: 'b', kind: 'robot', roleId: 'bot' };
+  const start = { n: 0, t: '10:00', day: 'mon' };
+
+  it('projects declared effects step by step and rejects at the first step a rule refuses, naming rule, reason and authority', () => {
+    const rb = compileDomain(planSite());
+    // pick in x (loaded := true), then go to y while loaded: refused at step 2 (index 1) by the manager's rule, with its instead hint.
+    const v1 = evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [{ action: 'look', area: 'x', facts: { approvedBy: { id: 'ann', authority: 'high' } } }, { action: 'pick' }, { action: 'go', area: 'y' }, { action: 'drop' }] });
+    expect(v1.status).toBe('BLOCK');
+    expect(v1.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'ALLOW', 'BLOCK']);     // nothing is projected past the refusal
+    expect(v1.steps[2].facts.loaded).toBe(true);
+    expect(v1.steps[2].decision.then).toBe('drop');
+    expect(v1.firstViolation).toEqual({ stepIndex: 2, ruleId: 'no_load_in_y', reason: expect.any(String), setBy: 'high', from: 'step' });
+    expect(v1.planChecks.map(c => `${c.ruleId}:${c.status}`)).toEqual(['end_in_x:BLOCK', 'look_before_pick:ALLOW', 'one_pick:ALLOW']);
+    expect(v1.finalArea).toBe('y');
+    expect(v1.fingerprint).toBe(rb.fingerprint);
+    expect(v1.planDigest).toMatch(/^[0-9a-f]{16}$/);
+    // Same plan, dropped before moving and back to x at the end: every step passes, the count fact went up by the pick.
+    const v2 = evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [{ action: 'look', area: 'x', facts: { approvedBy: { id: 'ann', authority: 'high' } } }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'y' }, { action: 'go', area: 'x' }] });
+    expect(v2.status).toBe('ALLOW');
+    expect(v2.steps).toHaveLength(5);
+    expect(v2.finalFacts).toMatchObject({ n: 1, loaded: false });
+    expect(v2.finalArea).toBe('x');
+    expect(v2.firstViolation).toBeUndefined();
+  });
+
+  it('plan rules judge the whole plan: what comes before what, how many, where it ends; a PAUSE collects the approvals a planner needs up front', () => {
+    const rb = compileDomain(planSite());
+    const r = evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [{ action: 'pick', area: 'x' }, { action: 'drop' }, { action: 'look' }, { action: 'pick' }, { action: 'go', area: 'y' }] });
+    expect(r.status).toBe('BLOCK');
+    expect(r.planChecks.filter(c => c.status === 'BLOCK').map(c => `${c.ruleId}@${c.setBy}#${c.stepIndex}`)).toEqual(['end_in_x@high#4', 'look_before_pick@low#0', 'one_pick@low#3']);
+    expect(r.firstViolation?.ruleId).toBe('look_before_pick');
+    expect(r.firstViolation?.from).toBe('plan');
+    // The steps themselves: the look needs an approval (listed so the planner can get it signed first); the second pick loads the robot, so the move to y is refused.
+    expect(r.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'ALLOW', 'PAUSE', 'ALLOW', 'BLOCK']);
+    expect(r.approvalRequests.map(a => `${a.ruleId}@${a.by}`)).toEqual(['ask_before_look@high']);
+    // History before the plan counts for "before"; a plan that ends on a step with no move effect stays where it was.
+    const withHistory = evaluatePlan(rb, { participant: bot, initialFacts: start, history: [{ action: 'look', areaId: 'x' }], steps: [{ action: 'pick', area: 'x' }, { action: 'drop' }] });
+    expect(withHistory.status).toBe('ALLOW');
+    expect(withHistory.finalArea).toBe('x');
+  });
+
+  it('a projected fact outside its declared range is a refusal, never a guess; a malformed plan is BLOCK, never a throw; the clock advances per step', () => {
+    const rb = compileDomain(planSite());
+    const approved = { approvedBy: { id: 'ann', authority: 'high' } };
+    // n has max 2: the second pick pushes it to 3, and the step after it is refused as required_facts (the plan as described cannot happen).
+    const r = evaluatePlan(rb, { participant: bot, initialFacts: { ...start, n: 1 }, steps: [{ action: 'look', area: 'x', facts: approved }, { action: 'pick' }, { action: 'drop' }, { action: 'pick' }, { action: 'drop' }, { action: 'pick' }] });
+    expect(r.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'BLOCK']);
+    expect(r.steps[4].decision.reasons[0].ruleId).toBe('required_facts');
+    expect(r.steps[4].facts.n).toBe(3);
+    expect(evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [] }).firstViolation?.ruleId).toBe('required_facts');
+    expect(evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [{ action: 'look' }] }).status).toBe('BLOCK');
+    expect(evaluatePlan(rb, { participant: bot, initialFacts: start, clock: 'nope', steps: [{ action: 'look', area: 'x' }] }).status).toBe('BLOCK');
+    const timed = evaluatePlan(compileDomain(planSite([rule('no_night', { answer: 'deny' }, { when: [{ fact: 't', op: 'between', from: '22:00', to: '06:00' }] })])), {
+      participant: bot, initialFacts: start, clock: 't', startTime: '21:58', stepDurationSeconds: 90, steps: [{ action: 'drop', area: 'x' }, { action: 'drop' }, { action: 'drop' }],
+    });
+    expect(timed.steps.map(s => `${s.facts.t}:${s.decision.status}`)).toEqual(['21:58:ALLOW', '21:59:ALLOW', '22:01:BLOCK']);
+  });
+
+  it('rejects effects and plan rules that name what the site did not declare', () => {
+    expect(() => compileDomain(planSite([]), {})).not.toThrow();
+    const bad = (patch: (i: CompileDomainInput) => void, re: RegExp) => { const i = planSite(); patch(i); expect(() => compileDomain(i)).toThrow(re); };
+    bad(i => { i.actions![2].effects = [{ op: 'set', fact: 'nope', value: 1 }]; }, /unknown fact "nope"/);
+    bad(i => { i.actions![2].effects = [{ op: 'add', fact: 'loaded', value: 1 }]; }, /applies to number facts/);
+    bad(i => { i.actions![2].effects = [{ op: 'set', fact: 'n', value: 1.5 }]; }, /whole number/);
+    bad(i => { i.planRules![0].check = { kind: 'ends_in', areas: 'roof' }; }, /unknown area "roof"/);
+    bad(i => { i.planRules![0].setBy = 'king'; }, /unknown authority "king"/);
+    bad(i => { i.planRules![2].check = { kind: 'at_most', actions: 'pick', count: -1 }; }, /whole number, 0 or more/);
+    bad(i => { i.planRules![1].id = 'no_load_in_y'; }, /declared twice/);
+    const rb = compileDomain(planSite());
+    expect(rb.planRules).toHaveLength(3);
+    expect(renderDomainRules(rb)).toContain('## Plan rules');
+    expect(renderDomainRules(rb)).toContain('loaded := true');
+    expect(checkRulebook(compileDomain({ ...planSite(), planRules: [...planSite().planRules!, { ...planSite().planRules![2], id: 'one_pick_again' }] })).map(f => `${f.kind}:${f.ruleIds.join('+')}`)).toContain('duplicate:one_pick+one_pick_again');
+  });
+});
+
+describe('history conditions: what the participant did recently, as the caller reports it', () => {
+  const site = tiny([
+    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 't', op: '>=', value: 5 }] }),
+    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 10, clock: 't', op: '>=', value: 1 }] }),
+  ]);
+  const rb = compileDomain(site);
+  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'x', at: `${String(Math.floor((from + i) / 60)).padStart(2, '0')}:${String((from + i) % 60).padStart(2, '0')}` }));
+
+  it('counts matching entries in the window of the clock fact; missing history is required_facts, never permission', () => {
+    expect(ids(evaluateDomainAction(rb, { ...tinyReq('look'), history: looks(4) }))).toEqual(['role_permits_action']);
+    expect(ids(evaluateDomainAction(rb, { ...tinyReq('look'), history: looks(5) }))).toEqual(['five_looks_an_hour']);
+    // Five looks, but the oldest is outside the hour: four count.
+    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '10:05' }), history: looks(5) }).status).toBe('ALLOW');
+    // Overnight: 23:55 then 00:03 is eight minutes later.
+    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'x', at: '23:55' }] }).status).toBe('PAUSE');
+    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'y', at: '23:55' }] }).status).toBe('ALLOW');
+    const missing = evaluateDomainAction(rb, tinyReq('look'));
+    expect(missing.status).toBe('BLOCK');
+    expect(missing.reasons[0].ruleId).toBe('required_facts');
+    expect(missing.reasons[0].reason).toContain('history is required');
+    // An entry without a time, when a rule uses a window, is incomplete.
+    expect(evaluateDomainAction(rb, { ...tinyReq('look'), history: [{ action: 'look', areaId: 'x' }] }).reasons[0].ruleId).toBe('required_facts');
+    // A request the history rules do not reach (action go) needs no history at all.
+    expect(evaluateDomainAction(rb, tinyReq('go')).status).toBe('ALLOW');
+  });
+
+  it('rejects history conditions that are not declared exactly', () => {
+    const bad = (history: unknown, re: RegExp) => expect(() => compileDomain(tiny([rule('r', { answer: 'deny' }, { history: history as Rule['history'] })]))).toThrow(re);
+    bad([{ actions: 'fly', op: '>=', value: 1 }], /unknown action "fly"/);
+    bad([{ actions: 'go', withinMinutes: 10, op: '>=', value: 1 }], /needs clock/);
+    bad([{ actions: 'go', withinMinutes: 10, clock: 'n', op: '>=', value: 1 }], /not a declared time fact/);
+    bad([{ actions: 'go', op: '>=', value: 1.5 }], /whole number/);
+    bad([{ actions: 'go', op: '~', value: 1 }], /history op/);
+  });
+});
+
 // ─── 0.4: soundness of the conflict check, under a seeded random generator ──
 
-describe('conflict check soundness: "disjoint" is never a lie', () => {
-  it('whenever the checker reports no overlap for two rules, no generated request matches both', () => {
+describe('conflict check exactness: "disjoint" is never a lie, and every witness is real', () => {
+  it('whenever the checker reports no overlap, no generated request matches both; whenever it reports one, its witness matches both', () => {
     // A small deterministic PRNG (mulberry32) so a failure is reproducible from the seed.
     let seed = 0x5eed2026;
     const rnd = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -686,14 +848,20 @@ describe('conflict check soundness: "disjoint" is never a lie', () => {
     });
     const randomFacts = () => ({ n: int(0, 7), m: int(0, 9) / 2, t: hhmm(), day: pick(days), mode: pick(modes), flag: pick([true, false]) });
 
-    let pairs = 0, disjointPairs = 0, requests = 0;
+    let pairs = 0, disjointPairs = 0, requests = 0, witnesses = 0;
     for (let round = 0; round < 400; round++) {
       let input: CompileDomainInput;
       try { input = tiny([randomRule('a', { answer: 'allow' }), randomRule('b', { answer: 'deny' })]); compileDomain(input); } catch { continue; }   // impossible conditions are refused at compile time; skip them
       const rb = compileDomain(input);
-      const overlap = rb.findings.some(f => f.ruleIds.includes('a') && f.ruleIds.includes('b'));
+      const found = rb.findings.find(f => f.ruleIds.includes('a') && f.ruleIds.includes('b'));
       pairs++;
-      if (overlap) continue;                 // a finding was reported: the checker claims nothing about disjointness here
+      if (found) {
+        // A finding was reported: the checker claims the overlap is real and its witness is a request that matches both. Check it.
+        expect(found.certainty).toBe('certain');
+        expect(matchingRules(rb, found.witness!).sort(), `witness does not match both: ${JSON.stringify({ rules: input.rules, witness: found.witness })}`).toEqual(['a', 'b']);
+        witnesses++;
+        continue;
+      }
       disjointPairs++;
       // No finding for an allow against a deny: the checker is claiming the two rules are provably disjoint. Try to refute it.
       for (let k = 0; k < 60; k++) {
@@ -708,6 +876,7 @@ describe('conflict check soundness: "disjoint" is never a lie', () => {
     }
     expect(pairs).toBeGreaterThan(200);
     expect(disjointPairs).toBeGreaterThan(20);
+    expect(witnesses).toBeGreaterThan(100);
     expect(requests).toBeGreaterThan(5000);
   });
 });

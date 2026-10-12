@@ -167,6 +167,7 @@ export function inputFromRulebook(rb: Rulebook): CompileDomainInput {
     otherwise: rb.otherwise,
   };
   if (rb.template) input.template = rb.template;
+  if (rb.planRules?.length) input.planRules = cloneJson(rb.planRules);
   return input;
 }
 

@@ -5,6 +5,9 @@ import { compileState, findingsOf, answerQuestion, draftFromText, confirmDraft, 
 import { toRequest, fromRequest, defaultSituation, reconcile } from '../src/lib/situation';
 import { encodeState, decodeState, hashPayload } from '../src/lib/url-state';
 import { importRulebook, rulebookJson, codeSnippet } from '../src/lib/share';
+import { evaluatePlan, matchingRules } from '../../src/index';
+import { planPresets, toPlan, fromPlan, defaultPlanState, reconcilePlan, parseFacts } from '../src/lib/plan';
+import { describeWitness } from '../src/ui/ConflictsPanel';
 
 describe('starting points', () => {
   it('every starting point compiles, and the grocery seed shows the deliberate conflicts on first visit', () => {
@@ -97,5 +100,69 @@ describe('sharing', () => {
     expect(importRulebook(tampered).ok).toBe(false);
     expect(importRulebook('{').ok).toBe(false);
     expect(codeSnippet(rb, STARTING_POINTS[0].presets[0].request)).toContain('evaluateDomainAction(rulebook, {');
+  });
+});
+
+describe('plan mode', () => {
+  it('every preset plan round-trips through the editor state and is decided by its rulebook; the replay\'s v1 is rejected at the scan rule, v2 pauses for one approval, v2 approved passes', () => {
+    for (const sp of STARTING_POINTS) {
+      const rb = compileState(freshState(sp.id)).rulebook!;
+      for (const p of planPresets(sp.id)) {
+        expect(toPlan(fromPlan(p.plan)), `${sp.id}: ${p.label}`).toEqual(p.plan);
+        const r = evaluatePlan(rb, toPlan(fromPlan(p.plan)));
+        expect(['ALLOW', 'LIMIT', 'PAUSE', 'BLOCK']).toContain(r.status);
+        expect(r.firstViolation?.ruleId, `${sp.id}: ${p.label} must not fail on a malformed plan`).not.toBe('required_facts');
+      }
+    }
+    const grocery = compileState(freshState('grocery')).rulebook!;
+    const [v1, v2, v2ok] = planPresets('grocery');
+    const r1 = evaluatePlan(grocery, v1.plan);
+    expect(r1.status).toBe('BLOCK');
+    expect(r1.firstViolation).toMatchObject({ stepIndex: 1, ruleId: 'scan_before_restock', from: 'plan', setBy: 'site-manager' });
+    expect(r1.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'ALLOW', 'BLOCK']);
+    expect(r1.steps[2].decision.reasons[0].ruleId).toBe('no_carrying_through_checkout');
+    expect(r1.planChecks.map(c => `${c.ruleId}:${c.status}`)).toEqual(['scan_before_restock:BLOCK', 'end_at_dock:BLOCK']);
+    const r2 = evaluatePlan(grocery, v2.plan);
+    expect(r2.status).toBe('PAUSE');
+    expect(r2.approvalRequests.map(a => a.ruleId)).toEqual(['robots_restricted_zones']);
+    expect(r2.finalArea).toBe('dock-a');
+    expect(evaluatePlan(grocery, v2ok.plan).status).toBe('ALLOW');
+  });
+
+  it('a default plan reconciles to another rulebook; step facts that are not a JSON object are ignored, not fatal', () => {
+    const grocery = compileState(freshState('grocery')).rulebook!;
+    const d = defaultPlanState(grocery);
+    expect(evaluatePlan(grocery, toPlan(d)).firstViolation?.ruleId).not.toBe('required_facts');
+    const warehouse = compileState(freshState('warehouse')).rulebook!;
+    const moved = reconcilePlan(d, warehouse);
+    expect(warehouse.roles.some(r => r.id === moved.participant.roleId)).toBe(true);
+    expect(Object.keys(moved.initialFacts).every(k => warehouse.facts.some(f => f.id === k))).toBe(true);
+    expect(parseFacts('{"a":1}')).toEqual({ a: 1 });
+    expect(parseFacts('nope')).toBeNull();
+    expect(parseFacts('')).toEqual({});
+    expect(toPlan({ ...d, steps: [{ action: 'move', area: 'aisle-3', facts: 'nope', note: '' }] }).steps[0].facts).toBeUndefined();
+  });
+
+  it('URL state carries the mode and the plan, and older links without them still load', async () => {
+    const rulebook = freshState('grocery');
+    const situation = fromRequest(STARTING_POINTS[0].presets[0].request);
+    const plan = fromPlan(planPresets('grocery')[0].plan);
+    const encoded = await encodeState({ v: 1, rulebook, situation, mode: 'plan', plan });
+    expect(await decodeState(encoded)).toEqual({ v: 1, rulebook, situation, mode: 'plan', plan });
+    const old = await encodeState({ v: 1, rulebook, situation });
+    expect((await decodeState(old))?.mode).toBeUndefined();
+  });
+
+  it('every finding on the grocery seed carries a witness that triggers both of its rules, in words the panel shows', () => {
+    const state = freshState('grocery');
+    const rb = compileState(state).rulebook!;
+    const findings = findingsOf(state);
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(f.certainty).toBe('certain');
+      expect(f.witness).toBeDefined();
+      expect(matchingRules(rb, f.witness!)).toEqual(expect.arrayContaining(f.ruleIds));
+      expect(describeWitness(f.witness!)).toContain(` does ${f.witness!.action} in `);
+    }
   });
 });
