@@ -1,42 +1,42 @@
 # robot-domain-rules
 
-**A small governance core for physical spaces. Turn operator-defined constraints into a portable rule set, then evaluate proposed actions against trusted facts supplied by your application.**
+**A governance core for physical spaces where robots, people and AI work together.**
 
-A site operator answers ten plain questions, declares zones and roles, and gets one rule set. Before every action, a robot (or a person's glasses) asks: *may I do this, here, now?* The answer is `ALLOW`, `LIMIT`, `PAUSE` or `BLOCK`, with the rules that decided it.
+The people who run a space turn their answers and plain-language rules into one rulebook. The rulebook flags rules that contradict each other. Before any robot, pair of glasses or AI-driven agent acts, it asks the rulebook and gets **yes / slower / wait / no**, with the reason. An AI can propose an action; the space's rules decide.
 
-An AI can propose an action; the core decides whether it's permitted. The core uses explicit rules only, so the same rules and facts always give the same answer.
+Every rule says who set it. A lower authority can only make things stricter. Approvals must come from someone with the right authority.
 
-> Give us the rules, the proposed action and the required facts. We'll tell you what is permitted, under what constraints, and why.
+## The process
+
+```
+template ──► answer questions ──► write rules in plain words ──► check for conflicts ──► compile ──► every participant asks
+ (optional)   each answer emits    "no restock robots in        rules at odds are      one JSON     evaluateDomainAction(
+              rules                 aisle 3 on Saturdays"        named, never hidden    rulebook       rulebook, request)
+```
+
+1. **Start from a template or from nothing.** A template brings default actions, facts, limits, authorities and a short set of questions. Or declare everything yourself: your own kinds of participants, your own actions (`deliver_meds`), your own facts (`patient_present`), your own authorities.
+2. **Answer questions.** Each answer emits rules. The first option is always the safe one; unanswered questions take it.
+3. **Write rules in plain words.** `draftRuleFromText("robots slow to 0.3 m/s in checkout")` pattern-matches against your rulebook's own vocabulary and returns a draft, a confidence, and the words it could not place. You read it, then confirm it. Nothing is added on its own. You can also hand the text to your own model with `buildRuleDraftPrompt` and validate its answer with `parseRuleDraft`; this package makes no network calls.
+4. **Check for conflicts.** Two rules that can match the same request but give different answers; a rule that can never take effect; two limits that disagree; a lower authority trying to loosen a higher one. Every finding says which rule wins and which never takes effect.
+5. **Compile.** One frozen JSON rulebook with a fingerprint. Save it, version it, ship it.
+6. **Every participant asks.** `ALLOW`, `LIMIT` (with the limits), `PAUSE` (for approval, or for the situation to change) or `BLOCK`, with the rules that decided, who set them, and a full trace.
 
 ## Who does what
 
-| Your system | This core | Your robot controller |
+| Your spatial system | This core | Your controller |
 |---|---|---|
-| Supplies location, identity, observations and verified approvals | Checks permissions, returns constraints, explains decisions | Enforces the decision |
+| Says **where** everything is and supplies the **facts** (which area, how many people, local time, emergency, who approved) | Decides **what is allowed** there, within what limits, and why | **Enforces** the decision |
 
-The core trusts the facts it is given. It never guesses a fact it wasn't given: a required fact that is missing or invalid gives `BLOCK` (rule `required_facts`), never permission.
+Location is not this package's job. A spatial system such as posemesh decides which area each participant is in and passes that in. The core trusts the facts it is given and never fills one in: a required fact that is missing or invalid is `BLOCK` (`required_facts`), never permission.
 
-```
-your spatial system (e.g. posemesh)          this package
-─────────────────────────────────            ─────────────────────────────────────
-where is robot-7?      → zone "aisle-3"  ─┐
-who else is there?     → 2 people        ─┼→ evaluateDomainAction(rules, request)
-what time is it?       → "14:05"         ─┘        │
-                                                    ▼
-                                         LIMIT · max 0.3 m/s
-                                         robots_near_people: "2 people in Aisle 3…"
-```
-
-**Location is not this package's job.** Your spatial system decides which zone each participant is in and how many people are there, and passes that in. This package only decides what is allowed there.
-
-## Run it (one minute)
+## Run it
 
 ```bash
 git clone https://github.com/NeuroverseOS/robot-domain-rules
 cd robot-domain-rules
 npm install
-npm run demo      # prints the rules, then a day of decisions
-npm test          # 20 tests
+npm run demo      # three rulebooks in plain text, their findings, and a day of decisions each
+npm test          # 38 tests
 ```
 
 ## Use it
@@ -46,117 +46,179 @@ npm install @neuroverseos/robot-domain-rules
 ```
 
 ```ts
-import { compileDomain, evaluateDomainAction } from '@neuroverseos/robot-domain-rules';
+import { DomainRulesBuilder, evaluateDomainAction } from '@neuroverseos/robot-domain-rules';
 
-const rules = compileDomain(store);                 // store = { site, zones, roles, answers } — see examples/store.ts
-// rules is plain JSON, frozen: save it, version it, send it to every robot and pair of glasses.
-// On the receiving side: verifyFingerprint(JSON.parse(text)) === true before trusting it.
+const builder = new DomainRulesBuilder({ id: 'store-1', name: 'Store 1', hours: { open: '07:00', close: '22:00' } })
+  .fromTemplate('grocery-store')
+  .area({ id: 'aisle-3', name: 'Aisle 3', tags: ['public'] })          // IDs your spatial system reports
+  .area({ id: 'back-room', name: 'Back room', tags: ['staff-only'] })
+  .role({ id: 'inventory_robot', name: 'Inventory robot', kind: 'robot', actions: ['enter_zone', 'move', 'scan', 'dock'] })
+  .role({ id: 'staff', name: 'Staff', kind: 'person', actions: ['camera_capture', 'command_robot'], tags: ['staff'] })
+  .answer('robots_near_people', 'slow')
+  .answer('robot_speed', 'walking')
+  .as('site-manager');                                                  // who sets the rules you add next
 
-const decision = evaluateDomainAction(rules, {
-  participant: { id: 'robot-7', kind: 'robot', roleId: 'inventory_robot' },
-  action: 'move',
-  zoneId: 'aisle-3',                                // from your spatial system
-  facts: { peopleInZone: 2, localTime: '14:05', requestedSpeedMps: 1.0 },
-});
+const draft = builder.addRuleFromText('robots slow to 0.3 m/s in aisle 3');
+console.log(draft.confidence, draft.unmatched, draft.notes);          // read it...
+builder.confirm(draft);                                                // ...then confirm it
 
-if (decision.status === 'BLOCK') stop();
-if (decision.status === 'PAUSE') waitOrAskAPerson(decision.reasons);
-if (decision.status === 'LIMIT') move({ maxSpeed: decision.limits!.maxSpeedMps });
-log(decision);                                      // reasons + full trace + rule-set fingerprint
+const rulebook = builder.compile();                                    // frozen JSON; rulebook.findings lists rules at odds
 ```
 
-No runtime dependencies. ESM and CommonJS, with types.
+```ts
+const decision = evaluateDomainAction(rulebook, {
+  participant: { id: 'robot-7', kind: 'robot', roleId: 'inventory_robot' },
+  action: 'move',
+  areaId: 'aisle-3',                                                   // from your spatial system
+  facts: { peopleInZone: 2, localTime: '14:05', requestedSpeedMps: 1.0 },
+});
+// decision.status  → 'LIMIT'
+// decision.limits  → { maxSpeedMps: 0.3 }
+// decision.reasons → [{ ruleId: 'robots_near_people', status: 'LIMIT', setBy: 'law-and-safety', reason: 'People are in the area; robots slow down. ...' }]
+// decision.trace   → every check that ran; decision.fingerprint → which rulebook decided
+```
+
+No runtime dependencies. ESM and CommonJS, with types. No clock, no network, no model inside `compileDomain` or `evaluateDomainAction`: the same rulebook and the same request always give the same decision.
+
+## The request / decision contract
+
+**Request**
+
+```ts
+{
+  participant: { id, kind, roleId },   // kind and role as the site declared them
+  action,                              // one of the site's actions
+  areaId,                              // the area the participant is in (or wants to enter)
+  facts: { ...the facts the rulebook declares, approvedBy? }
+}
+```
+
+`approvedBy` is the one built-in fact: a name, or `{ id, authority?, roleId? }`. It clears a `PAUSE` for approval — but only if the approver holds what the rule asks for (`then.by`: an authority, or a higher one; a role; or a role tag). It never clears a `PAUSE` for a condition.
+
+**Decision**
+
+```ts
+{
+  status: 'ALLOW' | 'LIMIT' | 'PAUSE' | 'BLOCK',
+  reasons: [{ ruleId, status, reason, setBy }],   // the checks at the strictest status
+  limits?: { [limitId]: number },                 // the lowest value across matching limit rules
+  then?: string,                                  // a deny rule's hint, e.g. 'dock'
+  trace: [...every check that ran...],
+  fingerprint
+}
+```
+
+How a decision is made, in order: the request must be complete and about declared things; **never rules** (nothing overrides them); the **role must list the action** (an action the rulebook does not know follows `otherwise`: deny, or wait for approval); then **every rule that matches**, and the strictest answer wins: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`. Never rules and every matching rule apply to every action, including an approved unknown one.
+
+## One rule shape
+
+```ts
+{
+  id: 'no_restock_saturday_pm',
+  text: 'no restock robots in aisle 3 on Saturdays between 14:00 and 16:00',
+  who:   'restock_robot',                       // roles, 'tag:staff', 'kind:robot', '*', '!dock' to exclude
+  does:  '*',                                   // actions, action tags, '*'
+  where: 'aisle-3',                             // areas, area tags, '*'
+  when:  [{ fact: 'localTime', op: 'between', from: '14:00', to: '16:00' }, { fact: 'day', op: 'days', days: ['sat'] }],
+  then:  { answer: 'deny' },                    // allow | limit {…} | wait {for: 'approval', by?} | wait {for: 'condition'} | deny {instead?}
+  setBy: 'site-manager',                        // declared, never inferred
+  source: { kind: 'text', ref: '…' },           // template | question | declaration | manual | text
+  never?: true                                  // an invariant: checked first, nothing overrides it
+}
+```
+
+Conditions: `== != > >= < <=`, `in`, `between` (a time window; overnight is fine), `days`. A rule may only depend on facts that are always present (required, or with a default). Facts are typed: `number` (min, max, integer), `boolean`, `time` ("HH:MM"), `day`, `enum`, `string`.
+
+## A rulebook, rendered
+
+`renderDomainRules(rulebook)` prints the rulebook as text a store manager can read. An excerpt from the grocery example:
+
+```
+## Never (nothing overrides these)
+
+- `emergency_stop` — robots · anything except dock · everywhere · emergency is true → **never (deny), then dock**
+  In an emergency, all robots stop; the only thing they may do is return to dock. (set by law-and-safety; question emergency:stop_then_dock)
+
+## Rules
+
+- `robots_near_people` — robots · movement-tagged · everywhere · peopleInZone > 0 → **limit maxSpeedMps 0.3**
+  Robots slow to 0.3 m/s while people are in their area. (set by law-and-safety; question robots_near_people:slow)
+- `glasses_capture` — persons except staff-tagged · capture-tagged · everywhere · always → **deny**
+  Only staff glasses may capture photos, video or audio here. (set by company; question glasses_capture:staff_only)
+- `shopper_photos_entrance` — Shopper · take photos or video · Entrance · always → **allow**
+  shoppers may take photos in the entrance (set by site-manager; written as "shoppers may take photos in the entrance")
+```
+
+## Rules at odds
+
+The manager wrote "shoppers may take photos in the entrance". The company had answered "staff only". The rulebook says:
+
+```
+CONFLICT authority-override (certain) — `shopper_photos_entrance` set by Site manager tries to loosen what
+`glasses_capture` set by Company sets: `shopper_photos_entrance` (set by Site manager) says allow;
+`glasses_capture` (set by Company) says deny. Both apply to Shopper · take photos or video · Entrance, always.
+A lower authority can only tighten, so `shopper_photos_entrance` never takes effect at all.
+```
+
+Findings come back on `rulebook.findings` (compile never hides them) and from `checkRulebook(input)` before you compile. Kinds: `contradiction`, `authority-override`, `never_vs_rule`, `shadowed` (a rule that can never change a decision), `duplicate`, `limit_disagreement`, `tightening` (a lower authority making things stricter: fine, for information). Each has a severity (`conflict`, `warning`, `info`), the rule IDs, and a certainty:
+
+- **certain** — any request that matches one rule matches the other.
+- **possible** — both conditions can hold at once on paper; whether they ever do depends on facts the rulebook does not control.
+- Rules that provably can never match the same request produce no finding. "Disjoint" is only ever claimed when it is provable: separate numeric ranges on one fact, non-overlapping time windows, different day sets, different enum values, `true` vs `false`.
+
+`compileDomain(input, { strict: true })` throws on any `conflict`.
+
+## Templates
+
+| Template | For | Questions |
+|---|---|---|
+| `grocery-store` | Robots on the floor; staff and shoppers wearing glasses | people near robots, speed, staff and restricted areas, opening hours, scanning near people, glasses capture, robot commands, emergency, unknown actions |
+| `warehouse` | Forklift-style robots in aisles; pickers wearing glasses | aisle exclusivity, robots per aisle, dock access, speed, emergency, glasses capture |
+
+Both ship the authority order `law-and-safety` > `company` > `site-manager` > `staff`; a site may declare its own names and order. [`examples/clinic.ts`](examples/clinic.ts) uses no template at all.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| [`examples/store.ts`](examples/store.ts) | A complete example site: 7 zones, 3 robot roles, 2 person roles, all 10 answers. Copy it to start. |
-| [`examples/demo.ts`](examples/demo.ts) | Compiles the store and runs 19 requests through a day: people arriving, a restricted room, a role-limited restroom, a fire alarm, after hours. |
-| [`src/types.ts`](src/types.ts) | Every type: zones, roles, actions, the request and the decision. Read this first. |
-| [`src/questions.ts`](src/questions.ts) | The 10 questions, their answers, and the rule each answer produces. |
-| [`src/compile.ts`](src/compile.ts) | Answers + zones + roles → rule set. Validation, inheritance, fingerprint, glasses bridge. |
-| [`src/evaluate.ts`](src/evaluate.ts) | One request → one decision. Pure, about 200 lines. |
-| [`src/zone-rules.ts`](src/zone-rules.ts) | The `ZoneRules` shape glasses enforce, and most-restrictive-wins merging. |
-| [`test/domain-rules.test.ts`](test/domain-rules.test.ts) | Tests for every path above. |
+| [`examples/grocery-store.ts`](examples/grocery-store.ts) | Template + answers + the manager's plain-language rules, two of them deliberately at odds. |
+| [`examples/warehouse.ts`](examples/warehouse.ts) | The warehouse template with two drafted rules, one naming who must approve. |
+| [`examples/clinic.ts`](examples/clinic.ts) | No template: a clinic with its own actions, facts and authorities. |
+| [`examples/demo.ts`](examples/demo.ts) | Prints each rulebook, its findings and a day of decisions. |
+| [`src/types.ts`](src/types.ts) | Every type. Read this first. |
+| [`src/compile.ts`](src/compile.ts) | Input → rulebook: validation, inheritance, templates, fingerprint, freezing. |
+| [`src/evaluate.ts`](src/evaluate.ts) | One request → one decision. |
+| [`src/check.ts`](src/check.ts) | The conflict check. |
+| [`src/draft.ts`](src/draft.ts) | Plain-text drafting and the model prompt / answer validation. |
+| [`src/templates/`](src/templates/) | The two templates and the template contract. |
 
-## The model
+## Glasses
 
-**Participants** are robots or people (people are assumed to wear glasses).
+`glassesZoneRules(rulebook, areaId, roleId)` turns the rulebook into the `ZoneRules` a person's glasses apply in one area, the same shape as `ZoneRules` in `@neuroverseos/governance/spatial` (optional, not a dependency). Rules with conditions are applied as if they held, so the glasses side only ever tightens; a stricter base passed in is never loosened.
 
-| Robot actions | Glasses actions |
+## Built / not built
+
+| Built, tested | Not built |
 |---|---|
-| `enter_zone`, `move`, `manipulate`, `scan`, `dock` | `camera_capture`, `record_audio`, `ai_overlay`, `share_location`, `command_robot` |
+| Any site's vocabulary: kinds, actions, areas, roles, facts, limits, authorities | Area geometry, localisation, people counting, identity, sensors (your spatial system) |
+| Templates whose answers emit rules; two shipped | A live connection to any spatial system (you pass the facts in) |
+| Plain-text drafting against the site's own vocabulary; model prompt + answer validation | Any network call, clock or model inside the core |
+| Conflict check with sound disjointness and plain-English findings | Signing a rulebook (the fingerprint identifies; sign the JSON with your own key) |
+| Authority: every rule says who set it; lower only tightens; approvals must hold the named authority | Per-area overrides of template answers (write a rule instead) |
+| Never rules, limits combined by MIN, approval vs condition waits, fail-closed evaluation | Natural-language understanding beyond the documented patterns (use your own model via the prompt) |
+| Frozen rulebooks, `verifyFingerprint`, glasses bridge | |
 
-**Zones** have a kind: `public`, `staff_only`, `restricted` or `dock`, an optional speed cap, and optional role limits: `allowRoles` (only these role IDs may act here) and `denyRoles` (these never may). A role must be listed itself: inheriting a listed role's actions does not pass its zone permission. Use the zone IDs your spatial system reports.
+## Upgrading from 0.2
 
-**Roles** list the actions they may take. A role can inherit another role of the same kind (inheritance only adds actions, never zone permission). Person roles can be `isStaff`; robot roles can be `afterHours`.
+The 0.2 input shape `{ site: { domainId, hours }, zones, roles, answers }` is still accepted by `compileDomain` and translated through the `grocery-store` template. It is deprecated. Requests may still say `zoneId` and a top-level `targetRobotId`. What changed:
 
-**Facts** come with every request. The core trusts them and never fills one in.
+- Zone kinds are area **tags** (`staff_only` → `staff-only`); `isStaff` is the role tag `staff`; `afterHours` is `after-hours`; a zone `maxSpeedMps` becomes the rule `zone_speed_cap:<zone>`.
+- Rule IDs in decisions: `zone_declared` → `area_declared`; `unknown_actions` → `unknown_action`; `zone_role_limits` → `area_role_limits:<area>` (and `…:deny`); the emergency rule for glasses commands is `emergency_stop_commands`; `zone_speed_cap` → `zone_speed_cap:<zone>`.
+- A `command_robot` request without `targetRobotId` is `required_facts` (the action requires that fact), not `robot_commands`.
+- `rulebook.policy` is gone; the answers are in `rulebook.answers` and their effect is in `rulebook.rules`. `format` is `neuroverse-domain-rules/2`.
+- Every check in a decision now carries `setBy`.
 
-| Fact | Required? | Valid when | If absent |
-|---|---|---|---|
-| `peopleInZone` | yes | whole number, 0 or more | `BLOCK` `required_facts` |
-| `localTime` | yes | `"HH:MM"` 24h | `BLOCK` `required_facts` |
-| `staffInZone` | no | whole number, 0 or more | treated as 0 (conservative) |
-| `requestedSpeedMps` | no | number, 0 or more | the decision carries the cap |
-| `emergency` | no | `true` or `false` | no emergency is active — the one fact with a default, because a site's emergency signal is an explicit event your system raises |
-| `approvedBy` | no | non-empty string | no approval |
-
-An invalid value (a negative count, `"2"`, `NaN`, `"9:00"`) is `BLOCK` `required_facts` with a reason naming the fact. The core never crashes on a bad request; only bad operator config (`compileDomain`) throws.
-
-**The ten questions** (safe default first):
-
-| Question | Answers |
-|---|---|
-| `robots_near_people` | `stop` · `slow` · `continue` |
-| `robot_speed` | `careful` 0.5 m/s · `walking` 1.0 · `brisk` 1.5 (each with a lower near-people speed) |
-| `robots_staff_zones` | `never` · `when_staff_present` · `allowed` |
-| `robots_restricted_zones` | `never` · `with_approval` |
-| `robots_after_hours` | `never` · `listed_roles` · `allowed` |
-| `robot_scan_near_people` | `never` · `pause` · `allowed` |
-| `glasses_capture` | `blocked` · `staff_only` · `confirm_each` · `allowed` |
-| `robot_commands` | `nobody` · `staff_only` · `anyone_with_approval` |
-| `emergency` | `stop_all` · `stop_then_dock` |
-| `unknown_actions` | `block` · `pause` |
-
-**Decisions.** Every check is recorded in `trace`. The decision is the strictest check: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`. Every reason names its `ruleId`.
-
-- `PAUSE` for **approval** (restricted zone, non-staff robot command, glasses `confirm_each`): re-send the same request with `facts.approvedBy` set and it goes through.
-- `PAUSE` to **wait** (people present, no staff in a staff zone): only a change in the facts clears it. Approval does not.
-- `LIMIT` carries `limits.maxSpeedMps`: the lowest of the site cap, the zone cap and the near-people cap.
-- In an emergency every robot action is `BLOCK`. With `stop_then_dock`, `dock` is the one thing allowed, and blocked moves carry `then: 'dock'`.
-
-**Fail closed.** A missing or invalid required fact, an undeclared zone, an undeclared role, a role the zone doesn't admit, an action the role doesn't list, or an action no rule covers is blocked (or paused, if you answered `unknown_actions: pause`). Bad input to the compiler throws a `DomainRulesError` that says what to fix.
-
-**Fundamental restrictions apply to every action.** Emergency, opening hours, zone kind, zone role limits and people-present rules run for every request, including an approved unknown action. Approval answers the `unknown_actions` question only; it never lifts an emergency stop or an after-hours block.
-
-**Rule sets are frozen.** `compileDomain` returns a deep copy, deep-frozen, so changing the input afterwards changes nothing and changing the rule set throws. `verifyFingerprint(ruleSet)` recomputes the fingerprint of a copy you received as JSON and tells you whether it still matches.
-
-## Glasses enforce the same rules on-device
-
-`glassesZoneRules(rules, zoneId, roleId)` turns the rule set into the `ZoneRules` a person's glasses apply in one zone. It agrees with `evaluateDomainAction`, and a stricter base passed in is never loosened (most restrictive wins).
-
-The output has the same shape as `ZoneRules` in [`@neuroverseos/governance/spatial`](https://github.com/NeuroverseOS/Neuroverseos-governance), so it can go straight into that package's spatial engine or MentraOS adapter. That package is optional; this one does not depend on it.
-
-## Extending it
-
-- **New zone or role:** add it to your site file. No code change.
-- **New question:** add it to `src/questions.ts` with the policy field it sets, add that field to `DomainPolicy` in `src/types.ts`, read it in `src/evaluate.ts`, and add a test. Keep the safe answer first.
-- **New action:** add it to `ROBOT_ACTIONS` or `GLASSES_ACTIONS` in `src/types.ts` and give it a phrase in `src/evaluate.ts`. Until a rule mentions it, the role list is the only thing that permits it.
-
-## What this is, and isn't, yet
-
-| Works today, tested | Not built |
-|---|---|
-| Compile, validate, inherit roles, fingerprint, frozen rule sets, `verifyFingerprint` | Zone geometry (your spatial system owns this) |
-| Robot rules: zones, people, speed, hours, scanning, emergency | Signing a rule set (sign the JSON with your own key; the fingerprint only identifies it) |
-| Glasses rules: capture, robot commands, role limits | Per-zone overrides of the ten answers (one answer set per site today) |
-| Per-zone role limits (`allowRoles`, `denyRoles`) | Live connection to any spatial system — you pass the facts in |
-| Required facts: missing or invalid is `BLOCK`, never permission | Location verification, identity, sensors — your system supplies these |
-| Same input → same output; no clock, network or LLM | |
-
-The fingerprint is a deterministic hash for citing which rule set decided. It is not a security signature.
+Every 0.2 test and every 0.2 demo scenario gives the same status in 0.3.
 
 ## License
 

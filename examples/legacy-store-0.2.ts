@@ -6,9 +6,10 @@
  * your spatial system reports (e.g. posemesh zone or anchor IDs).
  */
 
-import type { CompileDomainInput } from '../src/index';
+import type { LegacyCompileInput } from '../src/index';
 
-export const store: CompileDomainInput = {
+/** @deprecated 0.2 input shape; still accepted by compileDomain and translated through the grocery-store template. */
+export const store: LegacyCompileInput = {
   site: {
     domainId: 'example-grocery-01',
     name: 'Example Grocery',

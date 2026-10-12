@@ -1,210 +1,314 @@
 /**
- * Domain Rules — Type Definitions
+ * Domain rules — type definitions.
  *
- * A domain is one physical site (a store, a warehouse, a clinic) where robots
- * and people wearing smart glasses work side by side. The site operator
- * declares zones and roles and answers a short set of questions. The result
- * is one rule set that governs both robots and glasses.
+ * A domain is one physical site (a store, a warehouse, a clinic, a lab) where
+ * robots, people and AI-driven agents work side by side. The people who run
+ * the site declare their own vocabulary — the kinds of participants, the
+ * actions, the areas, the roles, the facts a request must bring, the limits a
+ * rule may impose and the authorities that set rules — and then write rules
+ * in one shape. The result is one rulebook that every participant asks before
+ * it acts.
  *
- * Location is NOT this module's job. The spatial system (e.g. Auki's posemesh)
- * decides which zone a participant is in and passes that zone ID in. This
- * module only decides what that participant may do there.
+ * Location is NOT this module's job. The spatial system (posemesh, for
+ * example) decides which area a participant is in and passes that area ID
+ * in with the facts. This module only decides what is allowed there.
  *
- *   posemesh: "robot-7 is in zone aisle-3, 2 people are in aisle-3"
+ *   spatial system: "robot-7 is in area aisle-3; 2 people are there"
  *        │
  *        ▼
- *   evaluateDomainAction(ruleSet, request)  →  ALLOW | LIMIT | PAUSE | BLOCK
- *                                              + the rules that decided it
+ *   evaluateDomainAction(rulebook, request) → ALLOW | LIMIT | PAUSE | BLOCK
+ *                                             + the rules that decided it
  *
  * Everything here is plain data and pure functions. No clock, no network,
- * no LLM. Same rule set + same request = same decision.
+ * no model. Same rulebook + same request = same decision.
  */
 
-// ─── Participants ────────────────────────────────────────────────────────────
+// ─── Vocabulary: what the site declares ──────────────────────────────────────
 
-/** Who is acting. People are assumed to be wearing smart glasses. */
-export type ParticipantKind = 'robot' | 'person';
+/** A value a fact can carry. */
+export type FactValue = number | string | boolean;
 
-/** Things a robot can ask to do. */
-export type RobotAction =
-  | 'enter_zone'   // cross into a zone
-  | 'move'         // drive / navigate within a zone
-  | 'manipulate'   // pick, place, open, push — any arm or tool use
-  | 'scan'         // capture images / point clouds (cameras, lidar)
-  | 'dock';        // go to or use a charging / docking station
+export type Day = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+export const DAYS: readonly Day[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-/** Things the AI on a person's glasses can ask to do. */
-export type GlassesAction =
-  | 'camera_capture'   // take a photo or video
-  | 'record_audio'     // record or transcribe audio
-  | 'ai_overlay'       // show AI content in the wearer's view
-  | 'share_location'   // share the wearer's position
-  | 'command_robot';   // tell a robot what to do
+/** Something a participant can ask to do, in the site's own words. */
+export interface ActionDef {
+  /** ID used in requests and rules ("move", "deliver_meds", "camera_capture"). */
+  id: string;
+  /** Human-readable name. Defaults to the ID with spaces. */
+  name?: string;
+  /** Which participant kinds may do this at all ("robot", "person", or any site-defined kind). */
+  kinds: string[];
+  /** Free tags rules can match ("movement", "capture"). */
+  tags?: string[];
+  /** Facts that must be present when this action is requested (on top of the always-required facts). */
+  requires?: string[];
+  /** Other words people use for it; used only by plain-text drafting. */
+  synonyms?: string[];
+}
 
-export type DomainAction = RobotAction | GlassesAction;
-
-export const ROBOT_ACTIONS: readonly RobotAction[] = ['enter_zone', 'move', 'manipulate', 'scan', 'dock'];
-export const GLASSES_ACTIONS: readonly GlassesAction[] = ['camera_capture', 'record_audio', 'ai_overlay', 'share_location', 'command_robot'];
-
-// ─── Zones ───────────────────────────────────────────────────────────────────
-
-/**
- * What a zone is for. The kind decides which questions apply to it.
- *
- *   public      — open to customers and visitors (sales floor, aisles)
- *   staff_only  — staff work areas (back room, stock room)
- *   restricted  — nobody goes in without approval (electrical, pharmacy)
- *   dock        — robot charging / parking
- */
-export type ZoneKind = 'public' | 'staff_only' | 'restricted' | 'dock';
-
-export interface DomainZone {
-  /** The zone ID your spatial system reports (e.g. a posemesh zone or anchor ID). */
-  zoneId: string;
-  /** Human-readable name ("Aisle 3", "Back room"). */
+/** A place the spatial system can report. */
+export interface AreaDef {
+  /** The area ID your spatial system reports (for example a posemesh zone or anchor ID). */
+  id: string;
   name: string;
-  kind: ZoneKind;
-  /** Optional per-zone speed cap in metres per second. Tighter of this and the site cap wins. */
-  maxSpeedMps?: number;
+  /** Free tags rules can match ("staff-only", "restricted", "dock", "aisle"). */
+  tags?: string[];
   /**
-   * Only these roles (by role ID, any participant kind) may act in this zone.
-   * A role must be listed itself: inheriting a listed role's actions does
-   * not pass its zone permission. Omit to allow every declared role.
+   * Only these roles (by role ID) may act in this area. A role must be listed
+   * itself: inheriting a listed role's actions does not pass its area permission.
+   * Compiled into a never rule `area_role_limits:<area>`.
    */
   allowRoles?: string[];
-  /** These roles (by role ID) may never act in this zone. Checked before allowRoles. */
+  /** These roles (by role ID) may never act in this area. */
   denyRoles?: string[];
+  /** Other words people use for it; used only by plain-text drafting. */
+  synonyms?: string[];
 }
 
-// ─── Roles ───────────────────────────────────────────────────────────────────
-
-export interface DomainRole {
+/** A kind of participant with a fixed list of actions it may take. */
+export interface RoleDef {
   /** Role ID used in requests ("cleaning_robot", "staff", "shopper"). */
-  roleId: string;
+  id: string;
   name: string;
-  kind: ParticipantKind;
-  /** Actions this role may take at all. Zone and situation rules can still say no. */
-  actions: DomainAction[];
-  /** Inherit another role's actions (same kind only). Inheritance can only add, never remove. */
+  /** The participant kind this role belongs to ("robot", "person", ...). */
+  kind: string;
+  /** Actions this role may take at all. Rules can still say no, slower, or wait. */
+  actions: string[];
+  /** Inherit another role's actions (same kind only). Inheritance only adds, never removes. */
   inherits?: string;
-  /** People only: counts as staff (staff zones, robot commands, staff-only camera). */
-  isStaff?: boolean;
-  /** Robots only: may work outside opening hours when after-hours work is limited to listed roles. */
-  afterHours?: boolean;
+  /** Free tags rules can match ("staff", "after-hours", "visitor"). */
+  tags?: string[];
+  /** Other words people use for it; used only by plain-text drafting. */
+  synonyms?: string[];
 }
 
-// ─── Site ────────────────────────────────────────────────────────────────────
+export type FactType = 'number' | 'boolean' | 'time' | 'day' | 'enum' | 'string';
 
-export interface DomainSite {
+/**
+ * A fact every request must bring (or that has a default). The rulebook
+ * trusts the facts it is given and never fills one in.
+ */
+export interface FactDef {
+  id: string;
+  type: FactType;
+  /** The request must carry it. A missing or invalid required fact is BLOCK `required_facts`. */
+  required?: boolean;
+  /** Used when the request does not carry the fact. A fact with a default is never "missing". */
+  default?: FactValue;
+  /** number only */
+  min?: number;
+  max?: number;
+  integer?: boolean;
+  /** enum only: the allowed values. */
+  values?: string[];
+  description?: string;
+  /** Other words people use for it; used only by plain-text drafting. */
+  synonyms?: string[];
+}
+
+/** A named numeric limit rules may impose ("maxSpeedMps"). Several rules on one limit combine by MIN. */
+export interface LimitDef {
+  id: string;
+  name?: string;
+  /** Unit for rendering and text drafting ("m/s"). */
+  unit?: string;
+  /**
+   * The request fact that carries the requested value. When present and at or
+   * under the limit, the decision is ALLOW and carries the limit; when absent
+   * or over it, the decision is LIMIT.
+   */
+  requestedFact?: string;
+  /** The actions a limit normally applies to; used by plain-text drafting as the default `does`. */
+  appliesTo?: Selector;
+  /** Other words people use for it; used only by plain-text drafting. */
+  synonyms?: string[];
+}
+
+/** Who may set rules. Listed highest first. */
+export interface AuthorityDef {
+  id: string;
+  name?: string;
+}
+
+export interface SiteDef {
   /** Your ID for this site. */
-  domainId: string;
+  id: string;
   name: string;
-  /** Optional: the posemesh (or other spatial system) domain ID this rule set is for. */
+  /** Optional: the posemesh (or other spatial system) domain ID this rulebook is for. */
   spatialDomainId?: string;
-  /** Opening hours, 24h "HH:MM" local time. Close may be earlier than open for overnight sites. */
-  hours: { open: string; close: string };
+  /** Opening hours, 24h "HH:MM" local time. Close may be earlier than open for overnight sites. Optional. */
+  hours?: { open: string; close: string };
 }
 
-// ─── Compiled policy ─────────────────────────────────────────────────────────
+// ─── Rules ───────────────────────────────────────────────────────────────────
 
-/** The answers, turned into the structured policy the evaluator reads. */
-export interface DomainPolicy {
-  /** What robots do when people are in their zone. */
-  robotsNearPeople: 'stop' | 'slow' | 'continue';
-  /** Site-wide robot speed cap, m/s. */
-  maxSpeedMps: number;
-  /** Speed cap when people are in the zone and robotsNearPeople is 'slow', m/s. */
-  nearPeopleSpeedMps: number;
-  /** Robots in staff-only zones. */
-  robotsInStaffZones: 'never' | 'when_staff_present' | 'allowed';
-  /** Robots in restricted zones. */
-  robotsInRestrictedZones: 'never' | 'with_approval';
-  /** Robots outside opening hours. */
-  robotsAfterHours: 'never' | 'listed_roles' | 'allowed';
-  /** Robot scanning while people are in the zone. */
-  robotScanNearPeople: 'never' | 'pause' | 'allowed';
-  /** Glasses camera / audio in the domain. */
-  glassesCapture: 'blocked' | 'staff_only' | 'confirm_each' | 'allowed';
-  /** Who may command robots from their glasses. */
-  robotCommands: 'nobody' | 'staff_only' | 'anyone_with_approval';
-  /** What happens in an emergency. Robots always stop; this says what comes after. */
-  emergency: 'stop_all' | 'stop_then_dock';
-  /** Actions no rule covers. */
-  unknownActions: 'block' | 'pause';
+/**
+ * Who / does / where selector. Entries are OR-ed:
+ *   '*'                 everything
+ *   'inventory_robot'   an ID
+ *   'tag:staff'         everything carrying that tag
+ *   'kind:robot'        every role (or action) of that kind
+ *   '!dock'             remove this ID, tag or kind from the selection
+ * A selector with only '!' entries starts from everything. A single string
+ * is the same as a one-entry list.
+ */
+export type Selector = '*' | string | string[];
+
+export type CompareOp = '==' | '!=' | '>' | '>=' | '<' | '<=';
+
+/** One condition over one fact. A rule's `when` list is AND-ed. */
+export type Condition =
+  | { fact: string; op: CompareOp; value: FactValue }
+  | { fact: string; op: 'in'; values: FactValue[] }
+  /** Time window on a `time` fact. `from` <= t < `to`; `from` later than `to` means overnight. */
+  | { fact: string; op: 'between'; from: string; to: string }
+  /** Day set on a `day` fact. */
+  | { fact: string; op: 'days'; days: Day[] };
+
+/** What a rule says when it matches. */
+export type Outcome =
+  | { answer: 'allow' }
+  | { answer: 'limit'; limits: Record<string, number> }
+  /**
+   * `by`: who may approve — an authority ID (that authority or a higher one),
+   * a role ID, or 'tag:<role tag>'. Without `by`, any approval clears the wait.
+   */
+  | { answer: 'wait'; for: 'approval' | 'condition'; by?: string }
+  /** `instead`: a hint about what to do instead (for example "dock"). Returned as `decision.then`. */
+  | { answer: 'deny'; instead?: string };
+
+export interface RuleSource {
+  kind: 'template' | 'question' | 'declaration' | 'manual' | 'text' | 'builtin';
+  /** Template ID, "question:answer", "area:restroom", the operator's text, ... */
+  ref: string;
 }
 
-export interface CompiledDomainRule {
-  /** Stable rule ID, cited in every decision. */
-  ruleId: string;
-  /** The rule in plain English. */
+/** One rule. Every rule in a rulebook has this shape, whatever produced it. */
+export interface Rule {
+  /** Stable ID, cited in every decision. */
+  id: string;
+  /** The rule in plain words. */
   text: string;
-  /** Which question produced it ('site' for zone/role declarations). */
-  sourceQuestion: string;
-  sourceAnswer: string;
+  who: Selector;
+  does: Selector;
+  where: Selector;
+  /** Conditions over facts, AND-ed. Empty or absent = always. */
+  when?: Condition[];
+  then: Outcome;
+  /** Plain-English reason shown in decisions. Defaults to `text`. */
+  reason?: string;
+  source: RuleSource;
+  /** The authority that set this rule. Declared, never inferred. */
+  setBy: string;
+  /** An invariant: checked first, nothing overrides it. Must have `then.answer === 'deny'`. */
+  never?: boolean;
+}
+
+// ─── Findings: rules at odds ─────────────────────────────────────────────────
+
+export type FindingKind =
+  | 'contradiction'        // two rules at the same authority can match the same request and give different answers
+  | 'authority-override'   // a lower authority tries to loosen what a higher authority set; it never takes effect
+  | 'tightening'           // a lower authority makes a higher authority's answer stricter (allowed; for information)
+  | 'shadowed'             // a rule fully covered by a stricter one; it can never change a decision
+  | 'duplicate'            // same scope, same answer
+  | 'limit_disagreement'   // two limits on the same name overlap with different values
+  | 'never_vs_rule';       // a rule tries to allow something a never rule forbids
+
+export interface Finding {
+  kind: FindingKind;
+  severity: 'conflict' | 'warning' | 'info';
+  ruleIds: string[];
+  /**
+   * 'certain': any request matching one rule matches the other (or both are unconditional).
+   * 'possible': both conditions can hold at once on paper; whether they ever do depends on
+   *             facts the rulebook does not control.
+   * Rules that provably never match the same request produce no finding.
+   */
+  certainty: 'certain' | 'possible';
+  message: string;
+}
+
+// ─── The rulebook ────────────────────────────────────────────────────────────
+
+/** Checks the evaluator always runs. They have IDs so decisions can cite them. */
+export interface BuiltinCheck {
+  id: string;
+  text: string;
 }
 
 /**
- * The complete, portable rule set for one domain. Plain JSON — store it, sign it, ship it.
+ * The complete, portable rulebook for one site. Plain JSON — store it, sign
+ * it, ship it to every robot, pair of glasses and agent.
  *
- * `compileDomain` returns it deep-frozen and detached from the input: editing
- * the input afterwards changes nothing here, and editing this object throws.
- * `verifyFingerprint(ruleSet)` recomputes the fingerprint of a copy received
+ * `compileDomain` returns it deep-frozen and detached from the input.
+ * `verifyFingerprint(rulebook)` recomputes the fingerprint of a copy received
  * as JSON and says whether it still matches.
  */
-export interface DomainRuleSet {
-  format: 'neuroverse-domain-rules/1';
-  site: DomainSite;
-  zones: DomainZone[];
+export interface Rulebook {
+  format: 'neuroverse-domain-rules/2';
+  site: SiteDef;
+  /** The template this rulebook was built from, if any. */
+  template?: string;
+  kinds: string[];
+  /** Highest first. */
+  authorities: AuthorityDef[];
+  actions: ActionDef[];
+  areas: AreaDef[];
   /** Roles with inheritance already resolved (actions are the full set). */
-  roles: DomainRole[];
+  roles: RoleDef[];
+  facts: FactDef[];
+  limits: LimitDef[];
+  /** Tags rules may name even when no declared thing carries them yet. */
+  tags: { actions: string[]; areas: string[]; roles: string[] };
+  /** Template question answers, by question ID. */
   answers: Record<string, string>;
-  policy: DomainPolicy;
-  rules: CompiledDomainRule[];
+  /** What happens when a request asks for an action the rulebook does not know. */
+  otherwise: 'deny' | 'wait-for-approval';
+  /** Every rule, never rules included (flagged `never: true`). */
+  rules: Rule[];
+  builtin: BuiltinCheck[];
+  /** What the conflict check found. Compile never hides these. */
+  findings: Finding[];
   /** Deterministic fingerprint of everything above. Cite it in logs to prove which rules decided. */
   fingerprint: string;
 }
 
 // ─── Requests and decisions ──────────────────────────────────────────────────
 
-/**
- * Live facts your system supplies with each request. The evaluator never
- * guesses them: a required fact that is missing or invalid gives BLOCK with
- * rule `required_facts`, never a crash and never permission. Absent optional
- * facts take the conservative reading noted on each field.
- */
-export interface DomainFacts {
-  /** People (not robots) currently in the zone, as your spatial system reports. Required; a whole number, 0 or more. */
-  peopleInZone: number;
-  /** Staff currently in the zone. A whole number, 0 or more. Absent means 0 (the conservative reading). */
-  staffInZone?: number;
-  /** Local time as "HH:MM" (24h). Required: the evaluator has no clock. */
-  localTime: string;
-  /** Requested speed for move / enter_zone / dock, m/s, 0 or more. Absent means "cap me". */
-  requestedSpeedMps?: number;
-  /**
-   * True while a site emergency is active. This is the one fact with a
-   * default: absent means no emergency is active. A site's emergency signal
-   * is an explicit event your system raises; the evaluator cannot infer one.
-   */
-  emergency?: boolean;
-  /** Set when a human has approved this specific action (the answer to an earlier PAUSE). Non-empty. */
-  approvedBy?: string;
+/** Who approved an action. A plain string is accepted as an unqualified approval. */
+export interface Approval {
+  id: string;
+  /** The authority the approver holds, by ID. */
+  authority?: string;
+  /** The role the approver holds, by ID. */
+  roleId?: string;
 }
 
 export interface DomainRequest {
-  participant: { id: string; kind: ParticipantKind; roleId: string };
-  action: DomainAction | string;
-  /** The zone the participant is in (or, for enter_zone, the zone it wants to enter). */
-  zoneId: string;
-  /** For command_robot: the robot being commanded. */
+  participant: { id: string; kind: string; roleId: string };
+  action: string;
+  /** The area the participant is in (or, for an entering action, the area it wants to enter). */
+  areaId?: string;
+  /** @deprecated 0.2 name for `areaId`. Still accepted. */
+  zoneId?: string;
+  /** @deprecated 0.2 field; copied into `facts.targetRobotId` when that fact is absent. */
   targetRobotId?: string;
-  facts: DomainFacts;
+  /**
+   * The facts the rulebook declares, plus the built-in `approvedBy` (an
+   * `Approval` or a non-empty string, set when a person has approved this
+   * specific action). The evaluator never guesses a fact: a required fact
+   * that is missing or invalid gives BLOCK `required_facts`, never a crash
+   * and never permission.
+   */
+  facts: Record<string, unknown>;
 }
 
 /**
  *   ALLOW — go ahead
- *   LIMIT — go ahead, within `limits` (e.g. a lower speed)
- *   PAUSE — wait: needs a human's approval, or for the situation to change
+ *   LIMIT — go ahead, within `limits`
+ *   PAUSE — wait: for a person's approval, or for the situation to change
  *   BLOCK — no
  */
 export type DomainDecisionStatus = 'ALLOW' | 'LIMIT' | 'PAUSE' | 'BLOCK';
@@ -214,18 +318,20 @@ export interface DomainCheck {
   status: DomainDecisionStatus;
   /** Plain-English reason. */
   reason: string;
+  /** The authority that set the rule; 'builtin' for the evaluator's own checks. */
+  setBy: string;
 }
 
 export interface DomainDecision {
   status: DomainDecisionStatus;
   /** The strictest checks — the reasons for this decision. */
   reasons: DomainCheck[];
-  /** Present when status is LIMIT. */
-  limits?: { maxSpeedMps?: number };
-  /** For emergencies with stop_then_dock: what the robot should do next. */
-  then?: 'dock';
+  /** Effective limits (MIN across matching limit rules), present when any limit rule matched. */
+  limits?: Record<string, number>;
+  /** A deny rule's `instead` hint (for example "dock"). */
+  then?: string;
   /** Every check that ran, in order. */
   trace: DomainCheck[];
-  /** The rule set that decided. */
+  /** The rulebook that decided. */
   fingerprint: string;
 }

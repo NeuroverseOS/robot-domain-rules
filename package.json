@@ -1,7 +1,7 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.2.1",
-  "description": "Rules for robots and smart-glasses wearers in one physical site. Your spatial system says where; this says what's allowed.",
+  "version": "0.3.0",
+  "description": "A governance core for physical spaces: turn any site's answers and plain-language rules into one rulebook, flag rules that conflict, and let robots, glasses and AI agents ask before they act.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
