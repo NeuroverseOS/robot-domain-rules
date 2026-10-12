@@ -12,5 +12,5 @@
     "noEmit": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "test/**/*", "vite.config.ts", "../src/**/*.ts", "../examples/grocery-store.ts", "../examples/warehouse.ts", "../examples/clinic.ts", "../examples/backtest/*.ts"]
+  "include": ["src/**/*", "test/**/*", "vite.config.ts", "../src/**/*.ts", "../examples/grocery-store.ts", "../examples/warehouse.ts", "../examples/clinic.ts", "../examples/backtest/rulebook.ts", "../examples/backtest/sample-week.ts"]
 }
