@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/findings.schema.json",
+  "title": "Findings (robot-domain-rules/1)",
+  "description": "What the conflict check reports. SPEC.md § Conflict analysis.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/finding" },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["kind", "severity", "ruleIds", "certainty", "message"],
+      "properties": {
+        "kind": { "enum": ["contradiction", "authority-override", "tightening", "shadowed", "duplicate", "limit_disagreement", "never_vs_rule"] },
+        "severity": { "enum": ["conflict", "warning", "info"] },
+        "ruleIds": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string" }, "description": "The looser (or narrower, for duplicates) rule first." },
+        "certainty": { "enum": ["certain", "possible"] },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

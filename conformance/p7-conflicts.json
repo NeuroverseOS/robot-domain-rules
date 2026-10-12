@@ -1,0 +1,4909 @@
+[
+  {
+    "id": "p7-contradiction-certain",
+    "principle": [
+      7
+    ],
+    "description": "An allow and a deny at the same authority where every request matching one matches the other: a certain contradiction.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "yes",
+          "text": "yes",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "yes"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no",
+          "text": "no",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "no"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "no"
+          ],
+          "certainty": "certain",
+          "message": "`yes` (set by high) says allow; `no` (set by high) says deny. Both apply to every role · every action · Yard, always. The strictest answer wins, so `yes` never takes effect there."
+        }
+      ],
+      "fingerprint": "473f29a880cdf870"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "no"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-contradiction-possible",
+    "principle": [
+      7
+    ],
+    "description": "Conditions on two independent facts can both hold on paper: a possible contradiction, never a certain one.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "yes",
+          "text": "yes",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "==",
+              "value": 0
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "yes"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "wait",
+          "text": "wait",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "when": [
+            {
+              "fact": "load",
+              "op": ">",
+              "value": 0
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "wait"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "warning",
+          "ruleIds": [
+            "yes",
+            "wait"
+          ],
+          "certainty": "possible",
+          "message": "`yes` (set by high) says allow; `wait` (set by high) says wait for the situation to change. Both apply to every role · every action · everywhere, when people in 0 and load > 0. The strictest answer wins, so `yes` never takes effect there. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+        }
+      ],
+      "fingerprint": "e8129c28af0a4fb8"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "warning",
+          "ruleIds": [
+            "yes",
+            "wait"
+          ],
+          "certainty": "possible"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-shadowed",
+    "principle": [
+      7
+    ],
+    "description": "A looser rule fully covered by a stricter one at the same authority can never change a decision: shadowed.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "big",
+          "text": "big",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "big"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "small",
+          "text": "small",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "small"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "small",
+            "big"
+          ],
+          "certainty": "certain",
+          "message": "`small` (set by high) is fully covered by the stricter `big` (set by high): `small` (set by high) says wait for approval; `big` (set by high) says deny. `small` can never change a decision."
+        }
+      ],
+      "fingerprint": "5ac66c22847dde5f"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "small",
+            "big"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-duplicate-same-scope",
+    "principle": [
+      7
+    ],
+    "description": "Two rules with the same scope and the same answer: duplicate.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "duplicate",
+          "severity": "info",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "message": "`a` (set by high) and `b` (set by high) cover the same ground and say the same thing (deny): every role · look · everywhere, always. One of them can go."
+        }
+      ],
+      "fingerprint": "31e1b2a195eb35d4"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "duplicate",
+          "severity": "info",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-duplicate-covered",
+    "principle": [
+      7
+    ],
+    "description": "A rule whose scope lies inside another with the same answer adds nothing: duplicate, narrower rule first.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "look",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "duplicate",
+          "severity": "info",
+          "ruleIds": [
+            "b",
+            "a"
+          ],
+          "certainty": "certain",
+          "message": "`b` (set by high) is already covered by `a` (set by high), which says the same thing (deny) for every role · look · Yard, always. `b` adds nothing."
+        }
+      ],
+      "fingerprint": "26a7156892e27e1c"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "duplicate",
+          "severity": "info",
+          "ruleIds": [
+            "b",
+            "a"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-limit-disagreement",
+    "principle": [
+      7
+    ],
+    "description": "Two limits on the same name whose scopes partly overlap with different values: limit_disagreement; the lower applies where both match.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "fast",
+          "text": "fast",
+          "who": "*",
+          "does": "*",
+          "where": "floor",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 1
+            }
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "<",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "fast"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "slow",
+          "text": "slow",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 0.5
+            }
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "slow"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "limit_disagreement",
+          "severity": "info",
+          "ruleIds": [
+            "fast",
+            "slow"
+          ],
+          "certainty": "possible",
+          "message": "`fast` (set by high) and `slow` (set by high) both limit speed for every role · every action · Floor, when people >= 3 and <= 4: 1 and 0.5. The lower value, 0.5, applies where both match. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+        }
+      ],
+      "fingerprint": "8bd2f8fbd3eb71e2"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "limit_disagreement",
+          "severity": "info",
+          "ruleIds": [
+            "fast",
+            "slow"
+          ],
+          "certainty": "possible"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-refinement-is-not-a-finding",
+    "principle": [
+      7
+    ],
+    "description": "A stricter special case of a looser limit is normal layering: no finding.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "site",
+          "text": "site",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 1
+            }
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "site"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "near",
+          "text": "near",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 0.3
+            }
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 0
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "near"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "1a85eb39bcecde65"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-restrictions-layer",
+    "principle": [
+      7
+    ],
+    "description": "A deny and a condition wait that overlap are one restriction on another, not a conflict: no finding.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "deny",
+          "text": "deny",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "deny"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "wait",
+          "text": "wait",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 0
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "wait"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "eef015512900b846"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-never-vs-allow",
+    "principle": [
+      7
+    ],
+    "description": "A rule that tries to allow what a never rule forbids: never_vs_rule, a conflict; certain, since every request matching the never rule matches the allow.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "inv",
+          "text": "inv",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "never": true,
+          "when": [
+            {
+              "fact": "alarm",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "inv"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ok",
+          "text": "ok",
+          "who": "*",
+          "does": "go",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ok"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "never_vs_rule",
+          "severity": "conflict",
+          "ruleIds": [
+            "ok",
+            "inv"
+          ],
+          "certainty": "certain",
+          "message": "`ok` (set by high) tries to allow what the never rule `inv` (set by high) forbids. Both apply to every role · go · everywhere, when alarm in true. Nothing overrides a never rule, so `ok` never takes effect there."
+        }
+      ],
+      "fingerprint": "c064b49dd1c4ad48"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "never_vs_rule",
+          "severity": "conflict",
+          "ruleIds": [
+            "ok",
+            "inv"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-never-and-deny-not-duplicate",
+    "principle": [
+      7
+    ],
+    "description": "A never rule is kept for its own sake: an ordinary deny with the same scope is not reported as a duplicate.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "inv",
+          "text": "inv",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "never": true,
+          "source": {
+            "kind": "manual",
+            "ref": "inv"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no",
+          "text": "no",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "no"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "328eef151ae9bca3"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-approval-named-vs-unnamed",
+    "principle": [
+      7
+    ],
+    "description": "An approval wait naming nobody is looser than one naming an approver; fully covered, it is shadowed.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "ask_high",
+          "text": "ask_high",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_high"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_any",
+          "text": "ask_any",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_any"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "ask_any",
+            "ask_high"
+          ],
+          "certainty": "certain",
+          "message": "`ask_any` (set by high) is fully covered by the stricter `ask_high` (set by high): `ask_any` (set by high) says wait for approval; `ask_high` (set by high) says wait for approval by high. `ask_any` can never change a decision."
+        }
+      ],
+      "fingerprint": "0c4df41f267d3f47"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "ask_any",
+            "ask_high"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-touching-boundary-overlaps",
+    "principle": [
+      7
+    ],
+    "description": "people <= 3 and people >= 3 share the value 3: the overlap is real and reported.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "<=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "possible",
+          "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 3. The strictest answer wins, so `a` never takes effect there. (Overlap is possible, not certain: whether both conditions ever hold at once depends on facts the rulebook does not control.)"
+        }
+      ],
+      "fingerprint": "22743441516d8292"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "possible"
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-disjoint-number-ranges",
+    "principle": [
+      7
+    ],
+    "description": "people < 3 and people >= 3 can never both hold: no finding.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "<",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "2a53a92ca31857c8"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-integer-gap",
+    "principle": [
+      7
+    ],
+    "description": "For an integer fact, > 2 and < 3 can never both hold: no finding.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "<",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "7a8b113aae5c9b12"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-eq-ne",
+    "principle": [
+      7
+    ],
+    "description": "!= 2 and == 2 are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "!=",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "==",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "b6a8d044f45df8ab"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-in-sets",
+    "principle": [
+      7
+    ],
+    "description": "Two disjoint `in` sets are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "in",
+              "values": [
+                1,
+                2
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "in",
+              "values": [
+                3,
+                4
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "fa4db1e90f4fa3f1"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-time-windows",
+    "principle": [
+      7
+    ],
+    "description": "A window and its exact complement (overnight) are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "09:00",
+              "to": "12:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "12:00",
+              "to": "09:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "a8715e4938046f3d"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-time-window-vs-compare",
+    "principle": [
+      7
+    ],
+    "description": "An overnight window and the daytime expressed with >= and < are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "22:00",
+              "to": "06:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": ">=",
+              "value": "06:00"
+            },
+            {
+              "fact": "time",
+              "op": "<",
+              "value": "22:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "57517197dfb4435b"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-days",
+    "principle": [
+      7
+    ],
+    "description": "Disjoint day sets are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "day",
+              "op": "days",
+              "days": [
+                "sat"
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "day",
+              "op": "days",
+              "days": [
+                "mon",
+                "tue"
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "059b2c91cbb5c3c3"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-boolean",
+    "principle": [
+      7
+    ],
+    "description": "true and false are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "alarm",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "alarm",
+              "op": "==",
+              "value": false
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "39ea534a78d2f4de"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-enum",
+    "principle": [
+      7
+    ],
+    "description": "Disjoint enum sets, and != vs ==, are disjoint.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "mode",
+              "op": "!=",
+              "value": "a"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "mode",
+              "op": "==",
+              "value": "a"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "eb917a9e17e4ba81"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-on-one-shared-fact",
+    "principle": [
+      7
+    ],
+    "description": "Two rules sharing a day but disagreeing on a count are disjoint because of the count.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "when": [
+            {
+              "fact": "day",
+              "op": "days",
+              "days": [
+                "sat"
+              ]
+            },
+            {
+              "fact": "people",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "day",
+              "op": "days",
+              "days": [
+                "sat"
+              ]
+            },
+            {
+              "fact": "people",
+              "op": "<",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "99b625d8a8476112"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-disjoint-selectors",
+    "principle": [
+      7
+    ],
+    "description": "Rules on different areas never meet: no finding, whatever their answers.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "floor",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "a940dce449dcf171"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-impossible-condition-rejected",
+    "principle": [
+      7,
+      4
+    ],
+    "description": "A rule whose own conditions can never all hold (people > 5 and people < 3) is rejected.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "r",
+          "text": "r",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "r"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">",
+              "value": 5
+            },
+            {
+              "fact": "people",
+              "op": "<",
+              "value": 3
+            }
+          ]
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "e95af9bcdddb2571"
+    },
+    "expect": {
+      "error": true,
+      "note": "Rule \"r\": its conditions on \"people\" can never all be true at once."
+    }
+  },
+  {
+    "id": "p7-grocery-example-findings",
+    "principle": [
+      7,
+      2
+    ],
+    "description": "The shipped grocery example reports the manager's deliberate conflicts: a tightening, an authority-override and a same-authority contradiction.",
+    "rulebookRef": "rulebooks/grocery.json",
+    "expect": {
+      "findings": [
+        {
+          "kind": "authority-override",
+          "severity": "conflict",
+          "ruleIds": [
+            "shopper_photos_entrance",
+            "glasses_capture"
+          ],
+          "certainty": "certain"
+        },
+        {
+          "kind": "contradiction",
+          "severity": "conflict",
+          "ruleIds": [
+            "staff_audio_back_room",
+            "no_audio_back_room_lunch"
+          ],
+          "certainty": "certain"
+        },
+        {
+          "kind": "tightening",
+          "severity": "info",
+          "ruleIds": [
+            "robot_speed",
+            "checkout_speed"
+          ],
+          "certainty": "certain"
+        }
+      ]
+    }
+  }
+]

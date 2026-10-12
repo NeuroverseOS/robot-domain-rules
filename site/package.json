@@ -1,7 +1,7 @@
 {
   "name": "robot-domain-rules-switchboard",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "The switchboard: build a rulebook, set a situation, see the decision and the authority behind it. Static, runs in the browser, imports the core from ../src.",
   "type": "module",
   "scripts": {

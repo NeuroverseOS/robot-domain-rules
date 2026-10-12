@@ -1,16 +1,18 @@
 /**
  * Drafting rules from plain words — deterministic, and optionally with the
- * operator's own model.
+ * caller's own model.
  *
  *   draftRuleFromText(text, rulebook, { setBy })   pattern-matches common forms
  *                                                 against the rulebook's own vocabulary
- *   buildRuleDraftPrompt(text, rulebook)           a prompt for the operator's model
+ *   buildRuleDraftPrompt(text, rulebook)           a prompt for the caller's model
  *   parseRuleDraft(json, rulebook, { setBy })      validates a model's JSON answer
  *
- * Both paths only PROPOSE. A draft is never added to a rulebook until the
- * operator confirms it. No network calls happen here. The authority that
- * sets a rule (`setBy`) always comes from the operator, never from the text
- * and never from the model.
+ * Both paths PROPOSE a rule. The authority that sets it (`setBy`) comes from
+ * the caller — the authority the space granted the author, whether a person,
+ * a system or an agent — never from the text and never from the model's
+ * answer. A draft whose author holds a declared authority is `ready` and can
+ * go straight into the rulebook; a draft with no `setBy` needs someone who
+ * holds one to confirm it. No network calls happen here.
  */
 
 import type { Condition, FactValue, Outcome, Rule, Rulebook, Selector } from './types';
@@ -27,13 +29,24 @@ export interface RuleDraft {
   unmatched: string[];
   /** What the drafter assumed or could not do, in plain words. */
   notes: string[];
+  /** True when the draft is a valid rule with a declared authority: it can be added as it is. False when `setBy` is missing or the draft is null. */
+  ready: boolean;
 }
 
 export interface DraftOptions {
-  /** The authority that will set the rule. Required before the draft can be confirmed. */
+  /** The authority that will set the rule: the level the space granted the author. Without it the draft is not `ready`. */
   setBy?: string;
   /** Rule ID. Defaults to a slug of the text. */
   id?: string;
+  /** Who is drafting: `text` (default, a person's words), `agent` (an AI agent) or `system`. Recorded in `source.kind`. */
+  source?: 'text' | 'agent' | 'system';
+  /** For `agent` and `system` sources: the author's ID, recorded in `source.ref` alongside the text. */
+  author?: string;
+}
+
+function sourceOf(options: DraftOptions, text: string): Rule['source'] {
+  const kind = options.source ?? 'text';
+  return { kind, ref: kind === 'text' || !options.author ? text : `${options.author}: ${text}` };
 }
 
 // ─── Deterministic drafting ──────────────────────────────────────────────────
@@ -165,7 +178,7 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
     }
   }
   if (!then) {
-    return { draft: null, confidence: 0, unmatched: leftovers(toks), notes: [...notes, 'Could not find what the rule decides. Say "no ...", "... may ...", "... wait for ... approval", "wait while ...", or "at most N <unit>".'] };
+    return { draft: null, confidence: 0, unmatched: leftovers(toks), notes: [...notes, 'Could not find what the rule decides. Say "no ...", "... may ...", "... wait for ... approval", "wait while ...", or "at most N <unit>".'], ready: false };
   }
 
   // Who, does, where — by the rulebook's own names and synonyms, longest phrase first across all three.
@@ -187,14 +200,14 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
     who: whoSel, does: doesSel, where: whereSel,
     ...(when.length ? { when } : {}),
     then: by ? { ...then, by } as Outcome : then,
-    source: { kind: 'text', ref: text },
+    source: sourceOf(options, text),
     setBy: options.setBy ?? '',
   };
-  if (!options.setBy) notes.push('Say who sets this rule (setBy) before confirming it.');
+  if (!options.setBy) notes.push('Say who sets this rule (setBy) before confirming it: the authority the space granted the author.');
   else {
-    try { validateRule(draft, vocab); } catch (e) { return { draft: null, confidence: 0, unmatched, notes: [...notes, (e as Error).message] }; }
+    try { validateRule(draft, vocab); } catch (e) { return { draft: null, confidence: 0, unmatched, notes: [...notes, (e as Error).message], ready: false }; }
   }
-  return { draft, confidence, unmatched, notes };
+  return { draft, confidence, unmatched, notes, ready: !!options.setBy };
 }
 
 // ─── Matching helpers ────────────────────────────────────────────────────────
@@ -383,7 +396,7 @@ export function buildRuleDraftPrompt(text: string, rulebook: Rulebook): string {
     '  "reason": "<one sentence shown in decisions>" } }',
     'Selector: "*" | "<id>" | "tag:<tag>" | "kind:<kind>" | a list of those; prefix "!" to exclude.',
     'Condition: {"fact","op":"=="|"!="|">"|">="|"<"|"<=","value"} | {"fact","op":"in","values":[...]} | {"fact","op":"between","from":"HH:MM","to":"HH:MM"} | {"fact","op":"days","days":["mon",...]}',
-    'Do not include "setBy" or "source"; the operator sets those.',
+    'Do not include "setBy" or "source"; the caller sets those from the authority the space granted the author.',
     'If the text cannot be expressed with this vocabulary, answer {"error": "<what is missing, in plain words>"}.',
     'Answer with JSON only.',
     '',
@@ -394,32 +407,34 @@ export function buildRuleDraftPrompt(text: string, rulebook: Rulebook): string {
 export interface ParsedDraft {
   draft: Rule | null;
   errors: string[];
+  /** True when the draft is a valid rule with a declared authority: it can be added as it is. */
+  ready: boolean;
 }
 
-/** Validate a model's JSON answer into a draft. `setBy` comes from the operator; anything the model says about it is ignored. */
+/** Validate a model's JSON answer into a draft. `setBy` comes from the caller; anything the model says about it is ignored. */
 export function parseRuleDraft(json: string | object, rulebook: Rulebook, options: DraftOptions & { text?: string } = {}): ParsedDraft {
   let parsed: unknown;
   if (typeof json === 'string') {
     const cleaned = json.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    try { parsed = JSON.parse(cleaned); } catch { return { draft: null, errors: ['The answer is not valid JSON.'] }; }
+    try { parsed = JSON.parse(cleaned); } catch { return { draft: null, errors: ['The answer is not valid JSON.'], ready: false }; }
   } else parsed = json;
-  if (!parsed || typeof parsed !== 'object') return { draft: null, errors: ['The answer is not a JSON object.'] };
+  if (!parsed || typeof parsed !== 'object') return { draft: null, errors: ['The answer is not a JSON object.'], ready: false };
   const obj = parsed as { error?: unknown; rule?: unknown };
-  if (typeof obj.error === 'string') return { draft: null, errors: [`The model could not express it: ${obj.error}`] };
+  if (typeof obj.error === 'string') return { draft: null, errors: [`The model could not express it: ${obj.error}`], ready: false };
   const raw = (obj.rule && typeof obj.rule === 'object' ? obj.rule : parsed) as Record<string, unknown>;
   const errors: string[] = [];
-  if (raw.setBy !== undefined) errors.push('The model tried to set "setBy"; ignored — the operator sets the authority.');
+  if (raw.setBy !== undefined) errors.push('The model tried to set "setBy"; ignored — the caller sets the authority, from the level the space granted the author.');
   const text = options.text ?? (typeof raw.text === 'string' ? raw.text : '');
   const draft = {
     ...clone(raw),
     id: options.id ?? (typeof raw.id === 'string' && raw.id ? raw.id : slug(text || 'rule')),
     text: typeof raw.text === 'string' && raw.text ? raw.text : text,
-    source: { kind: 'text', ref: text || '(model draft)' },
+    source: sourceOf(options, text || '(model draft)'),
     setBy: options.setBy ?? '',
   } as Rule;
-  if (!options.setBy) errors.push('Say who sets this rule (setBy) before confirming it.');
+  if (!options.setBy) errors.push('Say who sets this rule (setBy) before confirming it: the authority the space granted the author.');
   else {
-    try { validateRule(draft, vocabularyOf(rulebook)); } catch (e) { return { draft: null, errors: [...errors, e instanceof DomainRulesError ? e.message : String(e)] }; }
+    try { validateRule(draft, vocabularyOf(rulebook)); } catch (e) { return { draft: null, errors: [...errors, e instanceof DomainRulesError ? e.message : String(e)], ready: false }; }
   }
-  return { draft, errors };
+  return { draft, errors, ready: !!options.setBy };
 }

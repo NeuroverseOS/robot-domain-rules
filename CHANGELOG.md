@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0
+
+The release for engineers who will build their own: principles, a language-neutral spec with conformance tests, signed approvals, and a harness replay.
+
+### Added
+
+- **[PRINCIPLES.md](PRINCIPLES.md)** — nine principles for spaces shared by people, robots and AI, each enforced by named conformance cases. **[BOUNDARY.md](BOUNDARY.md)** — what this layer is and is not, what it trusts, the threat model, where each check belongs. **[RELATED-WORK.md](RELATED-WORK.md)** — how it compares with Cedar/AgentCore, ASIMOV, RoboGuard and Open-RMF.
+- **[SPEC.md](SPEC.md)** (`robot-domain-rules/1`) — normative: every format, the decision algorithm as numbered pseudocode, the conflict analysis, authority semantics, canonical JSON and the fingerprint byte for byte, request digests, approvals. JSON Schemas (draft 2020-12) in `spec/`.
+- **`conformance/`** — 144 language-neutral JSON cases grouped by principle, with shared rulebooks, Ed25519 test vectors under TEST ONLY keys, exact comparison rules (`README.md`), a framework-free runner (`run-node.mjs`) and the generator that produced them (`generate.ts`, intent stated by hand). The reference passes its own suite (`test/conformance.test.ts`).
+- **Seeded soundness test** for the conflict analysis: every pair the checker calls disjoint is attacked with thousands of generated requests; none may match both rules.
+- **Approvals as data, signed.** `ApprovalRequest` (returned as `decision.approvalRequests` on a PAUSE for approval: rule, required authority/role, `requestDigest`, `rulebookFingerprint`, reason), `SignedApproval`, `TrustedKey`. Ed25519 via the platform WebCrypto, no dependencies: `generateSigningKeys`, `publicKeyOf`, `signApproval`, `verifyApproval`, `signRulebook`, `verifyRulebookSignature`, `requestDigest`, `canonicalJson`. A rulebook may declare `trustedKeys`; then only an approval the caller verified (`verified: true`) and that is bound to this request's digest and this rulebook's fingerprint clears an approval wait. Without `trustedKeys` the plain `approvedBy` path still works (development only).
+- **`validateRulebook(rulebook)`** — the problems, in plain words, with a rulebook received as JSON; what the spec calls rulebook validation.
+- **Rules from agents and systems.** `source.kind` gains `agent` and `system`. A rule added by any author holding a declared authority goes in at that authority directly; `draftRuleFromText` / `parseRuleDraft` take `source` and `author` options and return `ready` (true when the draft has a declared authority and can be added as it is). The `grocery-store` template's authorities are now `law-and-safety` > `company` > `site-manager` > `staff` > `agent`.
+- **`examples/harness/`** — `volumes-to-areas.ts` maps a semantic-volumes collection (the shape `aukilabs/domain-harness` describes; sample hand-written) onto rulebook areas, with an example-only `volumeAt`; `replay.ts` + `events.jsonl` replay an AI planner proposing tasks, poses and people counts, one signed approval and an emergency into an append-only `decisions.jsonl` and a summary. Deterministic.
+- **`examples/mcp/`** — a ~100-line stdio MCP server (`may_i`, `explain_rulebook`) with its own `package.json`; the MCP SDK is a dependency there only.
+- README restructured for two readers; "Where AI fits"; "Why not Cedar or OPA?". AGENTS.md leads with the principles and the conformance-case rule. The switchboard links PRINCIPLES and SPEC and shows the approval request a PAUSE returns.
+
+### Changed
+
+- **`engines.node` is `>=20`** (Ed25519 in WebCrypto). The core still has no runtime dependencies.
+- The `grocery-store` template gained the `agent` authority, so rulebooks built from it (and the example fingerprints) changed. Decisions do not.
+- The reason text of an approval that does not count under declared trusted keys says why (`… does not count here: …`). Reason texts are free-form and not part of the conformance contract.
+- The published package now includes `PRINCIPLES.md`, `SPEC.md`, `BOUNDARY.md`, `RELATED-WORK.md`, `spec/` and `conformance/` (cases, runner, README); `examples/mcp` ships its source and `package.json` only.
+
 ## 0.3.1
 
 ### Added

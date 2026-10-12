@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/request.schema.json",
+  "title": "Request (robot-domain-rules/1)",
+  "description": "One question: may this participant do this action in this area, given these facts? SPEC.md § Request.",
+  "type": "object",
+  "required": ["participant", "action", "facts"],
+  "properties": {
+    "participant": { "type": "object", "required": ["id", "kind", "roleId"], "properties": {
+      "id": { "type": "string", "minLength": 1 }, "kind": { "type": "string", "minLength": 1 }, "roleId": { "type": "string", "minLength": 1 } } },
+    "action": { "type": "string", "minLength": 1 },
+    "areaId": { "type": "string", "minLength": 1 },
+    "zoneId": { "type": "string", "minLength": 1, "deprecated": true, "description": "0.2 name for areaId." },
+    "targetRobotId": { "type": "string", "deprecated": true, "description": "0.2 field; copied into facts.targetRobotId when absent there." },
+    "facts": {
+      "type": "object",
+      "description": "The declared facts by ID, plus the built-in approvedBy.",
+      "properties": {
+        "approvedBy": { "oneOf": [
+          { "type": "string", "minLength": 1 },
+          { "$ref": "approval.schema.json#/$defs/approval" }
+        ] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "anyOf": [{ "required": ["areaId"] }, { "required": ["zoneId"] }]
+}

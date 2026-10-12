@@ -24,7 +24,10 @@
  */
 
 export * from './types';
-export { compileDomain, verifyFingerprint, fingerprint, validateRule, BUILTIN_CHECKS, declarationAuthority } from './compile';
+export { compileDomain, verifyFingerprint, validateRulebook, validateRule, BUILTIN_CHECKS, declarationAuthority } from './compile';
+export { fingerprint, canonicalJson, requestDigest } from './canonical';
+export { generateSigningKeys, publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, signedText } from './approvals';
+export type { SigningKeys, VerifyResult, RulebookSignature } from './approvals';
 export type { CompileDomainInput, CompileOptions } from './compile';
 export { evaluateDomainAction } from './evaluate';
 export { checkRulebook } from './check';
@@ -103,7 +106,12 @@ export class DomainRulesBuilder {
     return this;
   }
 
-  /** Add a rule you wrote yourself. `setBy` defaults to the authority chosen with `as()`. */
+  /**
+   * Add a rule. `setBy` defaults to the authority chosen with `as()`. Any
+   * author holding a declared authority — a person, a system, an AI agent —
+   * adds rules this way; the rule goes in at that authority, which can only
+   * tighten what higher authorities set.
+   */
   addRule(rule: Omit<Rule, 'source' | 'setBy'> & { setBy?: string; source?: Rule['source'] }): this {
     const setBy = rule.setBy ?? this.authority;
     if (!setBy) throw new DomainRulesError(`Rule "${rule.id}": say who sets it — pass setBy or call as(<authority>) first.`);
@@ -113,14 +121,16 @@ export class DomainRulesBuilder {
 
   /**
    * Draft a rule from plain words against the current vocabulary. Returns the
-   * draft for you to read; nothing is added until you `confirm()` it.
+   * draft; `confirm()` adds it. With `as()` set the draft is `ready` (the
+   * author holds a declared authority) and `confirm` is just the add; without
+   * it, someone holding an authority must confirm.
    */
   addRuleFromText(text: string, options: Omit<DraftOptions, 'setBy'> = {}): RuleDraft {
     const setBy = this.authority ?? this.defaultAuthority();
     return draftRuleFromText(text, this.vocabularyRulebook(), { ...options, setBy });
   }
 
-  /** Add a draft (from addRuleFromText or parseRuleDraft) or a rule, after you have read it. */
+  /** Add a draft (from addRuleFromText or parseRuleDraft) or a rule. */
   confirm(draft: RuleDraft | { draft: Rule | null } | Rule, overrides: Partial<Rule> = {}): this {
     const rule = 'draft' in draft ? draft.draft : draft;
     if (!rule) throw new DomainRulesError('There is no draft to confirm; read the notes and rewrite the text.');

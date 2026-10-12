@@ -8,6 +8,8 @@
  *                   people, glasses capture, robot commands, unknown actions
  *   site-manager    area declarations (role limits), the manager's own rules
  *   staff           rules staff may add (none by default)
+ *   agent           rules an AI agent the site trusts may add: the lowest
+ *                   level, so an agent can only ever tighten
  */
 
 import type { Template, TemplateRule } from './template';
@@ -25,6 +27,7 @@ export const GROCERY_STORE: Template = {
     { id: 'company', name: 'Company' },
     { id: 'site-manager', name: 'Site manager' },
     { id: 'staff', name: 'Staff' },
+    { id: 'agent', name: 'AI agent' },
   ],
   requires: ['hours'],
   actions: [

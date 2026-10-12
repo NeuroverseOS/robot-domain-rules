@@ -1,0 +1,2129 @@
+[
+  {
+    "id": "approvals-test-keys",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "TEST ONLY keys: the seeds used to produce every signature in this file, so another implementation can reproduce them. Never use them for anything real.",
+    "testKeys": [
+      {
+        "keyId": "test-high",
+        "privateKey": "0001020304050607080910111213141516171819202122232425262728293031",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "note": "TEST ONLY — trusted for authority high"
+      },
+      {
+        "keyId": "test-lead",
+        "privateKey": "1111111111111111111111111111111111111111111111111111111111111111",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "note": "TEST ONLY — trusted for role lead"
+      },
+      {
+        "keyId": "test-stranger",
+        "privateKey": "2222222222222222222222222222222222222222222222222222222222222222",
+        "publicKey": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+        "note": "TEST ONLY — not trusted by the rulebook"
+      },
+      {
+        "keyId": "test-site",
+        "privateKey": "3333333333333333333333333333333333333333333333333333333333333333",
+        "publicKey": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+        "note": "TEST ONLY — signs the rulebook itself"
+      }
+    ],
+    "expect": {
+      "canonical": "{\"a\":\"x\",\"b\":1}",
+      "fingerprint": "1fc46df94e7ae50d"
+    },
+    "value": {
+      "b": 1,
+      "a": "x"
+    }
+  },
+  {
+    "id": "approvals-verify-ok",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A well-formed approval signed by a trusted key, claiming the authority that key is trusted for, verifies.",
+    "approval": {
+      "id": "ann",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-high",
+      "signature": "8ab8adf18fbedfb59e7b23fd8802d80b800a82dcf6cb169aaee22ebca7b4d4b051923de0699cbf929ebeb18aca50a793adb66545f3946c6257a8fdf355513006"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": true
+      }
+    }
+  },
+  {
+    "id": "approvals-verify-role-ok",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "An approval signed by a key trusted for a role, claiming that role, verifies.",
+    "approval": {
+      "id": "lee",
+      "roleId": "lead",
+      "requestDigest": "06d4dcc6d0f1bebc",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-lead",
+      "signature": "6eb7c953cb962df6f0c2498de1b31ff6f108b0bcb52960fade4eff64ff3866ed401f8c36170cc310f8ee0a0e9a16ed9463da69b90b69823ed92839cb6c314c05"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": true
+      }
+    }
+  },
+  {
+    "id": "approvals-verify-forged",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A signature made with a different private key under a trusted keyId does not verify.",
+    "approval": {
+      "id": "mallory",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-high",
+      "signature": "265e5c0134888f34608ba78077254bed1af7cc54fbff28b34d25de5027473a06bba7223c2a396545f8905c1e0aa03b6eb8fafc3349cf45620f7e262cd2630209"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "the signature does not verify"
+    }
+  },
+  {
+    "id": "approvals-verify-untrusted-key",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A keyId the rulebook does not trust does not verify.",
+    "approval": {
+      "id": "mallory",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-stranger",
+      "signature": "ccea3eb5531723144022d1e64bb6655ed04969da3f7841ce5a36bf414bcd49ec1f3baceea159e131226226b2abc1d584583a565465db3bbf3d8397b90cc23308"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "key \"test-stranger\" is not a trusted key"
+    }
+  },
+  {
+    "id": "approvals-verify-overclaim",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A key trusted for a role cannot sign an approval that claims an authority.",
+    "approval": {
+      "id": "lee",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-lead",
+      "signature": "e15cd74a1538822c8fda8c6e123045c91873dfea0e6cff526d4f7d8c382989375464a9aa41be84504aa11c11e338b27553a9b6acb42e57f451b3801e494e250b"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "key \"test-lead\" is not trusted to approve as authority \"high\""
+    }
+  },
+  {
+    "id": "approvals-verify-tampered-field",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "Changing any signed field (here the approver id) breaks the signature.",
+    "approval": {
+      "id": "bob",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-high",
+      "signature": "8ab8adf18fbedfb59e7b23fd8802d80b800a82dcf6cb169aaee22ebca7b4d4b051923de0699cbf929ebeb18aca50a793adb66545f3946c6257a8fdf355513006"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "the signature does not verify"
+    }
+  },
+  {
+    "id": "approvals-verify-missing-field",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "An approval with no issuedAt is malformed.",
+    "approval": {
+      "id": "ann",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "keyId": "test-high",
+      "signature": "8ab8adf18fbedfb59e7b23fd8802d80b800a82dcf6cb169aaee22ebca7b4d4b051923de0699cbf929ebeb18aca50a793adb66545f3946c6257a8fdf355513006"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "the approval has no issuedAt"
+    }
+  },
+  {
+    "id": "approvals-verify-bad-signature-encoding",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A signature that is not 64 bytes of hex does not verify.",
+    "approval": {
+      "id": "ann",
+      "authority": "high",
+      "requestDigest": "a972a032bcabeaaf",
+      "rulebookFingerprint": "96be85f891da7c40",
+      "issuedAt": "2026-10-12T09:00:00Z",
+      "keyId": "test-high",
+      "signature": "zz"
+    },
+    "trustedKeys": [
+      {
+        "keyId": "test-high",
+        "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+        "authority": "high"
+      },
+      {
+        "keyId": "test-lead",
+        "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+        "roleId": "lead"
+      }
+    ],
+    "expect": {
+      "verify": {
+        "ok": false
+      },
+      "note": "the signature does not verify"
+    }
+  },
+  {
+    "id": "approvals-pause-asks-with-digest",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "With trusted keys declared, an approval wait returns an approval request carrying the request digest and the rulebook fingerprint to sign.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-verified-clears",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A verified signed approval bound to this request and this rulebook clears the wait.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high",
+          "requestDigest": "a972a032bcabeaaf",
+          "rulebookFingerprint": "96be85f891da7c40",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-high",
+          "signature": "8ab8adf18fbedfb59e7b23fd8802d80b800a82dcf6cb169aaee22ebca7b4d4b051923de0699cbf929ebeb18aca50a793adb66545f3946c6257a8fdf355513006",
+          "verified": true
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-unverified-does-not-clear",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "The same signed approval without `verified: true` (the caller never verified it) does not clear the wait.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high",
+          "requestDigest": "a972a032bcabeaaf",
+          "rulebookFingerprint": "96be85f891da7c40",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-high",
+          "signature": "8ab8adf18fbedfb59e7b23fd8802d80b800a82dcf6cb169aaee22ebca7b4d4b051923de0699cbf929ebeb18aca50a793adb66545f3946c6257a8fdf355513006"
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-plain-does-not-clear-when-keys-declared",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "With trusted keys declared, a plain { id, authority } approval no longer clears anything.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high"
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-other-request-does-not-clear",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A verified approval for a different request (digest mismatch) does not clear this one.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high",
+          "requestDigest": "19674921c361eaa9",
+          "rulebookFingerprint": "96be85f891da7c40",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-high",
+          "signature": "629ac3088bfe9420c37efd8eb3cfb8a8e9f60fd56c58d489bf179f0ba143145d0f4034ca5fa5c20b1734ea5931ec9cc4ac6be64125e15876397de766f452430b",
+          "verified": true
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-other-rulebook-does-not-clear",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A verified approval given under another rulebook (fingerprint mismatch) does not clear the wait.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high",
+          "requestDigest": "a972a032bcabeaaf",
+          "rulebookFingerprint": "0000000000000000",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-high",
+          "signature": "7c798c9ea15a1f6ad48e395552a383b085622a5f6c0d4475a7307f7632dc543ef1dc278e3c3d6a6d7b6949b259159f1ecee46a4b6509b78b9c74f4b89d542307",
+          "verified": true
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-verified-but-insufficient",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A verified approval still has to hold what the rule names: a lead's approval does not clear a wait by \"high\".",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "lee",
+          "roleId": "lead",
+          "requestDigest": "a972a032bcabeaaf",
+          "rulebookFingerprint": "96be85f891da7c40",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-lead",
+          "signature": "6eb7c953cb962df6f0c2498de1b31ff6f108b0bcb52960fade4eff64ff3866ed401f8c36170cc310f8ee0a0e9a16ed9463da69b90b69823ed92839cb6c314c05",
+          "verified": true
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "approvalRequests": [
+          {
+            "ruleId": "ask_high",
+            "by": "high",
+            "requestDigest": "a972a032bcabeaaf",
+            "rulebookFingerprint": "96be85f891da7c40",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-verified-role-clears",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "A verified approval by role tag clears a wait that names that tag.",
+    "rulebookRef": "rulebooks/signed.json",
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "lee",
+          "roleId": "lead",
+          "requestDigest": "06d4dcc6d0f1bebc",
+          "rulebookFingerprint": "96be85f891da7c40",
+          "issuedAt": "2026-10-12T09:00:00Z",
+          "keyId": "test-lead",
+          "signature": "6eb7c953cb962df6f0c2498de1b31ff6f108b0bcb52960fade4eff64ff3866ed401f8c36170cc310f8ee0a0e9a16ed9463da69b90b69823ed92839cb6c314c05",
+          "verified": true
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_lead",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_lead",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "96be85f891da7c40"
+      }
+    }
+  },
+  {
+    "id": "approvals-plain-ok-without-keys",
+    "principle": [
+      2,
+      6
+    ],
+    "description": "Back-compat, development only: with no trusted keys declared, a plain { id, authority } approval clears the wait.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot",
+        "person",
+        "agent"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot",
+            "person",
+            "agent"
+          ],
+          "tags": [
+            "sensing"
+          ]
+        },
+        {
+          "id": "plan",
+          "kinds": [
+            "agent"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        },
+        {
+          "id": "office",
+          "name": "Office",
+          "allowRoles": [
+            "guard",
+            "lead"
+          ]
+        },
+        {
+          "id": "lab",
+          "name": "Lab",
+          "denyRoles": [
+            "planner"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        },
+        {
+          "id": "guard",
+          "name": "Guard",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff"
+          ]
+        },
+        {
+          "id": "visitor",
+          "name": "Visitor",
+          "kind": "person",
+          "actions": [
+            "look"
+          ]
+        },
+        {
+          "id": "lead",
+          "name": "Lead",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff",
+            "lead"
+          ]
+        },
+        {
+          "id": "planner",
+          "name": "Planner",
+          "kind": "agent",
+          "actions": [
+            "look",
+            "plan"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "id": "area_role_limits:office",
+          "never": true,
+          "setBy": "low",
+          "text": "Office is limited to: guard, lead.",
+          "who": [
+            "bot",
+            "visitor",
+            "planner"
+          ],
+          "does": "*",
+          "where": "office",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Office is limited to: guard, lead.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:office.allowRoles"
+          }
+        },
+        {
+          "id": "area_role_limits:lab:deny",
+          "never": true,
+          "setBy": "low",
+          "text": "Planner may never act in Lab.",
+          "who": [
+            "planner"
+          ],
+          "does": "*",
+          "where": "lab",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Planner may never act in Lab.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:lab.denyRoles"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_high",
+          "text": "ask_high",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_high"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "9d3c2be0645960e1"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "go",
+      "areaId": "yard",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon",
+        "approvedBy": {
+          "id": "ann",
+          "authority": "high"
+        }
+      }
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "ask_high",
+            "status": "ALLOW",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "9d3c2be0645960e1"
+      }
+    }
+  },
+  {
+    "id": "approvals-bad-trusted-key-rejected",
+    "principle": [
+      2
+    ],
+    "description": "A trusted key whose publicKey is not 32 bytes of hex makes the rulebook invalid.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot",
+        "person",
+        "agent"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot",
+            "person",
+            "agent"
+          ],
+          "tags": [
+            "sensing"
+          ]
+        },
+        {
+          "id": "plan",
+          "kinds": [
+            "agent"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        },
+        {
+          "id": "office",
+          "name": "Office",
+          "allowRoles": [
+            "guard",
+            "lead"
+          ]
+        },
+        {
+          "id": "lab",
+          "name": "Lab",
+          "denyRoles": [
+            "planner"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        },
+        {
+          "id": "guard",
+          "name": "Guard",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff"
+          ]
+        },
+        {
+          "id": "visitor",
+          "name": "Visitor",
+          "kind": "person",
+          "actions": [
+            "look"
+          ]
+        },
+        {
+          "id": "lead",
+          "name": "Lead",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff",
+            "lead"
+          ]
+        },
+        {
+          "id": "planner",
+          "name": "Planner",
+          "kind": "agent",
+          "actions": [
+            "look",
+            "plan"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "trustedKeys": [
+        {
+          "keyId": "test-high",
+          "publicKey": "abc",
+          "authority": "high"
+        },
+        {
+          "keyId": "test-lead",
+          "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+          "roleId": "lead"
+        }
+      ],
+      "rules": [
+        {
+          "id": "area_role_limits:office",
+          "never": true,
+          "setBy": "low",
+          "text": "Office is limited to: guard, lead.",
+          "who": [
+            "bot",
+            "visitor",
+            "planner"
+          ],
+          "does": "*",
+          "where": "office",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Office is limited to: guard, lead.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:office.allowRoles"
+          }
+        },
+        {
+          "id": "area_role_limits:lab:deny",
+          "never": true,
+          "setBy": "low",
+          "text": "Planner may never act in Lab.",
+          "who": [
+            "planner"
+          ],
+          "does": "*",
+          "where": "lab",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Planner may never act in Lab.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:lab.denyRoles"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_high",
+          "text": "ask_high",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_high"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_lead",
+          "text": "ask_lead",
+          "who": "bot",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "tag:lead"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_lead"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "104f8d37e08389cd"
+    },
+    "expect": {
+      "error": true,
+      "note": "Trusted key \"test-high\": publicKey must be a raw Ed25519 public key, 32 bytes as lowercase hex."
+    }
+  },
+  {
+    "id": "approvals-trusted-key-unknown-authority-rejected",
+    "principle": [
+      2
+    ],
+    "description": "A trusted key naming an authority the rulebook does not declare makes the rulebook invalid.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot",
+        "person",
+        "agent"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot",
+            "person",
+            "agent"
+          ],
+          "tags": [
+            "sensing"
+          ]
+        },
+        {
+          "id": "plan",
+          "kinds": [
+            "agent"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        },
+        {
+          "id": "office",
+          "name": "Office",
+          "allowRoles": [
+            "guard",
+            "lead"
+          ]
+        },
+        {
+          "id": "lab",
+          "name": "Lab",
+          "denyRoles": [
+            "planner"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        },
+        {
+          "id": "guard",
+          "name": "Guard",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff"
+          ]
+        },
+        {
+          "id": "visitor",
+          "name": "Visitor",
+          "kind": "person",
+          "actions": [
+            "look"
+          ]
+        },
+        {
+          "id": "lead",
+          "name": "Lead",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff",
+            "lead"
+          ]
+        },
+        {
+          "id": "planner",
+          "name": "Planner",
+          "kind": "agent",
+          "actions": [
+            "look",
+            "plan"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "trustedKeys": [
+        {
+          "keyId": "test-high",
+          "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+          "authority": "king"
+        },
+        {
+          "keyId": "test-lead",
+          "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+          "roleId": "lead"
+        }
+      ],
+      "rules": [
+        {
+          "id": "area_role_limits:office",
+          "never": true,
+          "setBy": "low",
+          "text": "Office is limited to: guard, lead.",
+          "who": [
+            "bot",
+            "visitor",
+            "planner"
+          ],
+          "does": "*",
+          "where": "office",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Office is limited to: guard, lead.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:office.allowRoles"
+          }
+        },
+        {
+          "id": "area_role_limits:lab:deny",
+          "never": true,
+          "setBy": "low",
+          "text": "Planner may never act in Lab.",
+          "who": [
+            "planner"
+          ],
+          "does": "*",
+          "where": "lab",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Planner may never act in Lab.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:lab.denyRoles"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_high",
+          "text": "ask_high",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_high"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_lead",
+          "text": "ask_lead",
+          "who": "bot",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "tag:lead"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_lead"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "5ecc7ccd6bc6cdf3"
+    },
+    "expect": {
+      "error": true,
+      "note": "Trusted key \"test-high\" names unknown authority \"king\". Known: high, low."
+    }
+  },
+  {
+    "id": "approvals-rulebook-signature-ok",
+    "principle": [
+      5
+    ],
+    "description": "A rulebook signature (Ed25519 over the canonical JSON of the whole rulebook, fingerprint included) verifies with the pinned public key.",
+    "rulebookRef": "rulebooks/signed.json",
+    "signature": {
+      "keyId": "test-site",
+      "fingerprint": "96be85f891da7c40",
+      "signature": "4e0ff70a02c2bd525daccf17690ffdc684ff6e0662231f57dc349ec933937a1d22be7842064e4a42db35c0d1cce06725a44763fb53e4d32d5ad7ec309b22670c"
+    },
+    "publicKey": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+    "expect": {
+      "rulebookSignature": {
+        "ok": true
+      }
+    }
+  },
+  {
+    "id": "approvals-rulebook-signature-tampered",
+    "principle": [
+      5
+    ],
+    "description": "A rulebook changed after signing (here `otherwise`) fails the signature, whatever its fingerprint says.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/2",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot",
+        "person",
+        "agent"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot",
+            "person",
+            "agent"
+          ],
+          "tags": [
+            "sensing"
+          ]
+        },
+        {
+          "id": "plan",
+          "kinds": [
+            "agent"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        },
+        {
+          "id": "office",
+          "name": "Office",
+          "allowRoles": [
+            "guard",
+            "lead"
+          ]
+        },
+        {
+          "id": "lab",
+          "name": "Lab",
+          "denyRoles": [
+            "planner"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        },
+        {
+          "id": "guard",
+          "name": "Guard",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff"
+          ]
+        },
+        {
+          "id": "visitor",
+          "name": "Visitor",
+          "kind": "person",
+          "actions": [
+            "look"
+          ]
+        },
+        {
+          "id": "lead",
+          "name": "Lead",
+          "kind": "person",
+          "actions": [
+            "look"
+          ],
+          "tags": [
+            "staff",
+            "lead"
+          ]
+        },
+        {
+          "id": "planner",
+          "name": "Planner",
+          "kind": "agent",
+          "actions": [
+            "look",
+            "plan"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "wait-for-approval",
+      "trustedKeys": [
+        {
+          "keyId": "test-high",
+          "publicKey": "4b5f52db17ebdeb555101922e89beac9b43e864086b02e4529951d7f491f0cfa",
+          "authority": "high"
+        },
+        {
+          "keyId": "test-lead",
+          "publicKey": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+          "roleId": "lead"
+        }
+      ],
+      "rules": [
+        {
+          "id": "area_role_limits:office",
+          "never": true,
+          "setBy": "low",
+          "text": "Office is limited to: guard, lead.",
+          "who": [
+            "bot",
+            "visitor",
+            "planner"
+          ],
+          "does": "*",
+          "where": "office",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Office is limited to: guard, lead.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:office.allowRoles"
+          }
+        },
+        {
+          "id": "area_role_limits:lab:deny",
+          "never": true,
+          "setBy": "low",
+          "text": "Planner may never act in Lab.",
+          "who": [
+            "planner"
+          ],
+          "does": "*",
+          "where": "lab",
+          "then": {
+            "answer": "deny"
+          },
+          "reason": "Planner may never act in Lab.",
+          "source": {
+            "kind": "declaration",
+            "ref": "area:lab.denyRoles"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_high",
+          "text": "ask_high",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_high"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_lead",
+          "text": "ask_lead",
+          "who": "bot",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "tag:lead"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_lead"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "96be85f891da7c40"
+    },
+    "signature": {
+      "keyId": "test-site",
+      "fingerprint": "96be85f891da7c40",
+      "signature": "4e0ff70a02c2bd525daccf17690ffdc684ff6e0662231f57dc349ec933937a1d22be7842064e4a42db35c0d1cce06725a44763fb53e4d32d5ad7ec309b22670c"
+    },
+    "publicKey": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce",
+    "expect": {
+      "rulebookSignature": {
+        "ok": false
+      }
+    }
+  },
+  {
+    "id": "approvals-rulebook-signature-wrong-key",
+    "principle": [
+      5
+    ],
+    "description": "The right rulebook and signature under the wrong public key fail.",
+    "rulebookRef": "rulebooks/signed.json",
+    "signature": {
+      "keyId": "test-site",
+      "fingerprint": "96be85f891da7c40",
+      "signature": "4e0ff70a02c2bd525daccf17690ffdc684ff6e0662231f57dc349ec933937a1d22be7842064e4a42db35c0d1cce06725a44763fb53e4d32d5ad7ec309b22670c"
+    },
+    "publicKey": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+    "expect": {
+      "rulebookSignature": {
+        "ok": false
+      }
+    }
+  }
+]

@@ -1,7 +1,7 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.3.1",
-  "description": "A governance core for physical spaces: turn any site's answers and plain-language rules into one rulebook, flag rules that conflict, and let robots, glasses and AI agents ask before they act.",
+  "version": "0.4.0",
+  "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, conflict detection, signed approvals, and a language-neutral spec with conformance tests.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -16,8 +16,24 @@
   },
   "files": [
     "dist",
-    "examples",
+    "examples/*.ts",
+    "examples/harness",
+    "examples/mcp/server.ts",
+    "examples/mcp/package.json",
+    "examples/mcp/tsconfig.json",
+    "examples/mcp/README.md",
+    "spec",
+    "conformance/*.json",
+    "conformance/rulebooks",
+    "conformance/compare.mjs",
+    "conformance/compare.d.mts",
+    "conformance/run-node.mjs",
+    "conformance/README.md",
     "README.md",
+    "PRINCIPLES.md",
+    "SPEC.md",
+    "BOUNDARY.md",
+    "RELATED-WORK.md",
     "AGENTS.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -27,10 +43,13 @@
     "test": "vitest run --dir test",
     "typecheck": "tsc --noEmit",
     "demo": "tsx examples/demo.ts",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run conformance",
     "site": "npm --prefix site run dev",
     "site:build": "npm --prefix site run build",
-    "site:test": "npm --prefix site test"
+    "site:test": "npm --prefix site test",
+    "conformance": "node conformance/run-node.mjs",
+    "conformance:generate": "tsx conformance/generate.ts",
+    "replay": "tsx examples/harness/replay.ts"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
@@ -42,10 +61,13 @@
   "keywords": [
     "robotics",
     "smart-glasses",
+    "ai-agents",
     "governance",
+    "authorization",
     "rules",
     "posemesh",
-    "spatial-computing"
+    "spatial-computing",
+    "conformance"
   ],
   "repository": {
     "type": "git",
@@ -56,6 +78,6 @@
     "url": "https://github.com/NeuroverseOS/robot-domain-rules/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

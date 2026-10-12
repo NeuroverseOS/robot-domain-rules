@@ -1,0 +1,12 @@
+{
+  "_comment": "A hand-written sample in the shape aukilabs/domain-harness describes for its semantic-volumes collection (metres and radians; each volume has a stable id, a required title, an optional description, a centre, a base elevation, width, depth, height and a rotation about Y). Nothing here was fetched from that repo. The '#tag' words in descriptions are a convention suggested by THIS example, not theirs.",
+  "collection": "spatial-harness.semantic-volumes/v1",
+  "volumes": [
+    { "id": "vol-entrance", "title": "Entrance", "description": "Front doors and the welcome mat. #public", "center": { "x": 0, "y": 0, "z": 0 }, "baseElevation": 0, "width": 6, "depth": 4, "height": 3, "rotationY": 0 },
+    { "id": "vol-aisle-3", "title": "Aisle 3", "description": "Dry goods. #public", "center": { "x": 10, "y": 0, "z": 0 }, "baseElevation": 0, "width": 2, "depth": 12, "height": 3, "rotationY": 0 },
+    { "id": "vol-checkout", "title": "Checkout", "description": "Tills 1-4. #public", "center": { "x": 4, "y": 0, "z": 8 }, "baseElevation": 0, "width": 8, "depth": 3, "height": 3, "rotationY": 0.3 },
+    { "id": "vol-back-room", "title": "Back room", "description": "Stock and staff lockers. #staff-only", "center": { "x": 20, "y": 0, "z": 6 }, "baseElevation": 0, "width": 6, "depth": 6, "height": 3, "rotationY": 0 },
+    { "id": "vol-electrical", "title": "Electrical room", "description": "Switchgear. #restricted", "center": { "x": 20, "y": 0, "z": -4 }, "baseElevation": 0, "width": 3, "depth": 3, "height": 3, "rotationY": 0 },
+    { "id": "vol-dock-a", "title": "Charging dock A", "description": "#dock", "center": { "x": -6, "y": 0, "z": 8 }, "baseElevation": 0, "width": 2, "depth": 2, "height": 2, "rotationY": 0 }
+  ]
+}

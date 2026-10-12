@@ -2,21 +2,24 @@
  * Compiler — site vocabulary + answers + rules → Rulebook.
  *
  * The compiler never invents rules. Every rule in the output comes from a
- * template, a question the operator answered, an area the operator declared
- * (role limits), or a rule the operator wrote or confirmed. Undefined
+ * template, an answered question, a declared area (role limits), or a rule
+ * written by an author holding a declared authority — a person, a system or
+ * an agent. Undefined
  * references and impossible conditions are configuration errors and throw
  * `DomainRulesError`. Rules at odds with each other are findings, returned
  * on the rulebook and never hidden.
  */
 
 import type {
-  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, FactDef, LimitDef, RoleDef, Rule, Rulebook, SiteDef,
+  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, FactDef, LimitDef, RoleDef, Rule, Rulebook, SiteDef, TrustedKey,
 } from './types';
+import { isHexBytes } from './approvals';
 import {
   DomainRulesError, authorityRank, constraintOn, isEmpty, isValidTime, validateCondition,
   validateFactDef, validateSelector, vocabularyOf, type Vocabulary,
 } from './vocabulary';
 import { checkRulebook } from './check';
+import { fingerprint } from './canonical';
 import { isLegacyInput, fromLegacyInput, type LegacyCompileInput } from './legacy';
 import type { Template, TemplateContext } from './templates/template';
 import { templateById } from './templates/index';
@@ -41,6 +44,8 @@ export interface CompileDomainInput {
   /** Rules written or confirmed by the operator. Each must say who set it. */
   rules?: Rule[];
   otherwise?: 'deny' | 'wait-for-approval';
+  /** Keys whose signed approvals count. Declaring any means plain approvals no longer clear a wait. */
+  trustedKeys?: TrustedKey[];
 }
 
 export interface CompileOptions {
@@ -109,6 +114,8 @@ export function assemble(input: CompileDomainInput): RulebookBody {
 
   const answers = resolveAnswers(template, input.answers ?? {});
   let otherwise: Rulebook['otherwise'] = input.otherwise ?? template?.otherwise ?? 'deny';
+  if (otherwise !== 'deny' && otherwise !== 'wait-for-approval') throw new DomainRulesError(`otherwise must be "deny" or "wait-for-approval", got ${JSON.stringify(otherwise)}.`);
+  const trustedKeys = input.trustedKeys === undefined ? undefined : validateTrustedKeys(input.trustedKeys, authorities, roles);
 
   const partial: RulebookBody = {
     format: 'neuroverse-domain-rules/2',
@@ -119,6 +126,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
     actions, areas, roles, facts, limits, tags,
     answers,
     otherwise,
+    ...(trustedKeys ? { trustedKeys } : {}),
     rules: [],
     builtin: clone(BUILTIN_CHECKS),
   };
@@ -202,6 +210,43 @@ export function validateRule(r: Rule, vocab: Vocabulary): void {
 }
 
 /**
+ * Is a rulebook received as JSON one this evaluator may govern with? Returns
+ * the problems in plain words (empty when the rulebook is valid). Checks the
+ * format, the vocabulary, every rule (`validateRule`), duplicate IDs, and the
+ * fingerprint. It is the check the spec calls "rulebook validation"; other
+ * implementations run the same list before deciding anything.
+ */
+export function validateRulebook(rulebook: unknown): string[] {
+  const rb = rulebook as Rulebook;
+  if (!rb || typeof rb !== 'object') return ['the rulebook is not an object'];
+  if (rb.format !== 'neuroverse-domain-rules/2') return [`format must be "neuroverse-domain-rules/2", got ${JSON.stringify(rb.format)}`];
+  const problems: string[] = [];
+  try {
+    const body = assemble({
+      site: rb.site, kinds: rb.kinds, authorities: rb.authorities, actions: rb.actions, facts: rb.facts, limits: rb.limits,
+      tags: rb.tags, areas: (rb.areas ?? []).map(a => ({ ...a, allowRoles: undefined, denyRoles: undefined })),
+      roles: (rb.roles ?? []).map(r => ({ ...r, inherits: undefined })), otherwise: rb.otherwise, trustedKeys: rb.trustedKeys, rules: [],
+    });
+    const vocab = vocabularyOf(body);
+    if (!Array.isArray(rb.rules)) problems.push('rules must be a list');
+    else {
+      const seen = new Set<string>();
+      for (const r of rb.rules) {
+        try { validateRule(r, vocab); } catch (e) { problems.push(e instanceof Error ? e.message : String(e)); continue; }
+        if (seen.has(r.id)) problems.push(`Rule "${r.id}" is declared twice.`);
+        seen.add(r.id);
+      }
+    }
+    if (!Array.isArray(rb.builtin) || BUILTIN_CHECKS.some(b => !rb.builtin.some(x => x && x.id === b.id))) problems.push(`builtin must list ${BUILTIN_CHECKS.map(b => b.id).join(', ')}`);
+    if (!Array.isArray(rb.findings)) problems.push('findings must be a list (empty when the check found nothing)');
+  } catch (e) {
+    problems.push(e instanceof Error ? e.message : String(e));
+  }
+  if (!problems.length && !verifyFingerprint(rb)) problems.push('the fingerprint does not match the contents');
+  return problems;
+}
+
+/**
  * Does the rulebook's fingerprint still match its contents? Use it on a
  * rulebook received as JSON before trusting it. It catches accidental change
  * in transit; it is not a signature (see `fingerprint`).
@@ -234,6 +279,21 @@ function validateAuthorities(list: AuthorityDef[]): void {
     if (seen.has(a.id)) throw new DomainRulesError(`Authority "${a.id}" is declared twice.`);
     seen.add(a.id);
   }
+}
+
+function validateTrustedKeys(keys: TrustedKey[], authorities: AuthorityDef[], roles: RoleDef[]): TrustedKey[] {
+  if (!Array.isArray(keys)) throw new DomainRulesError('trustedKeys must be a list of { keyId, publicKey, authority?, roleId? }.');
+  const seen = new Set<string>();
+  for (const k of keys) {
+    if (!k || typeof k !== 'object') throw new DomainRulesError('Each trusted key must be an object { keyId, publicKey, authority?, roleId? }.');
+    validateId(k.keyId, 'trusted key');
+    if (seen.has(k.keyId)) throw new DomainRulesError(`Trusted key "${k.keyId}" is declared twice.`);
+    seen.add(k.keyId);
+    if (!isHexBytes(k.publicKey, 32)) throw new DomainRulesError(`Trusted key "${k.keyId}": publicKey must be a raw Ed25519 public key, 32 bytes as lowercase hex.`);
+    if (k.authority !== undefined && !authorities.some(a => a.id === k.authority)) throw new DomainRulesError(`Trusted key "${k.keyId}" names unknown authority "${k.authority}". Known: ${authorities.map(a => a.id).join(', ')}.`);
+    if (k.roleId !== undefined && !roles.some(r => r.id === k.roleId)) throw new DomainRulesError(`Trusted key "${k.keyId}" names unknown role "${k.roleId}". Known: ${roles.map(r => r.id).join(', ')}.`);
+  }
+  return keys.map(k => clone(k));
 }
 
 function validateId(id: unknown, what: string): void {
@@ -388,32 +448,4 @@ export function deepFreeze<T>(value: T): T {
   return value;
 }
 
-// ─── Fingerprint ─────────────────────────────────────────────────────────────
-
-/**
- * Deterministic 64-bit FNV-1a fingerprint of the rulebook's canonical JSON.
- * It identifies a rulebook; it is not a security signature. To prove a
- * rulebook wasn't tampered with, sign the JSON with your own key.
- */
-export function fingerprint(value: unknown): string {
-  const text = canonicalJson(value);
-  let h = 0xcbf29ce484222325n;
-  const prime = 0x100000001b3n;
-  const mask = 0xffffffffffffffffn;
-  for (let i = 0; i < text.length; i++) {
-    h ^= BigInt(text.charCodeAt(i));
-    h = (h * prime) & mask;
-  }
-  return h.toString(16).padStart(16, '0');
-}
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
+export { fingerprint, canonicalJson } from './canonical';

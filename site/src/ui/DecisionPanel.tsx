@@ -87,6 +87,13 @@ export function DecisionPanel({ rulebook, situation, request, decision, findings
             ))}
           </div>
 
+          {decision.approvalRequests && (
+            <div class="notice">
+              <div class="small"><b>What a signed approval must say.</b> A PAUSE for approval returns this object; whoever holds the named authority signs it (Ed25519) and the request is re-sent with it. It is bound to this request's digest and this rulebook's fingerprint, so it cannot be reused for another action or under other rules.</div>
+              <pre class="code" style="margin-top:6px">{JSON.stringify(decision.approvalRequests, null, 2)}</pre>
+            </div>
+          )}
+
           <h3>Authority chain</h3>
           <p class="small muted">{authorities.map(a => a.name ?? a.id).join(' > ')}. A lower authority can only tighten what a higher one set.</p>
           <ol class="chain">

@@ -22,14 +22,21 @@
  *   - condition — the situation must change (people leave, staff arrive).
  *                 `approvedBy` does not override these.
  *
+ * A PAUSE for approval carries `approvalRequests`: one per rule still
+ * waiting, with the request digest to sign. When the rulebook declares
+ * `trustedKeys`, only a verified signed approval (`verified: true`, see
+ * approvals.ts) bound to this request's digest and this rulebook's
+ * fingerprint clears the wait.
+ *
  * Missing or invalid facts are never permission: they BLOCK with
  * `required_facts`. Never rules and every matching rule apply to every
  * action, including an approved unknown one.
  */
 
 import type {
-  Approval, DomainCheck, DomainDecision, DomainDecisionStatus, DomainRequest, FactValue, Rule, Rulebook,
+  Approval, ApprovalRequest, DomainCheck, DomainDecision, DomainDecisionStatus, DomainRequest, FactValue, Rule, Rulebook,
 } from './types';
+import { requestDigest } from './canonical';
 import {
   authorityRank, conditionHolds, factProblem, resolveSelector, selectorExcludesId, selectorIsOpen, show, vocabularyOf,
   type Vocabulary,
@@ -43,7 +50,8 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
   const check = (ruleId: string, status: DomainDecisionStatus, reason: string, setBy = 'builtin') => { trace.push({ ruleId, status, reason, setBy }); };
   let limits: Record<string, number> | undefined;
   let then: string | undefined;
-  const decide = () => finish(trace, rulebook.fingerprint, limits, then);
+  const approvalRequests: ApprovalRequest[] = [];
+  const decide = () => finish(trace, rulebook.fingerprint, limits, then, approvalRequests);
 
   // 1. The request must have a shape we can govern, and name a declared area and role.
   const shape = shapeProblems(request, vocab);
@@ -91,10 +99,14 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
   if (stopped) return decide();
 
   // 4. The role must list the action; an action the rulebook does not know follows `otherwise`.
+  const digest = requestDigest(request);
   const needsApproval = (ruleId: string, what: string, by: string | undefined, setBy: string) => {
-    if (!approval) { check(ruleId, 'PAUSE', `${what} — needs a person's approval${by ? ` (${by})` : ''}.`, setBy); return; }
+    const ask = () => approvalRequests.push({ ruleId, ...(by ? { by } : {}), requestDigest: digest, rulebookFingerprint: rulebook.fingerprint, reason: what, setBy });
+    if (!approval) { check(ruleId, 'PAUSE', `${what} — needs a person's approval${by ? ` (${by})` : ''}.`, setBy); ask(); return; }
+    const unbound = approvalBound(approval, rulebook, digest);
+    if (unbound) { check(ruleId, 'PAUSE', `${what} — ${approval.id}'s approval does not count here: ${unbound}.`, setBy); ask(); return; }
     const short = approvalSufficient(approval, by, vocab);
-    if (short) check(ruleId, 'PAUSE', `${what} — approval needs ${by}; ${approval.id} doesn't hold it (${short}).`, setBy);
+    if (short) { check(ruleId, 'PAUSE', `${what} — approval needs ${by}; ${approval.id} doesn't hold it (${short}).`, setBy); ask(); }
     else check(ruleId, 'ALLOW', `${what} — approved by ${approval.id}.`, setBy);
   };
   if (!actionDef) {
@@ -147,7 +159,7 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
   return decide();
 }
 
-function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string, number> | undefined, then: string | undefined): DomainDecision {
+function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string, number> | undefined, then: string | undefined, approvalRequests: ApprovalRequest[]): DomainDecision {
   let status: DomainDecisionStatus = 'ALLOW';
   for (const c of trace) if (SEVERITY[c.status] > SEVERITY[status]) status = c.status;
   const reasons = trace.filter(c => c.status === status);
@@ -156,12 +168,26 @@ function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string
     reasons,
     ...(limits && (status === 'LIMIT' || status === 'ALLOW') ? { limits } : {}),
     ...(then && status === 'BLOCK' ? { then } : {}),
+    ...(approvalRequests.length && status === 'PAUSE' ? { approvalRequests } : {}),
     trace,
     fingerprint,
   };
 }
 
 // ─── Approval authority ──────────────────────────────────────────────────────
+
+/**
+ * When the rulebook declares trusted keys, an approval must be a verified
+ * signed approval for this very request under this very rulebook. Why it is
+ * not, in plain words; null when it is (or when no keys are declared).
+ */
+function approvalBound(approval: Approval, rulebook: Rulebook, digest: string): string | null {
+  if (!rulebook.trustedKeys?.length) return null;
+  if (approval.verified !== true) return 'this rulebook accepts only signed approvals verified against its trusted keys';
+  if (approval.requestDigest !== digest) return `it is for another request (digest ${approval.requestDigest ?? 'missing'}, this request is ${digest})`;
+  if (approval.rulebookFingerprint !== rulebook.fingerprint) return `it was given under another rulebook (${approval.rulebookFingerprint ?? 'missing'}, this one is ${rulebook.fingerprint})`;
+  return null;
+}
 
 /** Why the approval is not enough, in plain words; null when it is. */
 function approvalSufficient(approval: Approval, by: string | undefined, vocab: Vocabulary): string | null {
@@ -220,6 +246,10 @@ function validateFacts(rulebook: Rulebook, vocab: Vocabulary, request: DomainReq
     else if (a && typeof a === 'object' && nonEmpty((a as Approval).id)) {
       const o = a as Approval;
       approval = { id: o.id };
+      for (const field of ['requestDigest', 'rulebookFingerprint', 'keyId', 'issuedAt', 'signature'] as const) {
+        if (o[field] !== undefined) { if (typeof o[field] !== 'string') problems.push(`approvedBy.${field} must be a string when given, got ${show(o[field])}`); else approval[field] = o[field]; }
+      }
+      if (o.verified !== undefined) { if (typeof o.verified !== 'boolean') problems.push(`approvedBy.verified must be true or false when given, got ${show(o.verified)}`); else approval.verified = o.verified; }
       if (o.authority !== undefined) {
         if (authorityRank(vocab, String(o.authority)) < 0) problems.push(`approvedBy.authority "${String(o.authority)}" is not a declared authority`);
         else approval.authority = o.authority;

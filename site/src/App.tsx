@@ -101,6 +101,8 @@ export function App({ initial }: { initial: SharedState }) {
         <nav aria-label="Links">
           <ConflictsBadge findings={findings} open={conflictsOpen} onToggle={() => setConflictsOpen(o => !o)} />
           <button class="btn" onClick={share} title="Everything on this page is in the link">{shareNote || 'Share link'}</button>
+          <a class="btn" href={`${GITHUB}/blob/main/PRINCIPLES.md`} target="_blank" rel="noopener" title="The nine principles, each enforced by conformance tests">Principles</a>
+          <a class="btn" href={`${GITHUB}/blob/main/SPEC.md`} target="_blank" rel="noopener" title="The normative spec: formats, the decision algorithm, conflict analysis, signed approvals">Spec</a>
           <a class="btn" href={GITHUB} target="_blank" rel="noopener">GitHub</a>
           <a class="btn" href={NPM} target="_blank" rel="noopener">npm</a>
         </nav>

@@ -2,12 +2,12 @@
  * Domain rules — type definitions.
  *
  * A domain is one physical site (a store, a warehouse, a clinic, a lab) where
- * robots, people and AI-driven agents work side by side. The people who run
- * the site declare their own vocabulary — the kinds of participants, the
- * actions, the areas, the roles, the facts a request must bring, the limits a
- * rule may impose and the authorities that set rules — and then write rules
- * in one shape. The result is one rulebook that every participant asks before
- * it acts.
+ * robots, people and AI-driven agents work side by side. The site declares
+ * its own vocabulary — the kinds of participants, the actions, the areas, the
+ * roles, the facts a request must bring, the limits a rule may impose and the
+ * authorities that set rules — and rules are written in one shape by whoever
+ * the site grants authority: people, systems or agents. The result is one
+ * rulebook that every participant asks before it acts.
  *
  * Location is NOT this module's job. The spatial system (posemesh, for
  * example) decides which area a participant is in and passes that area ID
@@ -178,9 +178,15 @@ export type Outcome =
   /** `instead`: a hint about what to do instead (for example "dock"). Returned as `decision.then`. */
   | { answer: 'deny'; instead?: string };
 
+/**
+ * Where a rule came from. `text`: drafted from plain words; `agent`: written
+ * by an AI agent; `system`: written by another system (a policy service, a
+ * regulation feed). What gives a rule weight is never its source but `setBy`:
+ * the authority the space granted its author.
+ */
 export interface RuleSource {
-  kind: 'template' | 'question' | 'declaration' | 'manual' | 'text' | 'builtin';
-  /** Template ID, "question:answer", "area:restroom", the operator's text, ... */
+  kind: 'template' | 'question' | 'declaration' | 'manual' | 'text' | 'agent' | 'system' | 'builtin';
+  /** Template ID, "question:answer", "area:restroom", the original text, the agent or system ID, ... */
   ref: string;
 }
 
@@ -199,7 +205,7 @@ export interface Rule {
   /** Plain-English reason shown in decisions. Defaults to `text`. */
   reason?: string;
   source: RuleSource;
-  /** The authority that set this rule. Declared, never inferred. */
+  /** The authority that set this rule — a level the space declared (a person's, a system's or an agent's). Declared, never inferred. */
   setBy: string;
   /** An invariant: checked first, nothing overrides it. Must have `then.answer === 'deny'`. */
   never?: boolean;
@@ -266,6 +272,12 @@ export interface Rulebook {
   answers: Record<string, string>;
   /** What happens when a request asks for an action the rulebook does not know. */
   otherwise: 'deny' | 'wait-for-approval';
+  /**
+   * Keys whose signed approvals count. When declared (non-empty), an approval
+   * clears a wait only if it is a verified `SignedApproval` for this request
+   * and this rulebook. When absent, a plain `Approval` is accepted (development only).
+   */
+  trustedKeys?: TrustedKey[];
   /** Every rule, never rules included (flagged `never: true`). */
   rules: Rule[];
   builtin: BuiltinCheck[];
@@ -277,12 +289,71 @@ export interface Rulebook {
 
 // ─── Requests and decisions ──────────────────────────────────────────────────
 
-/** Who approved an action. A plain string is accepted as an unqualified approval. */
+/**
+ * Who approved an action. A plain string is accepted as an unqualified
+ * approval. When the rulebook declares `trustedKeys`, only a `SignedApproval`
+ * that the caller has verified (`verified: true`, see `verifyApproval`) and
+ * that is bound to this request and this rulebook clears an approval wait.
+ */
 export interface Approval {
   id: string;
   /** The authority the approver holds, by ID. */
   authority?: string;
   /** The role the approver holds, by ID. */
+  roleId?: string;
+  /** Set only by `verifyApproval` after the signature checked out against a trusted key. */
+  verified?: boolean;
+  /** `requestDigest(request)` of the request this approval is for. */
+  requestDigest?: string;
+  /** The fingerprint of the rulebook the approver saw. */
+  rulebookFingerprint?: string;
+  /** The trusted key that signed it. */
+  keyId?: string;
+  issuedAt?: string;
+  signature?: string;
+}
+
+/**
+ * What a PAUSE for approval returns: everything a person (or their signing
+ * tool) needs to produce a `SignedApproval` for exactly this request.
+ */
+export interface ApprovalRequest {
+  /** The rule that is waiting. */
+  ruleId: string;
+  /** The authority (or higher), role, or `tag:<role tag>` the approver must hold. Absent: anyone. */
+  by?: string;
+  /** `requestDigest(request)`: binds the approval to this participant, action and area. */
+  requestDigest: string;
+  /** The rulebook the approver is approving under. */
+  rulebookFingerprint: string;
+  reason: string;
+  setBy: string;
+}
+
+/** An approval as data, signed with Ed25519. See `signApproval` / `verifyApproval`. */
+export interface SignedApproval {
+  /** The approver's ID. */
+  id: string;
+  authority?: string;
+  roleId?: string;
+  requestDigest: string;
+  rulebookFingerprint: string;
+  /** ISO 8601. The evaluator has no clock; the caller decides how old is too old. */
+  issuedAt: string;
+  /** Which of the rulebook's `trustedKeys` signed it. */
+  keyId: string;
+  /** Ed25519 signature, 64 bytes as lowercase hex, over the canonical JSON of every other field. */
+  signature: string;
+}
+
+/** A public key the rulebook trusts for approvals. */
+export interface TrustedKey {
+  keyId: string;
+  /** Raw Ed25519 public key, 32 bytes as lowercase hex. */
+  publicKey: string;
+  /** The authority this key may approve as. A signed approval under this key must claim this authority or none. */
+  authority?: string;
+  /** The role this key may approve as. */
   roleId?: string;
 }
 
@@ -330,6 +401,8 @@ export interface DomainDecision {
   limits?: Record<string, number>;
   /** A deny rule's `instead` hint (for example "dock"). */
   then?: string;
+  /** When the status is PAUSE for approval: what to get signed, one per rule still waiting. */
+  approvalRequests?: ApprovalRequest[];
   /** Every check that ran, in order. */
   trace: DomainCheck[];
   /** The rulebook that decided. */

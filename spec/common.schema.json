@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/common.schema.json",
+  "title": "robot-domain-rules/1 — shared definitions",
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "pattern": "^[^\\s*!:]+$", "description": "An identifier: non-empty, no whitespace, no * ! or :." },
+    "hex32": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "32 bytes as lowercase hex." },
+    "hex64": { "type": "string", "pattern": "^[0-9a-f]{128}$", "description": "64 bytes as lowercase hex." },
+    "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{16}$", "description": "64-bit FNV-1a as 16 lowercase hex digits." },
+    "time": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$", "description": "\"HH:MM\", 24-hour." },
+    "day": { "type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+    "factValue": { "type": ["number", "string", "boolean"] },
+    "status": { "type": "string", "enum": ["ALLOW", "LIMIT", "PAUSE", "BLOCK"] },
+    "selector": {
+      "description": "'*', an ID, 'tag:<tag>', 'kind:<kind>', or '!<entry>' to exclude; a list is OR-ed.",
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }]
+    },
+    "condition": {
+      "type": "object",
+      "required": ["fact", "op"],
+      "properties": { "fact": { "$ref": "#/$defs/id" } },
+      "oneOf": [
+        { "properties": { "op": { "enum": ["==", "!=", ">", ">=", "<", "<="] }, "value": { "$ref": "#/$defs/factValue" } }, "required": ["value"] },
+        { "properties": { "op": { "const": "in" }, "values": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/factValue" } } }, "required": ["values"] },
+        { "properties": { "op": { "const": "between" }, "from": { "$ref": "#/$defs/time" }, "to": { "$ref": "#/$defs/time" } }, "required": ["from", "to"] },
+        { "properties": { "op": { "const": "days" }, "days": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/day" } } }, "required": ["days"] }
+      ]
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["answer"],
+      "oneOf": [
+        { "properties": { "answer": { "const": "allow" } }, "additionalProperties": false },
+        { "properties": { "answer": { "const": "limit" }, "limits": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "number", "minimum": 0 } } }, "required": ["limits"], "additionalProperties": false },
+        { "properties": { "answer": { "const": "wait" }, "for": { "enum": ["approval", "condition"] }, "by": { "type": "string", "minLength": 1 } }, "required": ["for"], "additionalProperties": false },
+        { "properties": { "answer": { "const": "deny" }, "instead": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id", "text", "who", "does", "where", "then", "setBy", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "who": { "$ref": "#/$defs/selector" },
+        "does": { "$ref": "#/$defs/selector" },
+        "where": { "$ref": "#/$defs/selector" },
+        "when": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "then": { "$ref": "#/$defs/outcome" },
+        "reason": { "type": "string" },
+        "setBy": { "$ref": "#/$defs/id" },
+        "source": { "type": "object", "required": ["kind", "ref"], "properties": { "kind": { "enum": ["template", "question", "declaration", "manual", "text", "agent", "system", "builtin"] }, "ref": { "type": "string" } } },
+        "never": { "type": "boolean" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": ["ruleId", "status", "reason", "setBy"],
+      "properties": { "ruleId": { "type": "string" }, "status": { "$ref": "#/$defs/status" }, "reason": { "type": "string" }, "setBy": { "type": "string" } }
+    }
+  }
+}

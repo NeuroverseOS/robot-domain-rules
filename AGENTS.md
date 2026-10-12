@@ -1,99 +1,83 @@
 # AGENTS.md — for AI coding agents working in this repo
 
-## What this is
+## The invariants you must keep
 
-A governance core for physical spaces where robots, people and AI-driven agents work together. The people who run a site declare their own vocabulary (kinds, actions, areas, roles, facts, limits, authorities), answer a template's questions and write rules in plain words; `compileDomain()` turns that into one frozen JSON rulebook, with the conflict check's findings on it; `evaluateDomainAction(rulebook, request)` answers "may this participant do this action, in this area, now?" with `ALLOW | LIMIT | PAUSE | BLOCK`, the rule IDs that decided it, who set each rule, a full trace and the rulebook's fingerprint. Pure library, no runtime dependencies.
+[PRINCIPLES.md](PRINCIPLES.md) is the contract. Each principle is enforced by conformance cases, and any change that breaks one is a bug, not a redesign. In one line each:
 
-## The contract
+1. **Every rule carries a declared authority.** `source` and `setBy` on every rule; the engine invents nothing; a rule from an agent or a system is weighed by `setBy`, never by who wrote it.
+2. **Authority is declared, layered, and only tightens.** `authorities` highest first; a lower level can only tighten; `authority-override` is named and has no effect; approvals must hold what `wait.by` names.
+3. **AI writes and proposes; the rulebook decides.** No model and no clock in `evaluate.ts`, `check.ts`, `compile.ts`; the structured `then` decides, never prose; a draft's `setBy` comes from the caller, never from the model.
+4. **Unknown means no; a missing fact is never a yes.** `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`; only declared defaults are filled in.
+5. **Every decision explains itself.** `reasons`, `trace`, `setBy`, `limits`, `then`, `fingerprint`; canonical JSON and the FNV-1a fingerprint are reproduced byte for byte.
+6. **Waiting has two meanings.** Approval waits return `approvalRequests` and are cleared by a sufficient approval; condition waits are cleared only by facts; with `trustedKeys` declared, only a `verified` signed approval bound to the request digest and the rulebook fingerprint counts.
+7. **Conflicts are surfaced, never quietly resolved.** Seven finding kinds, two certainties; disjointness is claimed only when provable; compile never hides findings.
+8. **One law for everyone.** Robots, people and agents through one `evaluate`; selectors by ID, kind, tag and exclusion; area role limits as never rules.
+9. **Rules say what may happen; evidence says what is true.** Facts are trusted; this is not a safety system ([BOUNDARY.md](BOUNDARY.md)).
 
-Request: `{ participant: { id, kind, roleId }, action, areaId, facts: { ...declared facts, approvedBy? } }`. `approvedBy` is a string or `{ id, authority?, roleId? }`. (`zoneId` and a top-level `targetRobotId` are accepted for 0.2 callers.)
+Plus the mechanical ones: rulebooks are deep-frozen and detached from their input; bad config throws `DomainRulesError`, a bad request never throws; the glasses bridge only tightens; the 0.2 input shape keeps deciding identically (`legacy.ts`).
 
-Decision: `{ status, reasons: [{ ruleId, status, reason, setBy }], limits?, then?, trace, fingerprint }`. Status is the strictest check: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`.
+## Any behaviour change needs a conformance case
 
-Order in `evaluate.ts`: request shape and declared area/role → facts, typed and complete → never rules → role lists the action (unknown action: `otherwise`) → every matching rule; limits combine by MIN.
+If a change alters what `evaluate`, `check`, `validateRulebook`, `fingerprint`, `requestDigest` or the approval functions return for any input, it needs a case in [`conformance/`](conformance/) — that is how other implementations learn about it. Add it to `conformance/generate.ts` in the function for its principle, stating the intent by hand (status, reason rule IDs with authorities, finding kinds, or `error`); run `npx tsx conformance/generate.ts` (it refuses to write a case the implementation does not meet); read the JSON diff; run `npm test`. Update [SPEC.md](SPEC.md) in the same change. A change that alters a decision, finding, fingerprint or signature for an existing valid rulebook is a spec major bump (SPEC.md § 11).
 
-Rule: `{ id, text, who, does, where, when?, then, reason?, source, setBy, never? }`. Selectors resolve to finite sets of declared IDs. Conditions are per-fact and AND-ed.
+## The contract, briefly
 
-## Invariants — keep every one
+Request: `{ participant: { id, kind, roleId }, action, areaId, facts: { ...declared facts, approvedBy? } }`. `approvedBy` is a string, `{ id, authority?, roleId? }`, or a verified signed approval.
 
-1. **Pure and deterministic.** No `Date`, I/O, randomness, network or model in `compile.ts`, `evaluate.ts`, `check.ts` or `draft.ts`. Time is a fact.
-2. **Rules are never invented by the core.** Every rule in a rulebook comes from a template, a question the operator answered, an area the operator declared, or a rule the operator wrote or confirmed. Text drafting and model drafting only PROPOSE; nothing is added until the operator confirms it.
-3. **Authority is declared, never inferred.** Every rule has `setBy`, from the template question or the operator (`builder.as()`), never from text and never from a model. A lower authority may only tighten a higher one; the check names any attempt to loosen (`authority-override`). An approval clears a wait only if the approver holds what `then.by` names.
-4. **Conflict analysis is sound.** Two rules are called disjoint only when it is provable (`vocabulary.ts` constraints: exact intersection and subset per fact). `certain` means one rule's conditions imply the other's; anything else that overlaps is `possible`. Compile never hides findings.
-5. **Safe default first.** The first option of every question is the most restrictive; unanswered questions take it. Permissive answers emit no rule (the role list is the grant); templates emit restrictions.
-6. **Fail closed.** Undeclared area, undeclared role, action not in the role → `BLOCK`. An action the rulebook does not know follows `otherwise` (deny by default).
-7. **Missing facts never mean permission.** A required fact (or one the action requires) that is absent or invalid is `BLOCK required_facts`. Only a fact with a declared default is ever filled in. Rules may only condition on facts that are always present.
-8. **Never rules first; nothing overrides them.** They run before anything else, including for approved unknown actions, and every matching rule applies to every action.
-9. **Every decision cites rules.** Every `reasons`/`trace` entry has a `ruleId` that exists in `rulebook.rules` or `rulebook.builtin`, and a `setBy`.
-10. **Strictest wins; limits take the lowest.** Approval waits are cleared by a sufficient `approvedBy`; condition waits are not.
-11. **Rulebooks are frozen.** `compileDomain` deep-copies its input and deep-freezes the result. `verifyFingerprint` detects change, not tampering; the fingerprint is not a signature.
-12. **Bad config throws `DomainRulesError`** (undefined references, wrong fact types, impossible conditions, missing `setBy`); a bad *request* never throws.
-13. **Glasses rules only tighten.** `glassesZoneRules` reads conditional rules as if they held and merges most-restrictive-wins.
-14. **Area role limits are not inherited.** `allowRoles` / `denyRoles` name roles directly; they compile to never rules `area_role_limits:<area>`.
-15. **The 0.2 input shape keeps deciding identically** through the `grocery-store` template (`legacy.ts`); the equivalence test pins the 0.2.1 demo statuses.
+Decision: `{ status, reasons, limits?, then?, approvalRequests?, trace, fingerprint }`. Strictest wins: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`. The exact algorithm is SPEC.md § 6.
+
+Rule: `{ id, text, who, does, where, when?, then, reason?, source, setBy, never? }`. `source.kind` ∈ template, question, declaration, manual, text, agent, system, builtin.
 
 ## Files, in read order
 
 | File | Read it for |
 |---|---|
-| `src/types.ts` | **First.** Every type: vocabulary, rules, findings, rulebook, request, decision. |
-| `src/vocabulary.ts` | Selectors, fact validation, conditions, and the constraint sets the conflict check uses. |
-| `src/compile.ts` | Input → rulebook: templates, validation, role inheritance, area never rules, `validateRule`, fingerprint, freezing. |
-| `src/evaluate.ts` | One request → one decision, including approval authority. |
+| `src/types.ts` | **First.** Every type. |
+| `src/vocabulary.ts` | Selectors, fact validation, conditions, and the exact constraint sets the conflict check uses. |
+| `src/compile.ts` | Input → rulebook: templates, validation, role inheritance, area never rules, `validateRule`, `validateRulebook`, freezing. |
+| `src/canonical.ts` | Canonical JSON, `fingerprint`, `requestDigest` — what other languages reproduce. |
+| `src/evaluate.ts` | One request → one decision, including approval sufficiency and binding. |
 | `src/check.ts` | The conflict check: overlap, certainty, classification, plain-English messages. |
+| `src/approvals.ts` | Ed25519 via WebCrypto: sign/verify approvals and rulebooks. Zero dependencies. |
 | `src/draft.ts` | Deterministic text drafting; model prompt and answer validation. |
 | `src/templates/template.ts` | The template contract. `grocery-store.ts`, `warehouse.ts` are the two shipped. |
-| `src/legacy.ts` | 0.2 input shape → 0.3 input. |
-| `src/render.ts`, `src/glasses.ts`, `src/zone-rules.ts` | Plain-text rendering; the glasses bridge and its `ZoneRules` shape. |
+| `src/legacy.ts`, `src/render.ts`, `src/glasses.ts`, `src/zone-rules.ts` | 0.2 input shape; rendering; the glasses bridge. |
 | `src/index.ts` | Public exports and `DomainRulesBuilder`. |
-| `examples/` | `grocery-store.ts`, `warehouse.ts`, `clinic.ts`, `demo.ts`, `legacy-store-0.2.ts`. |
-| `test/domain-rules.test.ts` | One test per behaviour. Add here; do not add test files without being asked. |
-| `site/` | The switchboard (the live demo). Its own package; not published to npm. See below. |
+| `conformance/` | The cases, `compare.mjs` (the judging rules), `run-node.mjs`, `generate.ts`. |
+| `test/domain-rules.test.ts` | One test per behaviour, plus the seeded soundness test. `test/conformance.test.ts` runs every case. Do not add test files without being asked. |
+| `examples/` | Sites, `demo.ts`, `harness/` (volumes adapter + replay), `mcp/` (its own package). |
+| `site/` | The switchboard. See below. |
 
 ## How to extend
 
-- **A template:** add `src/templates/<id>.ts` exporting a `Template` (kinds, authorities, actions, facts, limits, tags, questions whose options emit rules via `rules(ctx)`; first option safe; each question names its `setBy`), register it in `src/templates/index.ts`, add an example and one test.
-- **An action, area, role, fact, limit or authority:** declare it in the site input (or the template). No code change.
-- **A fact type:** add it to `FactType` in `types.ts`; teach `factProblem`, `validateCondition`, `conditionHolds`, `universeConstraint` and `conditionConstraint` in `vocabulary.ts` (the constraint must support exact `intersect` and `isSubset`), `describeFact` in `render.ts`, and `matchCondition` in `draft.ts` if text should reach it. Add a test.
-- **A condition operator:** add it to `Condition` in `types.ts`; validate it, evaluate it and give it an exact constraint in `vocabulary.ts`; describe it; add it to the model prompt in `draft.ts`. Add a test that proves disjointness still holds where it should.
-- **A text pattern:** `draft.ts` only. Keep it deterministic and keep `unmatched` honest.
+- **A template:** `src/templates/<id>.ts` exporting a `Template` (first option of every question is the safe one; each question names its `setBy`), registered in `src/templates/index.ts`, with an example and one test.
+- **An action, area, role, fact, limit, authority or trusted key:** declare it in the site input. No code change.
+- **A fact type or condition operator:** `types.ts`, then `vocabulary.ts` (`factProblem`, `validateCondition`, `conditionHolds`, and a constraint with exact `intersect` and `isSubset`), `render.ts`, `draft.ts`; SPEC.md § 3.2 and § 7.1; conformance cases proving disjointness still holds where it should.
+- **A text pattern:** `draft.ts` only. Deterministic; keep `unmatched` honest.
 
 ## The switchboard (`site/`)
 
-A static single-page app (Vite + Preact + TypeScript) that lets a visitor build a rulebook, set a situation and see the decision with the authority behind it. Live at https://neuroverseos.github.io/robot-domain-rules/ via `.github/workflows/pages.yml`.
-
-- **It imports the core from the repo source**, never from `dist/` or npm: `site/src/**` imports `../../../src/index` (and two internals, `src/vocabulary.ts` `vocabularyOf` and `src/check.ts` `say`, to render rules the way `renderDomainRules` does). The starting points import the example builders from `examples/` and call `toInput()`, so the demo always shows the current code and the current examples.
-- **It runs entirely in the browser.** No backend, no model call, no analytics, no cookies, no external fonts. State is in the URL hash (`#s=`, deflated JSON) and in localStorage. Keep it that way.
-- **It never changes the core's meaning.** The site only calls public functions (`compileDomain`, `checkRulebook`, `evaluateDomainAction`, `draftRuleFromText`, `verifyFingerprint`, `renderDomainRules`). A UI need is not a reason to change `src/`; if the core needs something, change the core on its own terms, with a test.
-- **Where things are:** `site/src/lib/` is pure logic (`model.ts` the editable input and edits, `starting-points.ts` the four starting points and their scenario presets, `situation.ts` the request form, `url-state.ts` sharing, `share.ts` export/import/snippet); `site/src/ui/` the three panels and the conflicts panel; `site/test/switchboard.test.ts` tests the pure logic only.
-- **To add a scenario preset:** add `{ label, request }` to the starting point's `presets` in `site/src/lib/starting-points.ts`. The request is exactly what `evaluateDomainAction` receives; the test checks every preset round-trips through the situation form and decides.
-- **To add a starting point:** add an entry to `STARTING_POINTS` (an `input()` returning a plain `CompileDomainInput` with the template as its ID string, an `actingAs` authority, presets) and its ID to `StartingPointId` in `model.ts`.
-
-```bash
-cd site && npm install
-npm run dev         # vite dev server
-npm run typecheck   # tsc --noEmit (covers the site and the core it imports)
-npm test            # vitest run — the site's pure logic
-npm run build       # vite build → site/dist (base /robot-domain-rules/)
-```
-
-From the repo root: `npm run site`, `npm run site:test`, `npm run site:build`.
+Static Vite + Preact + TypeScript; live at https://neuroverseos.github.io/robot-domain-rules/ via `.github/workflows/pages.yml`. It imports the core from `../src` (never `dist/` or npm) and the example builders from `examples/`, runs entirely in the browser (no backend, no model call, no analytics; state in the URL hash and localStorage), and never changes the core's meaning: it only calls public functions. A UI need is not a reason to change `src/`. Pure logic in `site/src/lib/`, panels in `site/src/ui/`, tests of the pure logic in `site/test/`. Scenario presets live in `site/src/lib/starting-points.ts`.
 
 ## Commands
 
 ```bash
 npm install
-npm run typecheck   # tsc --noEmit
-npm test            # vitest run --dir test — 38 core tests
-npm run build       # tsup → dist/ (esm, cjs, d.ts)
-npm run demo        # tsx examples/demo.ts; add -- --json to write <site>.rules.json
+npm run typecheck        # tsc --noEmit (src, examples except mcp, test, conformance/generate.ts)
+npm test                 # vitest run --dir test — core tests + every conformance case
+npm run build            # tsup → dist/
+node conformance/run-node.mjs      # the cases against dist/, no framework
+npm run demo             # tsx examples/demo.ts; add -- --json to write <site>.rules.json
+npx tsx examples/harness/replay.ts
+cd site && npm install && npm run typecheck && npm test && npm run build
+cd examples/mcp && npm install && npm run typecheck
 ```
 
-Run all four before you say a change is done. If you touched `site/` or anything it imports, also run the site's typecheck, tests and build.
+Run typecheck, test, build and the conformance runner before you say a change is done; the site's three if you touched `site/` or anything it imports.
 
 ## Do not build here
 
-- Area geometry, localisation, people counting, identity, sensors, maps. The surrounding system owns that.
-- A clock, scheduler or live feed. Facts arrive in the request.
+- Area geometry, localisation, people counting, identity, sensors, maps. The surrounding system owns that (`examples/harness/volumeAt` is an example helper, not a feature).
+- A clock, scheduler or live feed. Facts arrive in the request; `issuedAt` is for the caller.
 - A model call anywhere in the core. `buildRuleDraftPrompt` / `parseRuleDraft` are the whole model surface.
-- Signing, a spatial-system client, or per-area template overrides, unless asked.
+- A key store, expiry policy, or HTTP service. Key custody and age limits are the deployment's.

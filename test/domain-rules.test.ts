@@ -13,7 +13,7 @@ import {
   renderDomainRules,
   verifyFingerprint,
 } from '../src/index';
-import type { CompileDomainInput, DomainRequest, LegacyCompileInput, Rule, Rulebook } from '../src/index';
+import type { CompileDomainInput, Condition, DomainRequest, LegacyCompileInput, Rule, Rulebook } from '../src/index';
 import type { ZoneRules } from '../src/zone-rules';
 import { store } from '../examples/legacy-store-0.2';
 import * as grocery from '../examples/grocery-store';
@@ -598,7 +598,13 @@ describe('generic rulebook: drafting from plain words', () => {
 
     expect(rb.rules.some(r => r.id === 'd')).toBe(false);
     // Without setBy the draft says so, and compile would refuse it.
-    expect(draftRuleFromText('shoppers may not take photos', rb).notes).toContain('Say who sets this rule (setBy) before confirming it.');
+    const noAuthority = draftRuleFromText('shoppers may not take photos', rb);
+    expect(noAuthority.notes.join(' ')).toMatch(/Say who sets this rule \(setBy\)/);
+    expect(noAuthority.ready).toBe(false);
+    // An AI agent holding the declared "agent" authority drafts a ready rule, recorded as its own.
+    const byAgent = draftRuleFromText('robots slow to 0.2 m/s in checkout', rb, { setBy: 'agent', source: 'agent', author: 'planner-7', id: 'ag' });
+    expect(byAgent.ready).toBe(true);
+    expect(byAgent.draft).toMatchObject({ setBy: 'agent', source: { kind: 'agent', ref: 'planner-7: robots slow to 0.2 m/s in checkout' } });
   });
 
   it('says plainly when text cannot be turned into a rule, and lowers confidence for words it could not place', () => {
@@ -620,7 +626,7 @@ describe('generic rulebook: drafting from plain words', () => {
     expect(prompt).toContain('Answer with JSON only');
     const good = parseRuleDraft('```json\n{"rule":{"id":"no_photos_restroom","text":"No photos in the restroom.","who":"*","does":"camera_capture","where":"restroom","then":{"answer":"deny"},"setBy":"law-and-safety"}}\n```', rb, { setBy: 'site-manager' });
     expect(good.draft).toMatchObject({ id: 'no_photos_restroom', setBy: 'site-manager', source: { kind: 'text' } });
-    expect(good.errors).toEqual(['The model tried to set "setBy"; ignored — the operator sets the authority.']);
+    expect(good.errors).toEqual(['The model tried to set "setBy"; ignored — the caller sets the authority, from the level the space granted the author.']);
     expect(parseRuleDraft('not json', rb, { setBy: 'site-manager' }).errors).toEqual(['The answer is not valid JSON.']);
     expect(parseRuleDraft({ error: 'there is no "laser" action' }, rb, { setBy: 'site-manager' }).errors[0]).toMatch(/no "laser" action/);
     const bad = parseRuleDraft({ rule: { id: 'x', text: 'x', who: 'martian', does: '*', where: '*', then: { answer: 'deny' } } }, rb, { setBy: 'site-manager' });
@@ -644,5 +650,64 @@ describe('generic rulebook: drafting from plain words', () => {
     expect(() => b.confirm(draftRuleFromText('be nice', b.compile()))).toThrow(/no draft to confirm/);
     // The company's default answer already blocks capture, so the staff rule adds nothing — said as info, not hidden.
     expect(b.check().map(f => [f.kind, f.severity, f.ruleIds])).toEqual([['duplicate', 'info', ['g', 'glasses_capture']]]);
+  });
+});
+
+// ─── 0.4: soundness of the conflict check, under a seeded random generator ──
+
+describe('conflict check soundness: "disjoint" is never a lie', () => {
+  it('whenever the checker reports no overlap for two rules, no generated request matches both', () => {
+    // A small deterministic PRNG (mulberry32) so a failure is reproducible from the seed.
+    let seed = 0x5eed2026;
+    const rnd = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
+    const int = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+    const hhmm = () => `${String(int(0, 23)).padStart(2, '0')}:${String(pick([0, 15, 30, 45])).padStart(2, '0')}`;
+    const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+    const modes = ['a', 'b', 'c'];
+    const condition = (): Condition => {
+      switch (int(0, 7)) {
+        case 0: return { fact: 'n', op: pick(['==', '!=', '>', '>=', '<', '<='] as const), value: int(0, 6) };
+        case 1: return { fact: 'n', op: 'in', values: [int(0, 6), int(0, 6)] };
+        case 2: return { fact: 'm', op: pick(['>', '>=', '<', '<='] as const), value: int(0, 8) / 2 };
+        case 3: return { fact: 't', op: 'between', from: hhmm(), to: hhmm() };
+        case 4: return { fact: 't', op: pick(['>=', '<'] as const), value: hhmm() };
+        case 5: return { fact: 'day', op: 'days', days: [pick(days), pick(days)] };
+        case 6: return pick([true, false]) ? { fact: 'mode', op: pick(['==', '!='] as const), value: pick(modes) } : { fact: 'mode', op: 'in', values: [pick(modes), pick(modes)] };
+        default: return { fact: 'flag', op: '==', value: pick([true, false]) };
+      }
+    };
+    const selector = (ids: string[]): Rule['who'] => (rnd() < 0.4 ? '*' : [pick(ids)]);
+    // Always an allow against a deny: when those overlap the checker MUST report a contradiction, so "no finding" is a claim of provable disjointness.
+    const randomRule = (id: string, then: Rule['then']): Omit<Rule, 'source' | 'setBy'> & { setBy?: string } => ({
+      id, text: id, who: '*', does: selector(['go', 'look']), where: selector(['x', 'y']),
+      when: Array.from({ length: int(0, 3) }, condition),
+      then,
+    });
+    const randomFacts = () => ({ n: int(0, 7), m: int(0, 9) / 2, t: hhmm(), day: pick(days), mode: pick(modes), flag: pick([true, false]) });
+
+    let pairs = 0, disjointPairs = 0, requests = 0;
+    for (let round = 0; round < 400; round++) {
+      let input: CompileDomainInput;
+      try { input = tiny([randomRule('a', { answer: 'allow' }), randomRule('b', { answer: 'deny' })]); compileDomain(input); } catch { continue; }   // impossible conditions are refused at compile time; skip them
+      const rb = compileDomain(input);
+      const overlap = rb.findings.some(f => f.ruleIds.includes('a') && f.ruleIds.includes('b'));
+      pairs++;
+      if (overlap) continue;                 // a finding was reported: the checker claims nothing about disjointness here
+      disjointPairs++;
+      // No finding for an allow against a deny: the checker is claiming the two rules are provably disjoint. Try to refute it.
+      for (let k = 0; k < 60; k++) {
+        const facts = randomFacts();
+        for (const action of ['go', 'look']) for (const areaId of ['x', 'y']) {
+          requests++;
+          const d = evaluateDomainAction(rb, tinyReq(action, areaId, facts));
+          const hit = new Set(d.trace.map(c => c.ruleId));
+          expect(hit.has('a') && hit.has('b'), `seed-generated pair claimed disjoint but request matched both: ${JSON.stringify({ rules: input.rules, action, areaId, facts })}`).toBe(false);
+        }
+      }
+    }
+    expect(pairs).toBeGreaterThan(200);
+    expect(disjointPairs).toBeGreaterThan(20);
+    expect(requests).toBeGreaterThan(5000);
   });
 });
