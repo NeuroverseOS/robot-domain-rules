@@ -37,28 +37,34 @@
 
 import type { Condition, FactValue, Finding, Outcome, PlanRule, Rule, Rulebook, Witness } from './types';
 import {
-  authorityName, authorityRank, constraintOn, describeConstraint, intersect, isEmpty, isSubset,
-  resolveSelector, sampleValue, vocabularyOf, witnessValue, type Vocabulary,
+  DomainRulesError, authorityName, authorityRank, constraintOn, describeConstraint, intersect, isEmpty, isSubset,
+  resolveSelector, sampleValue, selectorEntries, universeConstraint, vocabularyOf, witnessValue, type Constraint, type SelectorKind, type Vocabulary,
 } from './vocabulary';
 import { assemble, type CompileDomainInput } from './compile';
 import { isLegacyInput, fromLegacyInput, type LegacyCompileInput } from './legacy';
+import { RULEBOOK_FORMAT, rulebookVersionProblem } from './version';
 
 type Body = Omit<Rulebook, 'fingerprint' | 'findings'> & Partial<Pick<Rulebook, 'fingerprint' | 'findings'>>;
 
-/** Run the conflict check on an input (compiles the vocabulary first) or on a compiled rulebook. */
+/** Run the conflict check on an input (compiles the vocabulary first) or on a compiled rulebook. A compiled rulebook of another format is refused by name (DomainRulesError). */
 export function checkRulebook(input: CompileDomainInput | LegacyCompileInput | Rulebook): Finding[] {
-  const body: Body = 'format' in input && input.format === 'neuroverse-domain-rules/3'
+  if (input && typeof input === 'object' && 'format' in input && input.format !== RULEBOOK_FORMAT) throw new DomainRulesError(rulebookVersionProblem(input)!);
+  const body: Body = 'format' in input && input.format === RULEBOOK_FORMAT
     ? input
     : assemble(isLegacyInput(input) ? fromLegacyInput(input) : (input as CompileDomainInput));
   const vocab = vocabularyOf(body);
   const scopes = body.rules.map(r => scopeOf(r, vocab));
-  const blockers = blockersOf(body.rules, scopes);
+  const site = siteOf(vocab, body.rules, scopes);
   const findings: Finding[] = [];
+  for (let i = 0; i < body.rules.length; i++) {
+    const f = unmatchedSelector(body.rules[i], scopes[i], vocab);
+    if (f) findings.push(f);
+  }
   for (let i = 0; i < body.rules.length; i++) {
     if (scopes[i].empty) continue;
     for (let j = i + 1; j < body.rules.length; j++) {
       if (scopes[j].empty) continue;
-      const f = comparePair(body.rules[i], scopes[i], body.rules[j], scopes[j], vocab, reachability(vocab, blockers, body.rules[i].id, body.rules[j].id));
+      const f = comparePair(body.rules[i], scopes[i], body.rules[j], scopes[j], vocab, site);
       if (f) findings.push(f);
     }
   }
@@ -76,33 +82,84 @@ export function rulesOverlap(rulebook: Rulebook, ruleIdA: string, ruleIdB: strin
   const vocab = vocabularyOf(rulebook);
   const a = rulebook.rules.find(r => r.id === ruleIdA), b = rulebook.rules.find(r => r.id === ruleIdB);
   if (!a || !b) return null;
-  const sa = scopeOf(a, vocab), sb = scopeOf(b, vocab);
+  const scopes = rulebook.rules.map(r => scopeOf(r, vocab));
+  const sa = scopes[rulebook.rules.indexOf(a)], sb = scopes[rulebook.rules.indexOf(b)];
   if (sa.empty || sb.empty) return null;
-  const blockers = blockersOf(rulebook.rules, rulebook.rules.map(r => scopeOf(r, vocab)));
-  const o = overlapOf(sa, sb, vocab, reachability(vocab, blockers, a.id, b.id));
+  const o = overlapOf(a, sa, b, sb, vocab, siteOf(vocab, rulebook.rules, scopes));
   return o ? { witness: o.witness, certainty: o.certainty } : null;
 }
 
-// ─── Reachability: which (role, action, area) a lawful request can reach ─────
+// ─── The site, computed once per check: declaration order, who lists what, and the unconditional never rules ─────
 
-/** A never rule with no conditions: every request in its scope is refused before any other rule is weighed. */
-function blockersOf(rules: Rule[], scopes: Scope[]): Array<{ id: string; scope: Scope }> {
-  return rules.map((r, i) => ({ r, scope: scopes[i] })).filter(({ r, scope }) => r.never && !scope.when.length && !scope.history && !scope.empty).map(({ r, scope }) => ({ id: r.id, scope }));
+interface Site {
+  roles: string[]; actions: string[]; areas: string[];
+  /** role ID → the set of actions it lists. */
+  lists: Map<string, Set<string>>;
+  /** The unconditional never rules: every request in their scope is refused before any other rule is weighed. */
+  blockers: Array<{ id: string; scope: Scope }>;
+  /** Per (role, action), the areas some blocker covers — computed once and reused by every pair that is not itself a blocker. Equal sets share one instance. */
+  blocked: Map<string, Set<string>>;
+  interned: Map<string, Set<string>>;
 }
 
-/**
- * Can a lawful request reach this role, action and area? It can when the
- * role lists the action (else `role_permits_action` refuses it first) and no
- * unconditional never rule other than the two being compared covers the
- * triple (else that never rule refuses it first). Conditional never rules
- * are not filtered: their conditions are compared like any rule's.
- */
-function reachability(vocab: Vocabulary, blockers: Array<{ id: string; scope: Scope }>, idA: string, idB: string): (roleId: string, action: string, areaId: string) => boolean {
-  const others = blockers.filter(b => b.id !== idA && b.id !== idB);
-  return (roleId, action, areaId) => {
-    if (!vocab.roles.get(roleId)?.actions.includes(action)) return false;
-    return !others.some(b => b.scope.roles.has(roleId) && b.scope.actions.has(action) && b.scope.areas.has(areaId));
+function siteOf(vocab: Vocabulary, rules: Rule[], scopes: Scope[]): Site {
+  return {
+    roles: [...vocab.roles.keys()], actions: [...vocab.actions.keys()], areas: [...vocab.areas.keys()],
+    lists: new Map([...vocab.roles.values()].map(r => [r.id, new Set(r.actions)])),
+    blockers: rules.map((r, i) => ({ r, scope: scopes[i] })).filter(({ r, scope }) => r.never && !scope.history && !scope.empty && unconditional(scope, vocab)).map(({ r, scope }) => ({ id: r.id, scope })),
+    blocked: new Map(),
+    interned: new Map(),
   };
+}
+
+/** The areas the given blockers cover for this role and action (empty when none touches the pair). */
+function blockedAreas(blockers: Site['blockers'], roleId: string, action: string): Set<string> {
+  const out = new Set<string>();
+  for (const b of blockers) if (b.scope.roles.has(roleId) && b.scope.actions.has(action)) for (const z of b.scope.areas) out.add(z);
+  return out;
+}
+
+/** Do the rule's conditions hold for every value — no `when`, or every condition covers its fact's whole universe (`people >= 0` on a fact with min 0, `in` every enum value)? */
+function unconditional(scope: Scope, vocab: Vocabulary): boolean {
+  return scope.facts.every(f => isSubset(universeConstraint(vocab.facts.get(f)!), constraintOf(scope, f, vocab)));
+}
+
+// ─── A selector that matches nothing: the rule binds less than it reads ──────
+
+/**
+ * A positive entry (a tag, a kind, an ID) that expands to nothing declared,
+ * or a whole selector that resolves to the empty set, is a warning on that
+ * rule alone: validation passes (the tag may be declared by a template, or
+ * an exclusion may empty the set), but nothing is bound and the author
+ * almost certainly meant something. Tags match exactly, case included; a
+ * tag that matches only when case is ignored is named as the likely intent.
+ */
+function unmatchedSelector(r: Rule, scope: Scope, vocab: Vocabulary): Finding | null {
+  const notes: string[] = [];
+  const kinds: Array<[SelectorKind, Rule['who'], Set<string>]> = [['who', r.who, scope.roles], ['does', r.does, scope.actions], ['where', r.where, scope.areas]];
+  for (const [kind, sel, resolved] of kinds) {
+    const noun = kind === 'who' ? 'role' : kind === 'does' ? 'action' : 'area';
+    const things: Array<{ id: string; name?: string; tags?: string[] }> = kind === 'who' ? [...vocab.roles.values()] : kind === 'does' ? [...vocab.actions.values()] : [...vocab.areas.values()];
+    for (const raw of selectorEntries(sel)) {
+      const e = raw.startsWith('!') ? raw.slice(1) : raw;
+      if (e === '*') continue;
+      if (e.startsWith('tag:')) {
+        const tag = e.slice(4);
+        if (things.some(t => t.tags?.includes(tag))) continue;
+        const near = things.filter(t => t.tags?.some(x => x.toLowerCase() === tag.toLowerCase()));
+        const hint = near.length ? ` — tags match exactly, case included; ${near.map(t => `${t.name ?? t.id} carries "${t.tags!.find(x => x.toLowerCase() === tag.toLowerCase())}"`).join(', ')}` : '';
+        notes.push(`${kind} names ${noun} tag "${tag}", which no ${noun} carries${hint}`);
+      } else if (e.startsWith('kind:')) {
+        const k = e.slice(5);
+        const any = kind === 'who' ? [...vocab.roles.values()].some(t => t.kind === k) : kind === 'does' ? [...vocab.actions.values()].some(t => t.kinds.includes(k)) : false;
+        if (!any) notes.push(`${kind} names kind "${k}", which no ${noun} has`);
+      }
+    }
+    if (resolved.size === 0 && !notes.some(n => n.startsWith(kind))) notes.push(`${kind} resolves to no ${noun} at all`);
+  }
+  if (!notes.length) return null;
+  const binds = scope.empty ? 'The rule binds nothing and never takes effect.' : 'The rule binds less than it reads.';
+  return { kind: 'unmatched_selector', severity: 'warning', ruleIds: [r.id], certainty: 'certain', message: `\`${r.id}\` (set by ${authorityName(vocab, r.setBy)}): ${notes.join('; ')}. ${binds}` };
 }
 
 // ─── Scope ───────────────────────────────────────────────────────────────────
@@ -116,6 +173,8 @@ interface Scope {
   /** The rule conditions on history, which the analysis does not model. */
   history: boolean;
   empty: boolean;
+  /** The constraint on each fact, computed once. */
+  constraints: Map<string, Constraint>;
 }
 
 function scopeOf(r: Rule, vocab: Vocabulary): Scope {
@@ -123,7 +182,14 @@ function scopeOf(r: Rule, vocab: Vocabulary): Scope {
   const actions = resolveSelector(r.does, 'does', vocab);
   const areas = resolveSelector(r.where, 'where', vocab);
   const when = r.when ?? [];
-  return { roles, actions, areas, when, facts: [...new Set(when.map(c => c.fact))], history: (r.history?.length ?? 0) > 0, empty: roles.size === 0 || actions.size === 0 || areas.size === 0 };
+  return { roles, actions, areas, when, facts: [...new Set(when.map(c => c.fact))], history: (r.history?.length ?? 0) > 0, empty: roles.size === 0 || actions.size === 0 || areas.size === 0, constraints: new Map() };
+}
+
+/** The scope's constraint on a fact (the universe when the rule does not name it), cached on the scope. */
+function constraintOf(s: Scope, fact: string, vocab: Vocabulary): Constraint {
+  let c = s.constraints.get(fact);
+  if (!c) { c = constraintOn(s.when, fact, vocab); s.constraints.set(fact, c); }
+  return c;
 }
 
 const sub = (a: Set<string>, b: Set<string>) => [...a].every(x => b.has(x));
@@ -131,7 +197,7 @@ const meet = (a: Set<string>, b: Set<string>) => new Set([...a].filter(x => b.ha
 
 /** Does every request matching `a`'s conditions also match `b`'s? */
 function implies(a: Scope, b: Scope, vocab: Vocabulary): boolean {
-  return b.facts.every(f => isSubset(constraintOn(a.when, f, vocab), constraintOn(b.when, f, vocab)));
+  return b.facts.every(f => isSubset(constraintOf(a, f, vocab), constraintOf(b, f, vocab)));
 }
 
 function scopeCovered(a: Scope, b: Scope, vocab: Vocabulary): boolean {
@@ -153,26 +219,63 @@ interface Overlap {
  * from the first ID (in declaration order) and the smallest value of each
  * overlap, with every other fact the request needs at a sample value.
  */
-function overlapOf(a: Scope, b: Scope, vocab: Vocabulary, reachable: (roleId: string, action: string, areaId: string) => boolean): Overlap | null {
+function overlapOf(ra: Rule, a: Scope, rb: Rule, b: Scope, vocab: Vocabulary, site: Site): Overlap | null {
   const roles0 = meet(a.roles, b.roles), actions0 = meet(a.actions, b.actions), areas0 = meet(a.areas, b.areas);
   if (!roles0.size || !actions0.size || !areas0.size) return null;
-  // Only triples a lawful request can reach count; the first in declaration order is the witness.
-  const roles = new Set<string>(), actions = new Set<string>(), areas = new Set<string>();
-  let firstTriple: [string, string, string] | null = null;
-  for (const roleId of vocab.roles.keys()) for (const action of vocab.actions.keys()) for (const areaId of vocab.areas.keys()) {
-    if (!roles0.has(roleId) || !actions0.has(action) || !areas0.has(areaId) || !reachable(roleId, action, areaId)) continue;
-    roles.add(roleId); actions.add(action); areas.add(areaId);
-    firstTriple ??= [roleId, action, areaId];
-  }
-  if (!firstTriple) return null;
+  // The facts first: a disjoint condition ends it before any triple is enumerated.
   const facts = [...new Set([...a.facts, ...b.facts])];
   const values: Record<string, FactValue> = {};
   for (const f of facts) {
     const def = vocab.facts.get(f)!;
-    const v = witnessValue(intersect(constraintOn(a.when, f, vocab), constraintOn(b.when, f, vocab)), def);
+    const v = witnessValue(intersect(constraintOf(a, f, vocab), constraintOf(b, f, vocab)), def);
     if (v === undefined) return null;
     values[f] = v;
   }
+  // Only triples a lawful request can reach count; the first in declaration order is the witness. The
+  // enumeration runs over the intersection in declaration order, (role, action) first since the role's
+  // action list prunes most pairs, then the areas no other unconditional never rule covers for that pair.
+  // The blockers other than the pair itself. When neither rule is a blocker (nearly always) the site's cache of covered areas per (role, action) serves every pair.
+  const pairIsBlocker = site.blockers.some(x => x.id === ra.id || x.id === rb.id);
+  const others = pairIsBlocker ? site.blockers.filter(x => x.id !== ra.id && x.id !== rb.id) : site.blockers;
+  const coveredFor = (roleId: string, action: string): Set<string> => {
+    if (pairIsBlocker) return blockedAreas(others, roleId, action);
+    const key = `${roleId}\u0000${action}`;
+    let c = site.blocked.get(key);
+    if (!c) {
+      c = blockedAreas(others, roleId, action);
+      const content = [...c].sort().join('\u0000');
+      c = site.interned.get(content) ?? (site.interned.set(content, c), c);
+      site.blocked.set(key, c);
+    }
+    return c;
+  };
+  const roles = new Set<string>(), actions = new Set<string>(), areas = new Set<string>();
+  let firstTriple: [string, string, string] | null = null, everyArea = false;
+  const distinct = new Set<Set<string>>();
+  const roleList = site.roles.filter(r => roles0.has(r)), actionList = site.actions.filter(x => actions0.has(x)), areaList = site.areas.filter(z => areas0.has(z));
+  for (const roleId of roleList) {
+    const lists = site.lists.get(roleId)!;
+    for (const action of actionList) {
+      if (!lists.has(action)) continue;
+      const covered = coveredFor(roleId, action);
+      if (!covered.size) {
+        // No never rule touches this pair: every area in the overlap is reachable, no enumeration needed.
+        roles.add(roleId); actions.add(action); everyArea = true;
+        firstTriple ??= [roleId, action, areaList[0]];
+        continue;
+      }
+      // Reachable iff some area of the overlap is not covered; the first such area, in declaration order, is the witness's.
+      let hit: string | null = null;
+      for (const areaId of areaList) if (!covered.has(areaId)) { hit = areaId; break; }
+      if (hit === null) continue;
+      roles.add(roleId); actions.add(action); distinct.add(covered);
+      firstTriple ??= [roleId, action, hit];
+    }
+  }
+  if (!firstTriple) return null;
+  // The reachable areas (for the message): every area when some pair is uncovered, else the union over the distinct covered sets of what they leave.
+  if (everyArea) for (const z of areaList) areas.add(z);
+  else for (const covered of distinct) for (const z of areaList) if (!covered.has(z)) areas.add(z);
   const [roleId, action, areaId] = firstTriple;
   const role = vocab.roles.get(roleId)!;
   const witnessFacts: Record<string, FactValue> = {};
@@ -239,8 +342,8 @@ function looser(a: Rule, b: Rule): [Rule, Rule, string[], boolean] | null {
   return null;
 }
 
-function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary, reachable: (roleId: string, action: string, areaId: string) => boolean): Finding | null {
-  const overlap = overlapOf(sa, sb, vocab, reachable);
+function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary, site: Site): Finding | null {
+  const overlap = overlapOf(a, sa, b, sb, vocab, site);
   if (!overlap) return null;
   const where = describeOverlap(overlap, sa, sb, vocab);
   const aInB = scopeCovered(sa, sb, vocab), bInA = scopeCovered(sb, sa, vocab);
@@ -366,7 +469,7 @@ function describeOverlap(o: Overlap, a: Scope, b: Scope, vocab: Vocabulary): str
     names(o.actions, vocab.actions, 'every action'),
     names(o.areas, vocab.areas, 'everywhere'),
   ];
-  const conds = o.shared.map(f => describeConstraint(intersect(constraintOn(a.when, f, vocab), constraintOn(b.when, f, vocab)), vocab.facts.get(f)!));
+  const conds = o.shared.map(f => describeConstraint(intersect(constraintOf(a, f, vocab), constraintOf(b, f, vocab)), vocab.facts.get(f)!));
   return `${parts.join(' · ')}${conds.length ? `, when ${conds.join(' and ')}` : ', always'}`;
 }
 

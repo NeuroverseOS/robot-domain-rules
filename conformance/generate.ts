@@ -17,8 +17,8 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import {
-  compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, sha256Utf8, requestDigest,
-  publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, backtest, compareBacktests, planDigestOf,
+  compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, sha256Utf8,
+  publicKeyOf, signApproval, verifyApproval, verifyAndEvaluate, verifyAndEvaluatePlan, signRulebook, verifyRulebookSignature, backtest, compareBacktests, planDigestOf,
   type BacktestEvent, type BacktestOptions, type CompileDomainInput, type DomainRequest, type HistoryCondition, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
 } from '../src/index';
 import { projectDecision, projectFindings, projectPlan } from './compare.mjs';
@@ -91,7 +91,7 @@ interface Want {
   then?: string;
   /** Approval requests as "ruleId" or "ruleId@by". */
   asks?: string[];
-  /** Approval instances used, as "ruleId:nonce". */
+  /** Approval instances used, as "ruleId:nonce" (a decision's `approvalsUsed`, or a plan's). */
   used?: string[];
   /** Findings as "kind:certainty:idA+idB". */
   findings?: string[];
@@ -108,10 +108,14 @@ interface Spec {
   description: string;
   base?: string;
   input?: CompileDomainInput;
+  /** A rulebook given as is (for version-refusal cases: not compiled, not valid). */
+  rulebook?: Record<string, unknown>;
   /** A valid compiled rulebook, mutated after the fact (for error cases). */
   tamper?: (rb: Rulebook) => void;
   request?: DomainRequest;
   plan?: Plan;
+  /** Decide through the trusted layer's entry (`verifyAndEvaluate` / `verifyAndEvaluatePlan`): signatures are verified first. */
+  verified?: true;
   /** A recorded log for a backtest case; with `proposed`, a comparison case. */
   events?: BacktestEvent[];
   options?: BacktestOptions;
@@ -121,17 +125,26 @@ interface Spec {
 
 const bases: Record<string, Rulebook> = {};
 const files: Record<string, unknown[]> = {};
+/** Cases decided through the async trusted-layer entry: filled in before the files are written. */
+const pending: Promise<void>[] = [];
 let count = 0;
 
 function fail(id: string, msg: string): never {
   throw new Error(`case ${id}: ${msg}`);
 }
 
+/** The findings as compared, each witness with the reference's own matching relation on it, so a port's `matches` can be checked for soundness. */
+function findingsExpectation(rulebook: Rulebook) {
+  const got = checkRulebook(rulebook);
+  return projectFindings(got).map(f => (f.witness ? { ...f, witnessMatches: matchingRules(rulebook, f.witness as DomainRequest) } : f));
+}
+
 function add(file: string, s: Spec) {
   let rulebook: Rulebook | Record<string, unknown>;
   if (s.base) rulebook = bases[s.base];
   else if (s.input) rulebook = compileDomain(s.input);
-  else fail(s.id, 'needs base or input');
+  else if (s.rulebook) rulebook = s.rulebook;
+  else fail(s.id, 'needs base, input or rulebook');
   if (s.tamper) {
     const copy = JSON.parse(JSON.stringify(rulebook)) as Rulebook;
     s.tamper(copy);
@@ -144,22 +157,23 @@ function add(file: string, s: Spec) {
   if (w.error) {
     const problems = validateRulebook(rulebook);
     if (!problems.length) fail(s.id, 'expected the rulebook to be rejected');
+    out.client = true;
     out.expect = { error: true, note: problems[0] };
   } else if (w.findings) {
     const got = checkRulebook(rulebook as Rulebook);
     const kinds = got.map(f => `${f.kind}:${f.certainty}:${f.ruleIds.join('+')}`).sort();
     if (JSON.stringify(kinds) !== JSON.stringify([...w.findings].sort())) fail(s.id, `findings: want ${JSON.stringify(w.findings)}, got ${JSON.stringify(kinds)}`);
     for (const f of got) {
-      // Every certain finding between rules carries a witness, and the witness really matches both rules.
-      const betweenRules = f.ruleIds.every(id => (rulebook as Rulebook).rules.some(r => r.id === id));
+      // Every certain finding between two rules carries a witness, and the witness really matches both rules; a one-rule finding has none.
+      const betweenRules = f.ruleIds.length === 2 && f.ruleIds.every(id => (rulebook as Rulebook).rules.some(r => r.id === id));
       if (f.certainty === 'certain' && betweenRules && !f.witness) fail(s.id, `finding ${f.ruleIds.join('+')} is certain but has no witness`);
-      if (f.certainty === 'possible' && f.witness) fail(s.id, `finding ${f.ruleIds.join('+')} is possible but has a witness`);
+      if ((f.certainty === 'possible' || !betweenRules) && f.witness) fail(s.id, `finding ${f.ruleIds.join('+')} should carry no witness`);
       if (f.witness) {
         const hit = matchingRules(rulebook as Rulebook, f.witness);
         if (!f.ruleIds.every(id => hit.includes(id))) fail(s.id, `witness of ${f.ruleIds.join('+')} matches ${JSON.stringify(hit)}: ${JSON.stringify(f.witness)}`);
       }
     }
-    out.expect = { findings: projectFindings(got) };
+    out.expect = { findings: findingsExpectation(rulebook as Rulebook) };
   } else if (s.events && w.backtest) {
     out.events = s.events;
     if (s.options) out.options = s.options;
@@ -186,32 +200,40 @@ function add(file: string, s: Spec) {
     out.expect = { comparison: JSON.parse(JSON.stringify(c)) };
   } else if ('plan' in s) {
     out.plan = s.plan;
-    const p = evaluatePlan(rulebook as Rulebook, s.plan as Plan);
-    if (p.status !== w.status) fail(s.id, `plan status: want ${w.status}, got ${p.status}`);
-    const steps = p.steps.map(x => x.decision.status);
-    if (JSON.stringify(steps) !== JSON.stringify(w.steps ?? [])) fail(s.id, `plan steps: want ${JSON.stringify(w.steps)}, got ${JSON.stringify(steps)}`);
-    const fv = p.firstViolation ? `${p.firstViolation.ruleId}@${p.firstViolation.setBy}#${p.firstViolation.stepIndex}:${p.firstViolation.from}` : undefined;
-    if (fv !== w.firstViolation) fail(s.id, `plan firstViolation: want ${w.firstViolation}, got ${fv}`);
-    const checks = p.planChecks.map(c => `${c.ruleId}:${c.status}`);
-    if (JSON.stringify(checks) !== JSON.stringify(w.planChecks ?? [])) fail(s.id, `plan checks: want ${JSON.stringify(w.planChecks)}, got ${JSON.stringify(checks)}`);
-    const asks = p.approvalRequests.map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
-    if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `plan approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
-    out.expect = { plan: projectPlan(p) };
+    out.client = true;
+    const judge = (p: ReturnType<typeof evaluatePlan>) => {
+      if (p.status !== w.status) fail(s.id, `plan status: want ${w.status}, got ${p.status}`);
+      const steps = p.steps.map(x => x.decision.status);
+      if (JSON.stringify(steps) !== JSON.stringify(w.steps ?? [])) fail(s.id, `plan steps: want ${JSON.stringify(w.steps)}, got ${JSON.stringify(steps)}`);
+      const fv = p.firstViolation ? `${p.firstViolation.ruleId}@${p.firstViolation.setBy}#${p.firstViolation.stepIndex}:${p.firstViolation.from}` : undefined;
+      if (fv !== w.firstViolation) fail(s.id, `plan firstViolation: want ${w.firstViolation}, got ${fv}`);
+      const checks = p.planChecks.map(c => `${c.ruleId}:${c.status}`);
+      if (JSON.stringify(checks) !== JSON.stringify(w.planChecks ?? [])) fail(s.id, `plan checks: want ${JSON.stringify(w.planChecks)}, got ${JSON.stringify(checks)}`);
+      const asks = p.approvalRequests.map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
+      if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `plan approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
+      const used = p.approvalsUsed.map(a => `${a.ruleId}:${a.nonce}`);
+      if (JSON.stringify(used) !== JSON.stringify(w.used ?? [])) fail(s.id, `plan approvalsUsed: want ${JSON.stringify(w.used ?? [])}, got ${JSON.stringify(used)}`);
+    };
+    if (s.verified) pending.push(verifyAndEvaluatePlan(rulebook as Rulebook, s.plan as Plan).then(p => { judge(p); out.expect = { verifiedPlan: projectPlan(p) }; }));
+    else { const p = evaluatePlan(rulebook as Rulebook, s.plan as Plan); judge(p); out.expect = { plan: projectPlan(p) }; }
   } else {
     if (!s.request) fail(s.id, 'needs a request');
     out.request = s.request;
-    const d = evaluateDomainAction(rulebook as Rulebook, s.request);
-    if (d.status !== w.status) fail(s.id, `status: want ${w.status}, got ${d.status} (${d.reasons.map(r => r.reason).join('; ')})`);
-    const reasons = d.reasons.map(r => `${r.ruleId}@${r.setBy}`);
-    const wantReasons = (w.reasons ?? []).map((r, i) => (r.includes('@') ? r : `${r}@${d.reasons[i]?.setBy}`));
-    if (JSON.stringify(reasons) !== JSON.stringify(wantReasons)) fail(s.id, `reasons: want ${JSON.stringify(wantReasons)}, got ${JSON.stringify(reasons)}`);
-    if (JSON.stringify(d.limits) !== JSON.stringify(w.limits)) fail(s.id, `limits: want ${JSON.stringify(w.limits)}, got ${JSON.stringify(d.limits)}`);
-    if (d.then !== w.then) fail(s.id, `then: want ${w.then}, got ${d.then}`);
-    const asks = (d.approvalRequests ?? []).map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
-    if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
-    const used = (d.approvalsUsed ?? []).map(a => `${a.ruleId}:${a.nonce}`);
-    if (JSON.stringify(used) !== JSON.stringify(w.used ?? [])) fail(s.id, `approvalsUsed: want ${JSON.stringify(w.used ?? [])}, got ${JSON.stringify(used)}`);
-    out.expect = { decision: projectDecision(d) };
+    out.client = true;
+    const judge = (d: ReturnType<typeof evaluateDomainAction>) => {
+      if (d.status !== w.status) fail(s.id, `status: want ${w.status}, got ${d.status} (${d.reasons.map(r => r.reason).join('; ')})`);
+      const reasons = d.reasons.map(r => `${r.ruleId}@${r.setBy}`);
+      const wantReasons = (w.reasons ?? []).map((r, i) => (r.includes('@') ? r : `${r}@${d.reasons[i]?.setBy}`));
+      if (JSON.stringify(reasons) !== JSON.stringify(wantReasons)) fail(s.id, `reasons: want ${JSON.stringify(wantReasons)}, got ${JSON.stringify(reasons)}`);
+      if (JSON.stringify(d.limits) !== JSON.stringify(w.limits)) fail(s.id, `limits: want ${JSON.stringify(w.limits)}, got ${JSON.stringify(d.limits)}`);
+      if (d.then !== w.then) fail(s.id, `then: want ${w.then}, got ${d.then}`);
+      const asks = (d.approvalRequests ?? []).map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
+      if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
+      const used = (d.approvalsUsed ?? []).map(a => `${a.ruleId}:${a.nonce}`);
+      if (JSON.stringify(used) !== JSON.stringify(w.used ?? [])) fail(s.id, `approvalsUsed: want ${JSON.stringify(w.used ?? [])}, got ${JSON.stringify(used)}`);
+    };
+    if (s.verified) pending.push(verifyAndEvaluate(rulebook as Rulebook, s.request).then(d => { judge(d); out.expect = { verifiedDecision: projectDecision(d) }; }));
+    else { const d = evaluateDomainAction(rulebook as Rulebook, s.request); judge(d); out.expect = { decision: projectDecision(d) }; }
   }
   (files[file] ??= []).push(out);
   count++;
@@ -491,6 +513,14 @@ function p7() {
     [rule('yes', { answer: 'allow' }, { does: 'look' }), rule('no', { answer: 'deny' }, { does: 'look' })], [], { roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['go'] }] });
   pair('p7-unreachable-behind-never-rule-not-reported', 'A clash entirely inside the scope of an unconditional never rule is unreachable: the never rule refuses every such request first, so no finding; the never rule itself is still compared with the allow.',
     [rule('inv', { answer: 'deny' }, { never: true, where: 'yard' }), rule('yes', { answer: 'allow' }, { where: 'yard' }), rule('no', { answer: 'deny' }, { where: 'yard' })], ['never_vs_rule:certain:yes+inv']);
+  pair('p7-always-true-never-rule-is-unconditional', 'A never rule whose conditions can never fail (people >= 0 on a fact with min 0) is unconditional for reachability: the clash behind it is unreachable, exactly as behind a never rule with no conditions (0.5.2 reported the contradiction and a witness that the never rule refuses).',
+    [rule('inv', { answer: 'deny' }, { never: true, where: 'yard', when: [{ fact: 'people', op: '>=', value: 0 }] }), rule('yes', { answer: 'allow' }, { where: 'yard' }), rule('no', { answer: 'deny' }, { where: 'yard' })], ['never_vs_rule:certain:yes+inv']);
+  pair('p7-unmatched-selector-is-a-finding', 'A selector entry that matches nothing declared is a warning on that rule alone, with no witness: here a rule on tag:staff-only where the only tagged area carries "Staff-only" — tags match exactly, case included, and the message names the near miss. The rule binds nothing; 0.5.2 was silent.',
+    [rule('no_bots', { answer: 'deny' }, { where: 'tag:staff-only' })], ['unmatched_selector:certain:no_bots'], { areas: [{ id: 'floor', name: 'Floor' }, { id: 'yard', name: 'Aisle 5', tags: ['Staff-only'] }], tags: { areas: ['staff-only'] } });
+  pair('p7-unmatched-entry-in-a-wider-selector', 'One entry of a selector matches nothing while the rest bind: still a warning (the rule binds less than it reads), and the rule is still compared with the others on what it does bind.',
+    [rule('r', { answer: 'deny' }, { where: ['tag:staff-only', 'floor'] }), rule('yes', { answer: 'allow' }, { where: 'floor' })], ['unmatched_selector:certain:r', 'contradiction:certain:yes+r'], { tags: { areas: ['staff-only'] } });
+  pair('p7-exclusion-that-empties-a-selector', 'A selector emptied by its own exclusions (every area removed) is a warning: the rule never takes effect.',
+    [rule('r', { answer: 'deny' }, { where: ['*', '!floor', '!yard'] })], ['unmatched_selector:certain:r']);
   add(f, { id: 'p7-impossible-condition-rejected', principle: [7, 4], description: 'A rule whose own conditions can never all hold (people > 5 and people < 3) is rejected.',
     input: tiny([rule('r', { answer: 'deny' })]), tamper: rb => { rb.rules[0].when = [{ fact: 'people', op: '>', value: 5 }, { fact: 'people', op: '<', value: 3 }]; }, want: { error: true } });
   add(f, { id: 'p7-grocery-example-findings', principle: [7, 2], description: 'The shipped grocery example reports the manager\'s deliberate conflicts: a tightening, an authority-override and a same-authority contradiction.',
@@ -632,6 +662,12 @@ function plans() {
     want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
   add(f, { id: 'plan-null-is-block', principle: [4], description: 'A plan that is not an object (null) is BLOCK required_facts, never a throw; its digest is the digest of null.',
     input: site(), plan: null as unknown as Plan, want: { status: 'BLOCK', firstViolation: 'required_facts@builtin#0:plan' } });
+  add(f, { id: 'plan-clock-starts-at-the-wall-clock-of-now-west', principle: [9, 3], description: 'With clock and now but no startTime, the clock starts at the wall-clock time `now` names in its OWN offset: 21:00-05:00 is 21:00 on site, so the overnight rule does not fire (0.5.2 read 02:00 UTC and refused the step).',
+    input: site([], [rule('no_night', { answer: 'deny' }, { when: [{ fact: 'time', op: 'between', from: '22:00', to: '06:00' }] })]),
+    plan: plan([{ action: 'drop', area: 'floor' }], { clock: 'time', now: '2026-10-12T21:00:00-05:00' }), want: { status: 'ALLOW', steps: ['ALLOW'] } });
+  add(f, { id: 'plan-clock-starts-at-the-wall-clock-of-now-east', principle: [9, 3], description: 'The counterpart: 05:00+09:00 is 05:00 on site, inside the overnight window, so the step is refused (0.5.2 read 20:00 UTC and allowed it).',
+    input: site([], [rule('no_night', { answer: 'deny' }, { when: [{ fact: 'time', op: 'between', from: '22:00', to: '06:00' }] })]),
+    plan: plan([{ action: 'drop', area: 'floor' }], { clock: 'time', now: '2026-10-12T05:00:00+09:00' }), want: { status: 'BLOCK', steps: ['BLOCK'], firstViolation: 'no_night@high#0:step' } });
   add(f, { id: 'plan-rule-duplicate-finding', principle: [7], description: 'Two plan rules that make the same check for roles in common are a duplicate finding (plan rules only reject, so they never disagree).',
     input: site([planRule('one_pick', { kind: 'at_most', actions: 'pick', count: 1 }), planRule('one_pick_again', { kind: 'at_most', actions: 'pick', count: 1 }, { setBy: 'low' })]), want: { findings: ['duplicate:certain:one_pick+one_pick_again'] } });
 }
@@ -751,7 +787,7 @@ function fingerprintCases() {
   const vec = (id: string, description: string, value: unknown, canonical: string) => {
     const got = canonicalJson(value);
     if (got !== canonical) fail(id, `canonical: want ${canonical}, got ${got}`);
-    (files[f] ??= []).push({ id, principle: [5], description, value, expect: { canonical, fingerprint: fingerprint(value) } });
+    (files[f] ??= []).push({ id, principle: [5], description, client: true, value, expect: { canonical, fingerprint: fingerprint(value) } });
     count++;
   };
   vec('fp-empty-object', 'The empty object.', {}, '{}');
@@ -760,11 +796,14 @@ function fingerprintCases() {
   vec('fp-nested', 'Sorting applies at every depth; arrays keep their order.', { z: [{ y: 1, x: [3, 2, 1] }, 'a'], a: { c: null, b: true } }, '{"a":{"b":true,"c":null},"z":[{"x":[3,2,1],"y":1},"a"]}');
   vec('fp-numbers', 'Numbers as JavaScript JSON.stringify writes them: no trailing zeros, exponent form past 1e21, -0 as 0.', { a: 1.0, b: 0.5, c: 1e21, d: -0, e: 123456789012345680000, f: 0.000001, g: 1e-7 }, '{"a":1,"b":0.5,"c":1e+21,"d":0,"e":123456789012345680000,"f":0.000001,"g":1e-7}');
   vec('fp-strings', 'Strings as JSON.stringify writes them (RFC 8785): only ", \\, control characters escaped; non-ASCII kept literal; the hash runs over the UTF-8 bytes (é is two, ∑ three, the emoji four).', { s: 'a"b\\c\n\t\u0001 é ∑ 🤖' }, '{"s":"a\\"b\\\\c\\n\\t\\u0001 é ∑ 🤖"}');
+  vec('fp-number-edges', 'The ECMAScript Number::toString edges a port must reproduce (RFC 8785 § 3.2.2.3): -0 is 0; the smallest subnormal 5e-324; 1e21 is the first exponent integer, 1e20 is not; 1e-7 is exponent, 1e-6 is not; 2^53+1 rounds to 2^53; 0.1+0.2 is 0.30000000000000004; the largest double; 100 and 1e2 are 100.',
+    { a: -0, b: 5e-324, c: 1e21, d: 1e20, e: 1e-7, f: 1e-6, g: 9007199254740993, h: 0.1 + 0.2, i: 1.7976931348623157e308, j: 1e2, k: 123e-20, l: 1.5e300, m: -1e-7, n: 2.5e-7 },
+    '{"a":0,"b":5e-324,"c":1e+21,"d":100000000000000000000,"e":1e-7,"f":0.000001,"g":9007199254740992,"h":0.30000000000000004,"i":1.7976931348623157e+308,"j":100,"k":1.23e-18,"l":1.5e+300,"m":-1e-7,"n":2.5e-7}');
   vec('fp-null-and-booleans', 'null, true, false.', [null, true, false], '[null,true,false]');
   const sha = (id: string, description: string, text: string, want: string) => {
     const got = sha256Utf8(text);
     if (got !== want) fail(id, `sha256: want ${want}, got ${got}`);
-    (files[f] ??= []).push({ id, principle: [5], description, text, expect: { sha256: want } });
+    (files[f] ??= []).push({ id, principle: [5], description, client: true, text, expect: { sha256: want } });
     count++;
   };
   sha('sha256-empty', 'FIPS 180-4 SHA-256 of the empty string.', '', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
@@ -776,10 +815,6 @@ function fingerprintCases() {
   vec('fp-grocery-rulebook', 'The shipped grocery example rulebook (everything but its fingerprint and its findings) hashes to its fingerprint: findings carry free text and are left out, so two conforming compilers agree.', body, canonicalJson(body));
   if (fingerprint(body) !== claimed) fail('fp-grocery-rulebook', 'fingerprint mismatch');
   if (fingerprint({ ...body, findings: g.findings }) === claimed) fail('fp-grocery-rulebook', 'findings must not be in the fingerprint');
-  const r = req('go', 'yard', { people: 9 });
-  (files[f] ??= []).push({ id: 'fp-request-digest', principle: [5, 6], description: 'requestDigest is the fingerprint of { participantId, action, areaId } — never the facts.', request: r, expect: { requestDigest: requestDigest(r) } });
-  if (requestDigest(r) !== fingerprint({ participantId: r.participant.id, action: 'go', areaId: 'yard' })) fail('fp-request-digest', 'digest definition');
-  count++;
 }
 
 // ─── Approvals: signed, verified, bound ──────────────────────────────────────
@@ -790,6 +825,7 @@ async function approvals() {
   const keys: TrustedKey[] = [{ keyId: 'test-high', publicKey: pubHigh, authority: 'high' }, { keyId: 'test-lead', publicKey: pubLead, roleId: 'lead' }];
   const signedInput = shared([
     rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'yard' }),
+    rule('ask_twice', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'yard', when: [{ fact: 'mode', op: '==', value: 'b' }] }),
     rule('ask_lead', { answer: 'wait', for: 'approval', by: 'tag:lead' }, { does: 'look', who: 'bot' }),
     rule('crowd_wait', { answer: 'wait', for: 'condition' }, { does: 'go', where: 'yard', when: [{ fact: 'people', op: '>=', value: 3 }] }),
     rule('alarm_stop', { answer: 'deny' }, { never: true, when: [{ fact: 'alarm', op: '==', value: true }] }),
@@ -817,11 +853,12 @@ async function approvals() {
   const notYet = await signApproval({ id: 'ann', authority: 'high', ...bind, issuedAt: '2026-10-12T09:10:00Z', expiresAt: '2026-10-12T09:30:00Z', nonce: 'n-9' }, { keyId: 'test-high', privateKey: SEED_HIGH });
   /** A /2 approval, exactly as 0.5.1 signed it (requestDigest binding, no spec, nonce or expiry; 16-hex fingerprint), under the same key. */
   const v2Approval = { id: 'ann', authority: 'high', requestDigest: 'a972a032bcabeaaf', rulebookFingerprint: '96be85f891da7c40', issuedAt, keyId: 'test-high', signature: 'ab'.repeat(64) };
+  const APPROVAL_SPEC_STRING = 'robot-domain-rules-approval/3';
 
   const vec = async (id: string, description: string, approval: unknown, ok: boolean, principle = [2, 6]) => {
     const r = await verifyApproval(approval, keys);
     if (r.ok !== ok) fail(id, `verify: want ${ok}, got ${r.ok} (${r.reason})`);
-    (files[f] ??= []).push({ id, principle, description, approval, trustedKeys: keys, expect: { verify: { ok }, ...(r.reason ? { note: r.reason } : {}) } });
+    (files[f] ??= []).push({ id, principle, description, client: true, approval, trustedKeys: keys, expect: { verify: { ok }, ...(r.reason ? { note: r.reason } : {}) } });
     count++;
   };
   (files[f] ??= []).push({ id: 'approvals-test-keys', principle: [2, 6], description: 'TEST ONLY keys: the seeds used to produce every signature in this file, so another implementation can reproduce them. Never use them for anything real.',
@@ -831,7 +868,7 @@ async function approvals() {
       { keyId: 'test-stranger', privateKey: SEED_STRANGER, publicKey: pubStranger, note: 'TEST ONLY — not trusted by the rulebook' },
       { keyId: 'test-site', privateKey: SEED_SITE, publicKey: pubSite, note: 'TEST ONLY — signs the rulebook itself' },
     ],
-    expect: { canonical: canonicalJson({ b: 1, a: 'x' }), fingerprint: fingerprint({ b: 1, a: 'x' }) }, value: { b: 1, a: 'x' } });
+    client: true, expect: { canonical: canonicalJson({ b: 1, a: 'x' }), fingerprint: fingerprint({ b: 1, a: 'x' }) }, value: { b: 1, a: 'x' } });
   count++;
   await vec('approvals-verify-ok', 'A well-formed /3 approval signed by a trusted key, claiming the authority that key is trusted for, verifies.', highApproval, true);
   await vec('approvals-verify-role-ok', 'An approval signed by a key trusted for a role, claiming that role, verifies.', leadApproval, true);
@@ -845,32 +882,55 @@ async function approvals() {
   await vec('approvals-verify-v2-approval-refused', 'VERSION HANDLING: a robot-domain-rules/2 approval (requestDigest binding, no spec, no nonce, no expiry) is refused with a message naming the migration (re-issue under robot-domain-rules-approval/3); it is never reinterpreted.', v2Approval, false);
   await vec('approvals-verify-wrong-spec-refused', 'An approval declaring another spec string is refused.', { ...highApproval, spec: 'robot-domain-rules-approval/4' }, false);
 
-  const dec = (id: string, description: string, approvedBy: unknown, want: Want, r: DomainRequest = request) =>
-    add(f, { id, principle: [2, 6], description, base: 'signed', request: { ...r, facts: { ...r.facts, ...(approvedBy === undefined ? {} : { approvedBy }) } }, want });
-  const verified = (a: SignedApproval) => ({ ...a, verified: true });
+  /** Decided through `evaluate` alone (pure: it can verify nothing) or, with `via: 'trusted'`, through `verifyAndEvaluate` (the trusted layer verifies signatures first). */
+  const dec = (id: string, description: string, approvedBy: unknown, want: Want, r: DomainRequest = request, via: 'pure' | 'trusted' = 'pure') =>
+    add(f, { id, principle: [2, 6], description, base: 'signed', request: { ...r, facts: { ...r.facts, ...(approvedBy === undefined ? {} : { approvedBy }) } }, want, ...(via === 'trusted' ? { verified: true } : {}) });
+  const trusted = (id: string, description: string, approvedBy: unknown, want: Want, r: DomainRequest = request) => dec(id, description, approvedBy, want, r, 'trusted');
   const ASK = { status: 'PAUSE' as const, reasons: ['ask_high@high'], asks: ['ask_high@high'] };
   dec('approvals-pause-asks-with-binding', 'With trusted keys declared, an approval wait returns an approval request naming the rule, the rulebook fingerprint, the participant, the action and the area to sign for.', undefined, ASK);
-  dec('approvals-verified-clears', 'A verified signed approval bound to this rule, rulebook, participant, action and area, valid at now and not yet used, clears the wait; the decision reports the instance used so the caller can record it.', verified(highApproval), { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'], used: ['ask_high:n-1'] });
-  dec('approvals-unverified-does-not-clear', 'The same signed approval without `verified: true` (the caller never verified it) does not clear the wait.', highApproval, ASK);
+  trusted('approvals-verified-clears', 'Through the trusted layer (verifyAndEvaluate), a signed approval that verifies against a trusted key and is bound to this rule, rulebook, participant, action and area, valid at now and not yet used, clears the wait; the decision reports the instance used so the caller can record it.', highApproval, { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'], used: ['ask_high:n-1'] });
+  dec('approvals-evaluate-alone-never-clears', 'Through the pure evaluator alone, the SAME valid signed approval does not clear the wait: evaluate verifies nothing and nothing in a request can claim to have been verified; the reason says to use verifyAndEvaluate (or pass the object verifyApproval returned).', highApproval, ASK);
+  dec('approvals-unverified-does-not-clear', 'A signed approval the caller never verified does not clear the wait (as before).', highApproval, ASK);
+  dec('approvals-unsigned-verified-flag-clears-nothing', 'THE 0.5.2 BYPASS, CLOSED: an object with the right bound fields, `verified: true` and NO signature cleared the wait through both entry points in 0.5.2. The flag is request data and is ignored: PAUSE.', { spec: APPROVAL_SPEC_STRING, ...bind, id: 'mallory', authority: 'high', keyId: 'test-high', verified: true }, ASK);
+  trusted('approvals-unsigned-verified-flag-clears-nothing-via-trusted-layer', 'The same unsigned object through verifyAndEvaluate: there is no signature to verify, the flag is ignored, PAUSE.', { spec: APPROVAL_SPEC_STRING, ...bind, id: 'mallory', authority: 'high', keyId: 'test-high', verified: true }, ASK);
+  trusted('approvals-bogus-signature-does-not-clear', 'A bogus signature (64 bytes of hex that verify under no key), with `verified: true` set in the data, through verifyAndEvaluate: PAUSE.', { ...highApproval, signature: 'ab'.repeat(64), verified: true }, ASK);
+  trusted('approvals-forged-with-flag-does-not-clear', 'Signed by a key the rulebook does not trust and marked verified in the data, through verifyAndEvaluate: PAUSE.', { ...forged, verified: true }, ASK);
   dec('approvals-plain-does-not-clear-when-keys-declared', 'With trusted keys declared, a plain { id, authority } approval no longer clears anything.', { id: 'ann', authority: 'high' }, ASK);
-  dec('approvals-other-area-does-not-clear', 'SCOPE: a verified approval for another area does not clear this one.', verified(otherArea), ASK);
-  dec('approvals-other-action-does-not-clear', 'SCOPE: a verified approval for another action does not clear this one.', verified(otherAction), ASK);
-  dec('approvals-other-participant-does-not-clear', 'SCOPE: a verified approval for another participant does not clear this one.', verified(otherParticipant), ASK);
-  dec('approvals-other-rule-does-not-clear', 'An approval names the rule it clears: one for crowd_wait does not clear ask_high.', verified(otherRule), ASK);
-  dec('approvals-other-rulebook-does-not-clear', 'RULEBOOK: a verified approval given under another rulebook (fingerprint differs) does not clear the wait.', verified(otherRulebook), ASK);
-  dec('approvals-expired-is-refused', 'EXPIRY: an approval whose expiresAt is at or before now does not clear the wait.', verified(expired), ASK);
-  dec('approvals-not-yet-valid-is-refused', 'An approval whose issuedAt is after now does not clear the wait.', verified(notYet), ASK);
-  dec('approvals-replayed-is-refused', 'REPLAY: the same approval instance, after the caller recorded its nonce as consumed, does not clear the wait a second time.', verified(highApproval), ASK, { ...request, consumedApprovals: ['n-1'] });
-  dec('approvals-now-missing-is-required-facts', 'A signed approval cannot be judged without now: BLOCK required_facts (the engine has no clock; the caller supplies now).', verified(highApproval), { status: 'BLOCK', reasons: ['required_facts@builtin'] }, req('go', 'yard'));
-  dec('approvals-verified-but-insufficient', 'A verified approval still has to hold what the rule names: a lead\'s approval does not clear a wait by "high".', verified({ ...await signApproval({ id: 'lee', roleId: 'lead', ...bind, nonce: 'n-10' }, { keyId: 'test-lead', privateKey: SEED_LEAD }) }), ASK);
-  dec('approvals-verified-role-clears', 'A verified approval by role tag clears a wait that names that tag.', verified(leadApproval), { status: 'ALLOW', reasons: ['role_permits_action', 'ask_lead'], used: ['ask_lead:n-2'] }, { ...req('look', 'floor'), now: NOW });
+  trusted('approvals-other-area-does-not-clear', 'SCOPE: a verified approval for another area does not clear this one.', otherArea, ASK);
+  trusted('approvals-other-action-does-not-clear', 'SCOPE: a verified approval for another action does not clear this one.', otherAction, ASK);
+  trusted('approvals-other-participant-does-not-clear', 'SCOPE: a verified approval for another participant does not clear this one.', otherParticipant, ASK);
+  trusted('approvals-other-rule-does-not-clear', 'An approval names the rule it clears: one for crowd_wait does not clear ask_high.', otherRule, ASK);
+  trusted('approvals-other-rulebook-does-not-clear', 'RULEBOOK: a verified approval given under another rulebook (fingerprint differs) does not clear the wait.', otherRulebook, ASK);
+  trusted('approvals-expired-is-refused', 'EXPIRY: an approval whose expiresAt is at or before now does not clear the wait.', expired, ASK);
+  trusted('approvals-not-yet-valid-is-refused', 'An approval whose issuedAt is after now does not clear the wait.', notYet, ASK);
+  trusted('approvals-replayed-is-refused', 'REPLAY: the same approval instance, after the caller recorded its nonce as consumed, does not clear the wait a second time.', highApproval, ASK, { ...request, consumedApprovals: ['n-1'] });
+  trusted('approvals-now-missing-is-required-facts', 'A signed approval cannot be judged without now: BLOCK required_facts (the engine has no clock; the caller supplies now).', highApproval, { status: 'BLOCK', reasons: ['required_facts@builtin'] }, req('go', 'yard'));
+  trusted('approvals-verified-but-insufficient', 'A verified approval still has to hold what the rule names: a lead\'s approval does not clear a wait by "high".', await signApproval({ id: 'lee', roleId: 'lead', ...bind, nonce: 'n-10' }, { keyId: 'test-lead', privateKey: SEED_LEAD }), ASK);
+  trusted('approvals-verified-role-clears', 'A verified approval by role tag clears a wait that names that tag.', leadApproval, { status: 'ALLOW', reasons: ['role_permits_action', 'ask_lead'], used: ['ask_lead:n-2'] }, { ...req('look', 'floor'), now: NOW });
   dec('approvals-v2-approval-does-not-clear', 'VERSION HANDLING: a /2 approval passed to the evaluator (even marked verified) does not clear the wait; the reason names the migration.', { ...v2Approval, verified: true }, ASK);
+  // Sub-millisecond timestamps are truncated to the millisecond (SPEC.md § 1): a port with finer ticks must truncate the same way.
+  trusted('approvals-sub-millisecond-now-is-truncated-valid', 'TIMESTAMPS: now = 09:29:59.9999Z is truncated to 09:29:59.999Z, before the 09:30:00Z expiry: still valid.', highApproval, { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'], used: ['ask_high:n-1'] }, { ...request, now: '2026-10-12T09:29:59.9999Z' });
+  trusted('approvals-sub-millisecond-now-is-truncated-expired', 'TIMESTAMPS: now = 09:30:00.0004Z is truncated to 09:30:00.000Z, which is not before the expiry: expired.', highApproval, ASK, { ...request, now: '2026-10-12T09:30:00.0004Z' });
+  // Several approvals in one request: each clears at most one wait.
+  const twice = await signApproval({ id: 'ann', authority: 'high', ...bind, ruleId: 'ask_twice', nonce: 'n-11' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  trusted('approvals-two-waits-need-two-approvals', 'Two approval waits on one request (ask_high and ask_twice, when mode is b): one approval clears one of them and the decision still asks for the other.', highApproval, { status: 'PAUSE', reasons: ['ask_twice@high'], asks: ['ask_twice@high'] }, { ...request, facts: { ...request.facts, mode: 'b' } });
+  trusted('approvals-list-each-clears-one-wait', 'approvedBy may be a list: each approval is spent on at most one wait, so two signed approvals, one per rule, clear both; both instances are reported.', [highApproval, twice], { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high', 'ask_twice'], used: ['ask_high:n-1', 'ask_twice:n-11'] }, { ...request, facts: { ...request.facts, mode: 'b' } });
+  trusted('approvals-list-one-approval-cannot-clear-two-waits', 'The same approval listed twice is one instance: it clears one wait, and the other still asks.', [highApproval, highApproval], { status: 'PAUSE', reasons: ['ask_twice@high'], asks: ['ask_twice@high'] }, { ...request, facts: { ...request.facts, mode: 'b' } });
   // Authorisation is separate from the operational facts: an approval clears its wait and nothing else.
-  dec('approvals-facts-changed-condition-wait-still-holds', 'FACTS CHANGE AFTER APPROVAL: the same valid approval, but now three people are in the yard: the approval clears ask_high and the condition wait crowd_wait still holds. PAUSE on the facts current now, with no new approval request.', verified(highApproval), { status: 'PAUSE', reasons: ['crowd_wait@high'] }, { ...request, facts: { ...request.facts, people: 3 } });
-  dec('approvals-current-never-rule-still-blocks', 'CURRENT BLOCK: with the alarm on, the never rule blocks whatever approval is presented; the approval is not even weighed.', verified(highApproval), { status: 'BLOCK', reasons: ['alarm_stop@high'] }, { ...request, facts: { ...request.facts, alarm: true } });
-  dec('approvals-current-deny-still-blocks', 'CURRENT BLOCK: at night the deny rule matches; the valid approval clears ask_high, but the strictest answer is the current BLOCK.', verified(highApproval), { status: 'BLOCK', reasons: ['no_yard_at_night@high'] }, { ...request, facts: { ...request.facts, time: '23:00' } });
+  trusted('approvals-facts-changed-condition-wait-still-holds', 'FACTS CHANGE AFTER APPROVAL: the same valid approval, but now three people are in the yard: the approval clears ask_high and the condition wait crowd_wait still holds. PAUSE on the facts current now, with no new approval request.', highApproval, { status: 'PAUSE', reasons: ['crowd_wait@high'] }, { ...request, facts: { ...request.facts, people: 3 } });
+  trusted('approvals-current-never-rule-still-blocks', 'CURRENT BLOCK: with the alarm on, the never rule blocks whatever approval is presented; the approval is not even weighed.', highApproval, { status: 'BLOCK', reasons: ['alarm_stop@high'] }, { ...request, facts: { ...request.facts, alarm: true } });
+  trusted('approvals-current-deny-still-blocks', 'CURRENT BLOCK: at night the deny rule matches; the valid approval clears ask_high, but the strictest answer is the current BLOCK.', highApproval, { status: 'BLOCK', reasons: ['no_yard_at_night@high'] }, { ...request, facts: { ...request.facts, time: '23:00' } });
+  // A plan spends approvals step by step.
+  add(f, { id: 'approvals-plan-consumes-step-by-step', principle: [6, 3], description: 'ONE APPROVAL, ONE STEP: a single-use approval in the plan\'s initial facts clears the first step\'s wait; the nonce is consumed for every later step, so steps two and three pause (0.5.2 allowed all three on one nonce). approvalsUsed is reported at plan level.',
+    base: 'signed', verified: true, plan: { participant: { id: 'b-1', kind: 'robot', roleId: 'bot' }, initialFacts: { people: 0, time: '10:00', day: 'mon', approvedBy: highApproval }, now: NOW, steps: [{ action: 'go', area: 'yard' }, { action: 'go' }, { action: 'go' }] },
+    want: { status: 'PAUSE', steps: ['ALLOW', 'PAUSE', 'PAUSE'], asks: ['ask_high@high'], used: ['ask_high:n-1'] } });
+  add(f, { id: 'approvals-plan-pure-evaluator-never-clears', principle: [6, 3], description: 'The same plan through the pure evaluatePlan: nothing is verified, so no step clears.',
+    base: 'signed', plan: { participant: { id: 'b-1', kind: 'robot', roleId: 'bot' }, initialFacts: { people: 0, time: '10:00', day: 'mon', approvedBy: highApproval }, now: NOW, steps: [{ action: 'go', area: 'yard' }, { action: 'go' }, { action: 'go' }] },
+    want: { status: 'PAUSE', steps: ['PAUSE', 'PAUSE', 'PAUSE'], asks: ['ask_high@high'] } });
   add(f, { id: 'approvals-plain-ok-without-keys', principle: [2, 6], description: 'Back-compat, development only: with no trusted keys declared, a plain { id, authority } approval clears the wait (no nonce is recorded: there is none).',
     input: unsignedInput, request: { ...request, facts: { ...request.facts, approvedBy: { id: 'ann', authority: 'high' } } }, want: { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'] } });
+  add(f, { id: 'approvals-v2-approval-refused-without-keys', principle: [2, 6], description: 'VERSION HANDLING: a /2 approval is refused by name even where no trusted keys are declared (0.5.2 took it as a plain approval and allowed).',
+    input: unsignedInput, request: { ...request, facts: { ...request.facts, approvedBy: v2Approval } }, want: ASK });
   add(f, { id: 'approvals-participant-id-required', principle: [2, 6, 4], description: 'A request that needs an approval must name the participant (an approval binds to it): an empty participant.id is BLOCK required_facts.',
     input: unsignedInput, request: { ...request, participant: { ...request.participant, id: '' } }, want: { status: 'BLOCK', reasons: ['required_facts@builtin'] } });
   add(f, { id: 'approvals-bad-trusted-key-rejected', principle: [2], description: 'A trusted key whose publicKey is not 32 bytes of hex makes the rulebook invalid.',
@@ -880,12 +940,12 @@ async function approvals() {
 
   const sig = await signRulebook(rb, { keyId: 'test-site', privateKey: SEED_SITE });
   if (!(await verifyRulebookSignature(rb, sig, pubSite))) fail('approvals-rulebook-signature', 'does not verify');
-  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-ok', principle: [5], description: 'A rulebook signature (Ed25519 over the canonical JSON of the whole rulebook, fingerprint and findings included) verifies with the pinned public key.', rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: true } } });
+  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-ok', principle: [5], description: 'A rulebook signature (Ed25519 over the canonical JSON of the whole rulebook, fingerprint and findings included) verifies with the pinned public key.', client: true, rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: true } } });
   const tampered = JSON.parse(JSON.stringify(rb)) as Rulebook;
   (tampered as { otherwise: string }).otherwise = 'wait-for-approval';
   if (await verifyRulebookSignature(tampered, sig, pubSite)) fail('approvals-rulebook-signature-tampered', 'verified a tampered rulebook');
-  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-tampered', principle: [5], description: 'A rulebook changed after signing (here `otherwise`) fails the signature, whatever its fingerprint says.', rulebook: tampered, signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: false } } });
-  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-wrong-key', principle: [5], description: 'The right rulebook and signature under the wrong public key fail.', rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubStranger, expect: { rulebookSignature: { ok: false } } });
+  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-tampered', principle: [5], description: 'A rulebook changed after signing (here `otherwise`) fails the signature, whatever its fingerprint says.', client: true, rulebook: tampered, signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: false } } });
+  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-wrong-key', principle: [5], description: 'The right rulebook and signature under the wrong public key fail.', client: true, rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubStranger, expect: { rulebookSignature: { ok: false } } });
   count += 3;
 }
 
@@ -899,14 +959,47 @@ function versions() {
   const v2 = { ...body, format: 'neuroverse-domain-rules/2', fingerprint: '5f8c2e1a9b3d4c70' };
   const problems = validateRulebook(v2);
   if (!problems.length || !/robot-domain-rules\/2/.test(problems[0]) || !/recompile/i.test(problems[0])) fail('versions-v2-rulebook-refused', `expected a versioned refusal naming the migration, got ${JSON.stringify(problems)}`);
-  (files[f] ??= []).push({ id: 'versions-v2-rulebook-refused', principle: [4, 5], description: 'VERSION HANDLING: a rulebook declaring format neuroverse-domain-rules/2 (spec /2, FNV-1a fingerprint) is refused by validation with a message that names its version and the migration (recompile under /3); its contents are never reinterpreted under /3 rules.', rulebook: v2, expect: { error: true, note: problems[0] } });
+  (files[f] ??= []).push({ id: 'versions-v2-rulebook-refused', principle: [4, 5], description: 'VERSION HANDLING: a rulebook declaring format neuroverse-domain-rules/2 (spec /2, FNV-1a fingerprint) is refused by validation with a message that names its version and the migration (recompile under /3); its contents are never reinterpreted under /3 rules.', client: true, rulebook: v2, expect: { error: true, note: problems[0] } });
   const v1 = { ...body, format: 'neuroverse-domain-rules/1', fingerprint: '5f8c2e1a9b3d4c70' };
-  (files[f] ??= []).push({ id: 'versions-v1-rulebook-refused', principle: [4, 5], description: 'The same for a /1 rulebook.', rulebook: v1, expect: { error: true, note: validateRulebook(v1)[0] } });
+  (files[f] ??= []).push({ id: 'versions-v1-rulebook-refused', principle: [4, 5], description: 'The same for a /1 rulebook.', client: true, rulebook: v1, expect: { error: true, note: validateRulebook(v1)[0] } });
   const unknown = { ...body, format: 'neuroverse-domain-rules/9' };
-  (files[f] ??= []).push({ id: 'versions-unknown-format-refused', principle: [4], description: 'An unknown format string is refused.', rulebook: unknown, expect: { error: true, note: validateRulebook(unknown)[0] } });
+  (files[f] ??= []).push({ id: 'versions-unknown-format-refused', principle: [4], description: 'An unknown format string is refused.', client: true, rulebook: unknown, expect: { error: true, note: validateRulebook(unknown)[0] } });
   const fnvOnV3 = { ...body, fingerprint: '5f8c2e1a9b3d4c70' };
-  (files[f] ??= []).push({ id: 'versions-v2-fingerprint-on-v3-rulebook-refused', principle: [5], description: 'A /3 rulebook carrying a 16-hex (/2-shaped) fingerprint fails validation: the fingerprint does not match its contents.', rulebook: fnvOnV3, expect: { error: true, note: validateRulebook(fnvOnV3)[0] } });
+  (files[f] ??= []).push({ id: 'versions-v2-fingerprint-on-v3-rulebook-refused', principle: [5], description: 'A /3 rulebook carrying a 16-hex (/2-shaped) fingerprint fails validation: the fingerprint does not match its contents.', client: true, rulebook: fnvOnV3, expect: { error: true, note: validateRulebook(fnvOnV3)[0] } });
   count += 4;
+  // The evaluator refuses too: "refused by name" is true at every door, not only at validation (0.5.2 decided a /2 rulebook as ALLOW).
+  add(f, { id: 'versions-v2-rulebook-refused-by-evaluator', principle: [4, 5], description: 'EVERY DOOR: evaluate on a /2 rulebook is BLOCK rulebook_version with validation\'s exact message and the claimed fingerprint, never a decision on its contents (0.5.2 returned ALLOW with the /2 fingerprint).',
+    rulebook: v2, request: req('go', 'floor'), want: { status: 'BLOCK', reasons: ['rulebook_version@builtin'] } });
+  add(f, { id: 'versions-v2-rulebook-refused-by-verify-and-evaluate', principle: [4, 5], description: 'The same through verifyAndEvaluate.',
+    rulebook: v2, verified: true, request: req('go', 'floor'), want: { status: 'BLOCK', reasons: ['rulebook_version@builtin'] } });
+  add(f, { id: 'versions-unknown-format-refused-by-evaluator', principle: [4], description: 'An unknown format is refused by the evaluator the same way.',
+    rulebook: unknown, request: req('go', 'floor'), want: { status: 'BLOCK', reasons: ['rulebook_version@builtin'] } });
+  add(f, { id: 'versions-v2-rulebook-refused-by-plan', principle: [4, 5], description: 'evaluatePlan on a /2 rulebook: BLOCK rulebook_version from the plan, no steps evaluated.',
+    rulebook: v2, plan: { participant: as('robot', 'bot'), initialFacts: { people: 0, time: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'floor' }] }, want: { status: 'BLOCK', firstViolation: 'rulebook_version@builtin#0:plan' } });
+}
+
+// ─── Integrity: what is derived is re-derived at validation ──────────────────
+
+function integrity() {
+  const f = 'integrity.json';
+  const office = bases.shared.areas.find(a => a.id === 'office')!;
+  add(f, { id: 'integrity-stripped-area-rule-rejected', principle: [8, 4], description: 'An area\'s allowRoles compile to the never rule area_role_limits:<area>. A rulebook from which that rule was removed — fingerprint recomputed so it still matches — is invalid: validation re-derives the rule from the area and finds it missing (0.5.2 validated it clean and ALLOWed a robot into the office).',
+    base: 'shared', tamper: rb => { rb.rules = rb.rules.filter(r => r.id !== `area_role_limits:${office.id}`); }, want: { error: true } });
+  add(f, { id: 'integrity-altered-area-rule-rejected', principle: [8, 4], description: 'The same rule narrowed to one role: the re-derived rule differs, so the rulebook is invalid.',
+    base: 'shared', tamper: rb => { rb.rules.find(r => r.id === `area_role_limits:${office.id}`)!.who = ['bot']; }, want: { error: true } });
+  add(f, { id: 'integrity-impostor-area-rule-rejected', principle: [8, 4], description: 'A rule claiming to be an area\'s role limit (the reserved id prefix) that no area declares is invalid.',
+    base: 'shared', tamper: rb => { rb.rules.push({ ...rb.rules.find(r => r.id === `area_role_limits:${office.id}`)!, id: 'area_role_limits:nowhere' }); }, want: { error: true } });
+  add(f, { id: 'integrity-emptied-findings-rejected', principle: [7], description: '"Findings MUST NOT be hidden" is checked: the grocery rulebook with its findings emptied (the fingerprint does not cover them, so it still matches) is invalid — validation re-runs the conflict check and compares.',
+    base: 'grocery', tamper: rb => { rb.findings = []; }, want: { error: true } });
+  add(f, { id: 'integrity-downgraded-finding-rejected', principle: [7], description: 'A finding whose severity was changed (a conflict made info) is invalid: kind, severity, rule IDs and certainty must agree with the check; only the message is free.',
+    base: 'grocery', tamper: rb => { rb.findings = rb.findings.map(x => (x.kind === 'authority-override' ? { ...x, severity: 'info' as const } : x)); }, want: { error: true } });
+  add(f, { id: 'integrity-invalid-witness-rejected', principle: [7], description: 'A finding whose witness no longer matches both of its rules is invalid.',
+    base: 'grocery', tamper: rb => { const x = rb.findings.find(y => y.witness)!; x.witness = { ...x.witness!, areaId: 'nowhere' }; }, want: { error: true } });
+  const reworded = JSON.parse(JSON.stringify(bases.grocery)) as Rulebook;
+  reworded.findings = reworded.findings.map(x => ({ ...x, message: 'a port may word this finding differently' }));
+  if (validateRulebook(reworded).length) fail('integrity-reworded-findings-ok', `reworded findings should validate: ${validateRulebook(reworded).join('; ')}`);
+  add(f, { id: 'integrity-reworded-findings-still-decides', principle: [7, 5], description: 'Reworded finding messages are fine: the message is free text. The rulebook validates and decides as before.',
+    rulebook: reworded as unknown as Record<string, unknown>, request: grocery.day[0][1], want: { status: evaluateDomainAction(bases.grocery, grocery.day[0][1]).status, reasons: evaluateDomainAction(bases.grocery, grocery.day[0][1]).reasons.map(r => `${r.ruleId}@${r.setBy}`), limits: evaluateDomainAction(bases.grocery, grocery.day[0][1]).limits } });
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -927,6 +1020,8 @@ async function main() {
   fingerprintCases();
   await approvals();
   versions();
+  integrity();
+  await Promise.all(pending);
 
   for (const [file, cases] of Object.entries(files)) writeFileSync(join(OUT, file), JSON.stringify(cases, null, 2) + '\n');
   console.log(`wrote ${count} cases in ${Object.keys(files).length} files`);

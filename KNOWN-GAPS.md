@@ -6,22 +6,35 @@ What this layer does not do yet, or does not do at all, said plainly. Each item 
 
 A request names one `areaId`. If your spatial system reports that a participant is inside several volumes at once (a nested "cold aisle" inside "aisle 5"), the rulebook has no notion of containment and will not combine them for you.
 
-**Interim rule:** evaluate once per area the participant is in and take the strictest decision. Statuses order `ALLOW < LIMIT < PAUSE < BLOCK`; limits combine by the minimum per name.
+**Interim rule:** evaluate once per area the participant is in and combine: the status is the strictest (`ALLOW < LIMIT < PAUSE < BLOCK`); every area's limits apply (the minimum per name, kept even when another area pauses — a PAUSE does not lift a ceiling); every area's approval requests are collected, so the planner can gather them all; every area's `approvalsUsed` is recorded; every trace is kept.
 
 ```ts
-import { evaluateDomainAction, type DomainDecision } from '@neuroverseos/robot-domain-rules';
+import { evaluateDomainAction, SEVERITY, type ApprovalRequest, type DomainDecision, type DomainRequest, type Rulebook } from '@neuroverseos/robot-domain-rules';
 
-const ORDER = { ALLOW: 0, LIMIT: 1, PAUSE: 2, BLOCK: 3 } as const;
-function strictestAcrossAreas(rulebook, base, areaIds: string[]): DomainDecision {
-  const decisions = areaIds.map(areaId => evaluateDomainAction(rulebook, { ...base, areaId }));
-  const strictest = decisions.reduce((a, b) => (ORDER[b.status] > ORDER[a.status] ? b : a));
+/** One decision over several areas: strictest status, min of every limit, every approval request, every trace. */
+function acrossAreas(rulebook: Rulebook, base: Omit<DomainRequest, 'areaId'>, areaIds: string[]): DomainDecision & { perArea: Record<string, DomainDecision> } {
+  const perArea = Object.fromEntries(areaIds.map(areaId => [areaId, evaluateDomainAction(rulebook, { ...base, areaId })]));
+  const decisions = Object.values(perArea);
+  const status = decisions.reduce((s, d) => (SEVERITY[d.status] > SEVERITY[s] ? d.status : s), 'ALLOW' as DomainDecision['status']);
   const limits: Record<string, number> = {};
   for (const d of decisions) for (const [k, v] of Object.entries(d.limits ?? {})) limits[k] = k in limits ? Math.min(limits[k], v) : v;
-  return Object.keys(limits).length && (strictest.status === 'ALLOW' || strictest.status === 'LIMIT') ? { ...strictest, limits } : strictest;
+  const approvalRequests: ApprovalRequest[] = decisions.flatMap(d => d.approvalRequests ?? []);
+  const approvalsUsed = decisions.flatMap(d => d.approvalsUsed ?? []);
+  return {
+    status,
+    reasons: decisions.flatMap(d => d.reasons.filter(r => r.status === status)),
+    ...(Object.keys(limits).length && (status === 'ALLOW' || status === 'LIMIT') ? { limits } : {}),
+    ...(status === 'PAUSE' && approvalRequests.length ? { approvalRequests } : {}),
+    ...((status === 'ALLOW' || status === 'LIMIT') && approvalsUsed.length ? { approvalsUsed } : {}),
+    ...(status === 'BLOCK' ? { then: decisions.find(d => d.then)?.then } : {}),
+    trace: decisions.flatMap(d => d.trace),
+    fingerprint: rulebook.fingerprint,
+    perArea,
+  };
 }
 ```
 
-The trace of the returned decision is the strictest area's only; keep all of them if you audit. A first-class answer (area containment in the rulebook, one decision over a set of areas) is a spec change and not scheduled.
+A limit is reported only when the combined status is ALLOW or LIMIT, as for one decision; when the status is PAUSE the limits are still in `perArea` for the controller to honour once the wait clears. A first-class answer (area containment in the rulebook, one decision over a set of areas) is a spec change and not scheduled.
 
 ## Fact provenance and freshness
 
@@ -33,7 +46,11 @@ Two robots asking at the same moment each get a decision on the facts each reque
 
 ## Authority is not yet bound to domain ownership or identity
 
-`setBy` and `trustedKeys` are declared in the rulebook, and the rulebook is validated by a fingerprint and optionally a pinned signing key. Nothing ties an authority to an owner of the spatial domain, to a login, or to an organisation's identity provider; nothing lets a higher authority grant a one-off exception to a lower rule except by writing a rule. Those are deployment and product questions this layer leaves open.
+`setBy` and `trustedKeys` are declared in the rulebook, and the rulebook is validated by a fingerprint and optionally a pinned signing key. Nothing ties an authority to an owner of the spatial domain, to a login, or to an organisation's identity provider. Without `trustedKeys`, an approval's authority is whatever the request says it is. Those are deployment and product questions this layer leaves open.
+
+## No exceptions: a higher authority cannot loosen a lower rule either
+
+Strictest-wins is absolute. A higher authority writing an `allow` does not lift a lower authority's `deny` — the deny still matches and still wins (and the check reports the pair as `tightening`). The only ways to make a one-off exception are to change the rule (narrow its scope, add a condition on a fact the harness reports) or to design the rule as a `wait` for approval by that authority. A rule-level exception mechanism (an override with its own authority and audit trail) is a spec change and not scheduled.
 
 ## Rulebook pinning and revocation per domain
 
@@ -51,6 +68,14 @@ An approval is single-use only if the caller keeps the `consumedApprovals` set i
 
 A rule with `history` conditions is reported as `possible` against anything it overlaps on facts, with no witness. Exact analysis of history windows would need a model of the caller's history; not scheduled.
 
-## The plain-text drafter is a convenience
+## The plain-text drafter is a convenience, not an editor
 
-It handles the simple forms and refuses to guess beyond them (counts versus speeds, verbs it does not model). A real editor should use the model path (`buildRuleDraftPrompt` + `parseRuleDraft`), where the model proposes structured JSON and the validator refuses what the site did not declare.
+It handles the simple forms and refuses to guess beyond them: counts are not speeds and bind entering only; an exception word (unless, except, but), a comparison it cannot turn into a limit, a condition it cannot read, or a "no ..." whose verb is not a declared action produces no draft at all rather than a rule on everything. A draft it is confident in is `confidentDraft`; that is the drafter's confidence in its own reading, not a safety claim — a person reads every draft before it goes in, and the switchboard asks them to say so. A real editor should use the model path (`buildRuleDraftPrompt` + `parseRuleDraft`), where the model proposes structured JSON and the validator refuses what the site did not declare, with the same human read before confirming.
+
+## The semantic-volumes adapter reads the Home collection only
+
+`examples/harness/volumes-to-areas.ts` reads the `{ schema, frame, items: [{ id, title, description, semantic_type, center, size, yaw }] }` collection the domain harness stores, in every UUID form the Rust `uuid` crate parses. The SDK/mobile variant (`name`, `position`, `dimensions`) is not read; its exact shape was not available to copy from, and the adapter will not guess at it.
+
+## Validation re-derives what it can; a signature protects the rest
+
+`validateRulebook` recomputes the area role-limit never rules and the findings and refuses a rulebook where either was removed or altered, whatever its fingerprint says. It cannot recompute the rules themselves: a rule changed by hand with the fingerprint recomputed validates. Only a rulebook signature verified against a key pinned outside the rulebook catches that (BOUNDARY.md).

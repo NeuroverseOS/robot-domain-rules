@@ -39,7 +39,7 @@ import type { AreaDef } from '../../src/index';
 export const SEMANTIC_VOLUMES_SCHEMA = 'spatial-harness.semantic-volumes/v1';
 
 export interface SemanticVolume {
-  /** A UUID, unique within the collection. */
+  /** A UUID, unique within the collection (any form `uuid::Uuid::parse_str` accepts: hyphenated, simple, braced, urn:uuid:). */
   id: string;
   title: string;
   description: string;
@@ -60,7 +60,14 @@ export interface SemanticVolumes {
 }
 
 const DEFAULT_SEMANTIC_TYPE = 'region';
-const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+/**
+ * Every form Rust's `uuid` crate (`Uuid::parse_str`, which the harness uses) accepts: hyphenated, simple (32 hex),
+ * braced, and `urn:uuid:`. The id is kept as written (it is the area id the spatial system reports); uniqueness is
+ * judged on the 32 hex digits, as the harness would after parsing.
+ */
+const HYPHENATED = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const UUID = new RegExp(`^(?:(${HYPHENATED})|\\{(${HYPHENATED})\\}|urn:uuid:(${HYPHENATED})|([0-9a-fA-F]{32}))$`);
+const uuidHex = (id: string): string | null => { const m = UUID.exec(id); return m ? (m[1] ?? m[2] ?? m[3] ?? m[4]).replace(/-/g, '').toLowerCase() : null; };
 const ITEM_FIELDS = new Set(['id', 'title', 'description', 'semantic_type', 'center', 'size', 'yaw']);
 const COLLECTION_FIELDS = new Set(['schema', 'frame', 'items']);
 
@@ -85,8 +92,9 @@ export function parseSemanticVolumes(value: unknown, frame: string): SemanticVol
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Each volume must be an object');
     for (const k of Object.keys(raw)) if (!ITEM_FIELDS.has(k)) throw new Error(`unknown field \`${k}\` on a volume (id, title, description, semantic_type, center, size, yaw only)`);
     const v = raw as Record<string, unknown>;
-    if (typeof v.id !== 'string' || !UUID.test(v.id) || ids.has(v.id)) throw new Error('Invalid or duplicate volume identity');
-    ids.add(v.id);
+    const hex = typeof v.id === 'string' ? uuidHex(v.id) : null;
+    if (typeof v.id !== 'string' || hex === null || ids.has(hex)) throw new Error('Invalid or duplicate volume identity');
+    ids.add(hex);
     if (typeof v.title !== 'string' || !v.title.trim() || [...v.title].length > 120 || typeof v.description !== 'string' || [...v.description].length > 10000) throw new Error('Provide a title (up to 120 characters) and a description up to 10000 characters');
     const semantic_type = v.semantic_type === undefined ? DEFAULT_SEMANTIC_TYPE : v.semantic_type;
     if (typeof semantic_type !== 'string' || !semantic_type.trim() || [...semantic_type].length > 80 || /\p{Cc}/u.test(semantic_type)) throw new Error('Invalid semantic type');

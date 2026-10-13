@@ -183,6 +183,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -404,6 +405,7 @@
         "extraneous": "ignored"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -625,6 +627,7 @@
         "extraneous": "ignored"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",

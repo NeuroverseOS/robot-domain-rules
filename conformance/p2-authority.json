@@ -168,6 +168,7 @@
       "findings": [],
       "fingerprint": "36baedbe31c579034b25f5b80018d11fe5a0299302b70cc69fb6e324d72ea6c3"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"r\": setBy names unknown authority \"king\". Known: high, low."
@@ -319,6 +320,7 @@
       "findings": [],
       "fingerprint": "2549296c50b58579b61b5245cfb5daf9384d3b70ee9a20673877f1aeb12ca104"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Declare at least one authority (highest first)."
@@ -557,7 +559,11 @@
               "time": "00:00",
               "day": "mon"
             }
-          }
+          },
+          "witnessMatches": [
+            "h_deny",
+            "l_allow"
+          ]
         }
       ]
     }
@@ -785,6 +791,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -1048,7 +1055,11 @@
               "time": "00:00",
               "day": "mon"
             }
-          }
+          },
+          "witnessMatches": [
+            "h_allow",
+            "l_deny"
+          ]
         }
       ]
     }
@@ -1276,6 +1287,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -1546,7 +1558,11 @@
               "time": "00:00",
               "day": "mon"
             }
-          }
+          },
+          "witnessMatches": [
+            "h_cap",
+            "l_cap"
+          ]
         }
       ]
     }
@@ -1781,6 +1797,7 @@
         "speedAsked": 0.8
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "LIMIT",
@@ -2039,6 +2056,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -2249,6 +2267,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -2479,6 +2498,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2703,6 +2723,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2927,6 +2948,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -3154,6 +3176,7 @@
         "approvedBy": "carl"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -3384,6 +3407,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -3720,6 +3744,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -4066,6 +4091,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -4418,6 +4444,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -4684,6 +4711,7 @@
         "speedAsked": 0.8
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "LIMIT",
@@ -4962,7 +4990,11 @@
               "time": "00:00",
               "day": "mon"
             }
-          }
+          },
+          "witnessMatches": [
+            "manager_cap",
+            "agent_cap"
+          ]
         }
       ]
     }
@@ -5205,7 +5237,11 @@
               "time": "00:00",
               "day": "mon"
             }
-          }
+          },
+          "witnessMatches": [
+            "manager_no_yard",
+            "agent_allows_yard"
+          ]
         }
       ]
     }
@@ -5438,6 +5474,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -5663,6 +5700,7 @@
         }
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -5887,6 +5925,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -6084,6 +6123,7 @@
       "findings": [],
       "fingerprint": "af168f468110014dc5a2dcf7d412a728b547a6599d11c5635eb3645d279d9132"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"ask\": wait.by \"nobody\" is not a declared authority, role, or role tag (tag:<role tag>)."

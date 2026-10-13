@@ -11,17 +11,25 @@
  * "X may Y", "slow to N m/s in Z", "wait for A approval", "wait while F",
  * "max N <participants>"). It refuses to guess: a bare number next to a
  * participant noun is a count, never a speed; a speed needs a unit or a speed
- * word; a verb it does not model makes the draft not `ready`. For a real
- * editor, use the model path (buildRuleDraftPrompt + parseRuleDraft): the
- * model proposes structured JSON and the validator refuses anything the site
- * did not declare.
+ * word; a count becomes a rule on ENTERING the area only (the robots already
+ * inside must be able to leave); an exception word ("unless", "except",
+ * "but"), a comparison it did not turn into a limit ("faster than", "more
+ * than" with nothing to count), a "while"/"until" it could not read as a
+ * condition, or a "no ..." whose verb it could not match to a declared action
+ * produces NO draft at all — never a rule that denies everything. A verb it
+ * does not model makes the draft not a `confidentDraft`. For a real editor,
+ * use the model path (buildRuleDraftPrompt + parseRuleDraft): the model
+ * proposes structured JSON and the validator refuses anything the site did
+ * not declare — and a person reads the draft, its notes and its unmatched
+ * words before confirming it.
  *
  * Both paths PROPOSE a rule. The authority that sets it (`setBy`) comes from
  * the caller — the authority the space granted the author, whether a person,
  * a system or an agent — never from the text and never from the model's
- * answer. A draft whose author holds a declared authority is `ready` and can
- * go straight into the rulebook; a draft with no `setBy` needs someone who
- * holds one to confirm it. No network calls happen here.
+ * answer. A draft whose author holds a declared authority and that the
+ * drafter is confident in (`confidentDraft`) can go into the rulebook after
+ * a person reads it; a draft with no `setBy` needs someone who holds one to
+ * confirm it. No network calls happen here.
  */
 
 import type { Condition, FactValue, Outcome, Rule, Rulebook, Selector } from './types';
@@ -38,12 +46,18 @@ export interface RuleDraft {
   unmatched: string[];
   /** What the drafter assumed or could not do, in plain words. */
   notes: string[];
-  /** True when the draft is a valid rule with a declared authority, has no verb the drafter cannot model, and confidence is at least 0.5: it can be added as it is. Otherwise read the notes. */
+  /**
+   * True when the draft is a valid rule with a declared authority, every word of the text was placed or is a stop word
+   * (nothing unmatched), no verb the drafter cannot model appears, and confidence is at least 0.6. It is the drafter's
+   * confidence in its own reading — not a statement that the rule is safe to add. Read the draft before confirming it.
+   */
+  confidentDraft: boolean;
+  /** @deprecated 0.5.2 name of `confidentDraft`; the same value. Removed in 0.6. */
   ready: boolean;
 }
 
 export interface DraftOptions {
-  /** The authority that will set the rule: the level the space granted the author. Without it the draft is not `ready`. */
+  /** The authority that will set the rule: the level the space granted the author. Without it the draft is never a `confidentDraft`. */
   setBy?: string;
   /** Rule ID. Defaults to a slug of the text. */
   id?: string;
@@ -72,15 +86,23 @@ const DAY_WORDS: Record<string, string[]> = {
 
 interface Tok { raw: string; norm: string; used: boolean }
 
-/** Verbs the drafter does not model. A rule about them needs an action the site declares (or the model path); the draft is never `ready`. */
+/** Verbs the drafter does not model. A rule about them needs an action the site declares (or the model path); the draft is never a `confidentDraft`. */
 const UNMODELLED_VERBS = new Set(['block', 'blocks', 'blocking', 'blocked', 'obstruct', 'obstructs', 'obstructing', 'loiter', 'loitering', 'linger', 'lingering', 'crowd', 'crowding', 'queue', 'queuing', 'tailgate', 'tailgating', 'follow', 'following', 'approach', 'approaching', 'idle', 'idling', 'park', 'parking', 'touch', 'touching', 'push', 'pushing', 'carry', 'carrying', 'lift', 'lifting']);
 const SPEED_WORDS = new Set(['slow', 'slower', 'speed', 'fast', 'faster', 'velocity', 'mps', 'm/s', 'km/h', 'kph', 'mph']);
+/** Words that carve an exception out of a rule. The drafter cannot express one, so it drafts nothing rather than the rule without it. */
+const EXCEPTION_WORDS = new Set(['unless', 'except', 'excepting', 'but', 'besides', 'apart', 'other']);
+/** Comparatives: a limit when a unit or a count fact makes sense of them, and otherwise a comparison the drafter does not model. */
+const COMPARATIVES = new Set(['faster', 'slower', 'quicker', 'more', 'less', 'fewer', 'higher', 'lower', 'heavier', 'lighter', 'louder', 'quieter', 'closer', 'nearer', 'further', 'farther', 'longer', 'shorter', 'bigger', 'smaller', 'larger', 'greater']);
 
 export function draftRuleFromText(text: string, rulebook: Rulebook, options: DraftOptions = {}): RuleDraft {
   const vocab = vocabularyOf(rulebook);
   const notes: string[] = [];
   const toks = tokenize(text);
   const use = (i: number, n = 1) => { for (let k = i; k < i + n; k++) toks[k].used = true; };
+  const refuse = (why: string): RuleDraft => ({ draft: null, confidence: 0, unmatched: leftovers(toks), notes: [...notes, why, 'Not drafted: the drafter refuses to guess. For anything beyond the simple forms, use buildRuleDraftPrompt with your own model and parseRuleDraft to validate its answer.'], confidentDraft: false, ready: false });
+  // An exception ("unless there is an emergency", "except staff") changes what the rule means; the drafter cannot carry it, so it drafts nothing.
+  const exception = toks.find(t => EXCEPTION_WORDS.has(t.norm));
+  if (exception) return refuse(`"${exception.raw}" carves an exception out of the rule, which the drafter cannot express; a draft without it would say more than the text does.`);
   const timeFact = rulebook.facts.find(f => f.type === 'time' && (f.required || f.default !== undefined));
   const dayFact = rulebook.facts.find(f => f.type === 'day' && (f.required || f.default !== undefined));
   const when: Condition[] = [];
@@ -127,7 +149,8 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
   };
   for (let i = 0; i < toks.length && !then && !notReady; i++) {
     const w = (k: number) => toks[i + k]?.norm;
-    const forms: Array<[number, boolean, boolean]> = [[1, w(0) === 'max' || w(0) === 'maximum', false], [2, (w(0) === 'slow' && w(1) === 'to'), true], [2, (w(0) === 'at' && w(1) === 'most') || (w(0) === 'up' && w(1) === 'to') || (w(0) === 'limited' && w(1) === 'to') || (w(0) === 'limit' && w(1) === 'to'), false], [3, (w(0) === 'no' || w(0) === 'not') && w(1) === 'faster' && w(2) === 'than', true], [3, (w(0) === 'no' || w(0) === 'not') && w(1) === 'more' && w(2) === 'than', false]];
+    const neg = (k: number) => w(k) === 'no' || w(k) === 'not' || w(k) === 'never';
+    const forms: Array<[number, boolean, boolean]> = [[1, w(0) === 'max' || w(0) === 'maximum', false], [2, (w(0) === 'slow' && w(1) === 'to'), true], [2, (w(0) === 'at' && w(1) === 'most') || (w(0) === 'up' && w(1) === 'to') || (w(0) === 'limited' && w(1) === 'to') || (w(0) === 'limit' && w(1) === 'to'), false], [3, neg(0) && w(1) === 'faster' && w(2) === 'than', true], [4, neg(0) && !!w(1) && w(2) === 'faster' && w(3) === 'than', true], [3, neg(0) && w(1) === 'more' && w(2) === 'than', false], [4, neg(0) && !!w(1) && w(2) === 'more' && w(3) === 'than', false]];
     for (const [len, ok, speedForm] of forms) {
       if (!ok || !isNumber(w(len))) continue;
       const value = Number(w(len));
@@ -141,9 +164,14 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
         const countFacts = rulebook.facts.filter(f => f.type === 'number' && (f.required || f.default !== undefined) && [f.id, ...(f.synonyms ?? [])].some(x => x.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[\s_-]+/).map(stem).includes(st)));
         const countFact = countFacts.find(f => [f.id, ...(f.synonyms ?? [])].some(x => /zone|area|aisle|room|present|near/i.test(x))) ?? countFacts[0];
         if (!countFact) { notReady = `"${phrase} ${unitTok}" is a count of ${unitTok}, not a speed or any declared limit; the rulebook declares no number fact that counts ${unitTok} (declare one, for example a required "${st}sInZone" fact that the spatial system reports, then this reads as "wait while ${st}sInZone >= ${value}").`; break; }
+        // A cap on how many may be in an area binds ENTERING it: the actions that move the participant there. Those already inside must be able to act and leave.
+        const entering = [...vocab.actions.values()].filter(a => a.effects?.some(e => e.op === 'move')).map(a => a.id);
+        const movement = entering.length ? entering : [...vocab.actions.values()].filter(a => a.tags?.includes('movement')).map(a => a.id);
+        if (!movement.length) { notReady = `"${phrase} ${unitTok}" caps how many may be in an area, which binds the action that enters it; the rulebook declares no action with a move effect (or tagged "movement"), so the drafter cannot say which action to bind without binding every action, including leaving.`; break; }
         then = { answer: 'wait', for: 'condition' };
         when.push({ fact: countFact.id, op: '>=', value });
-        notes.push(`"${phrase} ${unitTok}" was read as a count on the fact "${countFact.id}": the participant waits while ${countFact.id} >= ${value}. Check that this is the fact your spatial system reports for ${unitTok} already present.`);
+        doesFromLimit = movement;
+        notes.push(`"${phrase} ${unitTok}" was read as a count on the fact "${countFact.id}": entering (${movement.join(', ')}) waits while ${countFact.id} >= ${value}; other actions, including leaving, are not bound. Check that this is the fact your spatial system reports for ${unitTok} already present.`);
         confidence -= 0.2;
         use(i, len + 1);
         break;
@@ -164,7 +192,10 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
       break;
     }
   }
-  if (notReady) return { draft: null, confidence: 0, unmatched: leftovers(toks), notes: [...notes, notReady, 'Not drafted: the drafter refuses to guess. For anything beyond the simple forms, use buildRuleDraftPrompt with your own model and parseRuleDraft to validate its answer.'], ready: false };
+  if (notReady) return refuse(notReady);
+  // A comparison the limit phase did not turn into a limit ("faster than the staff", "more than before") is not modelled.
+  const comparative = toks.findIndex((t, i) => !t.used && COMPARATIVES.has(t.norm) && toks[i + 1]?.norm === 'than');
+  if (comparative >= 0) return refuse(`"${toks[comparative].raw} than" is a comparison the drafter did not turn into a declared limit (a limit needs a number with a unit the rulebook declares, or a count of a declared count fact); a draft without it would not say what the text says.`);
   // Approval: "wait for X approval", "with X approval", "need(s) X approval", "approved by X", "ask X first/before".
   let by: string | undefined;
   for (let i = 0; i < toks.length && !then; i++) {
@@ -218,9 +249,10 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
       if (pos >= 0) { then = { answer: 'allow' }; use(pos); }
     }
   }
-  if (!then) {
-    return { draft: null, confidence: 0, unmatched: leftovers(toks), notes: [...notes, 'Could not find what the rule decides. Say "no ...", "... may ...", "... wait for ... approval", "wait while ...", or "at most N <unit>".'], ready: false };
-  }
+  if (!then) return refuse('Could not find what the rule decides. Say "no ...", "... may ...", "... wait for ... approval", "wait while ...", or "at most N <unit>".');
+  // A "while"/"until" that was not read as a condition on a declared fact is a condition the drafter cannot express.
+  const dangling = toks.find(t => !t.used && (t.norm === 'while' || t.norm === 'until' || t.norm === 'whenever'));
+  if (dangling) return refuse(`"${dangling.raw} ..." is a condition the drafter could not read as one on a declared fact (${[...vocab.facts.values()].filter(f => f.required || f.default !== undefined).map(f => f.id).join(', ') || 'none declared'}); a draft without it would apply always.`);
 
   // Who, does, where — by the rulebook's own names and synonyms, longest phrase first across all three.
   const sel = matchSelectors(toks, vocab, use, doesFromLimit === undefined);
@@ -230,10 +262,16 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
 
   let whoSel: Selector, doesSel: Selector, whereSel: Selector;
   if (who.length) whoSel = who; else { whoSel = '*'; confidence -= 0.3; notes.push('No role, kind or tag was recognised; the draft applies to anyone.'); }
-  if (Array.isArray(does) ? does.length : does) doesSel = does; else if (then.answer === 'deny') { doesSel = '*'; notes.push('No action was recognised; "no ..." was read as: no action at all.'); } else { doesSel = '*'; confidence -= 0.3; notes.push('No action was recognised; the draft applies to every action. Name one.'); }
+  const unmatched = leftovers(toks);
+  if (Array.isArray(does) ? does.length : does) doesSel = does;
+  else if (unmatched.length) {
+    // "No scanning", "no dancing": the text names something specific that is not a declared action. A rule on every action would say far more than the text.
+    const verbs = unmatched.filter(w => UNMODELLED_VERBS.has(norm(w)));
+    const verbNote = verbs.length ? `"${verbs.join('", "')}" is a verb the drafter does not model: it knows allow, deny, limit, wait and the actions the site declares. ` : '';
+    return refuse(`${verbNote}No declared action matches "${unmatched.join(' ')}" (declared: ${[...vocab.actions.keys()].join(', ')}). A draft on every action would ${then.answer === 'deny' ? 'forbid everything' : 'bind everything'}, which is not what the text says; declare the action, or use the model path.`);
+  } else if (then.answer === 'deny') { doesSel = '*'; notes.push('No action was recognised; "no ..." was read as: no action at all.'); } else { doesSel = '*'; confidence -= 0.3; notes.push('No action was recognised; the draft applies to every action. Name one.'); }
   if (where.length) whereSel = where; else { whereSel = '*'; notes.push('No area was recognised; the draft applies everywhere.'); }
 
-  const unmatched = leftovers(toks);
   const unmodelled = unmatched.filter(w => UNMODELLED_VERBS.has(norm(w)));
   if (unmodelled.length) { notes.push(`"${unmodelled.join('", "')}" is a verb the drafter does not model: it knows allow, deny, limit, wait and the actions the site declares (${[...vocab.actions.keys()].join(', ')}). Declare an action for it, or use the model path (buildRuleDraftPrompt / parseRuleDraft).`); confidence -= 0.5; }
   confidence = Math.max(0, Math.min(1, confidence - 0.1 * unmatched.length));
@@ -248,12 +286,13 @@ export function draftRuleFromText(text: string, rulebook: Rulebook, options: Dra
   };
   if (!options.setBy) notes.push('Say who sets this rule (setBy) before confirming it: the authority the space granted the author.');
   else {
-    try { validateRule(draft, vocab); } catch (e) { return { draft: null, confidence: 0, unmatched, notes: [...notes, (e as Error).message], ready: false }; }
+    try { validateRule(draft, vocab); } catch (e) { return { draft: null, confidence: 0, unmatched, notes: [...notes, (e as Error).message], confidentDraft: false, ready: false }; }
   }
-  // Ready: a valid rule, a declared authority, no verb the drafter cannot model, and confidence of at least 0.5. Below that the draft is shown, never added as it is.
-  const ready = !!options.setBy && unmodelled.length === 0 && confidence >= 0.5;
-  if (!!options.setBy && !ready) notes.push('Not ready: read the draft and the notes above; confirm it only after fixing the text or the draft, or use the model path.');
-  return { draft, confidence, unmatched, notes, ready };
+  // A confident draft: a valid rule, a declared authority, every word placed, no verb the drafter cannot model, confidence of at least 0.6.
+  // Below that the draft is shown with its notes, never added as it is. Either way a person reads it before it goes in.
+  const confidentDraft = !!options.setBy && unmodelled.length === 0 && unmatched.length === 0 && confidence >= 0.6;
+  if (!!options.setBy && !confidentDraft) notes.push('Not a confident draft: read the draft, the notes and the unmatched words above; confirm it only after fixing the text or the draft, or use the model path.');
+  return { draft, confidence, unmatched, notes, confidentDraft, ready: confidentDraft };
 }
 
 // ─── Matching helpers ────────────────────────────────────────────────────────
@@ -453,7 +492,9 @@ export function buildRuleDraftPrompt(text: string, rulebook: Rulebook): string {
 export interface ParsedDraft {
   draft: Rule | null;
   errors: string[];
-  /** True when the draft is a valid rule with a declared authority: it can be added as it is. */
+  /** True when the model's answer is a valid rule with a declared authority. A person still reads it before it goes in. */
+  confidentDraft: boolean;
+  /** @deprecated 0.5.2 name of `confidentDraft`; the same value. Removed in 0.6. */
   ready: boolean;
 }
 
@@ -462,11 +503,11 @@ export function parseRuleDraft(json: string | object, rulebook: Rulebook, option
   let parsed: unknown;
   if (typeof json === 'string') {
     const cleaned = json.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    try { parsed = JSON.parse(cleaned); } catch { return { draft: null, errors: ['The answer is not valid JSON.'], ready: false }; }
+    try { parsed = JSON.parse(cleaned); } catch { return { draft: null, errors: ['The answer is not valid JSON.'], confidentDraft: false, ready: false }; }
   } else parsed = json;
-  if (!parsed || typeof parsed !== 'object') return { draft: null, errors: ['The answer is not a JSON object.'], ready: false };
+  if (!parsed || typeof parsed !== 'object') return { draft: null, errors: ['The answer is not a JSON object.'], confidentDraft: false, ready: false };
   const obj = parsed as { error?: unknown; rule?: unknown };
-  if (typeof obj.error === 'string') return { draft: null, errors: [`The model could not express it: ${obj.error}`], ready: false };
+  if (typeof obj.error === 'string') return { draft: null, errors: [`The model could not express it: ${obj.error}`], confidentDraft: false, ready: false };
   const raw = (obj.rule && typeof obj.rule === 'object' ? obj.rule : parsed) as Record<string, unknown>;
   const errors: string[] = [];
   if (raw.setBy !== undefined) errors.push('The model tried to set "setBy"; ignored — the caller sets the authority, from the level the space granted the author.');
@@ -480,7 +521,7 @@ export function parseRuleDraft(json: string | object, rulebook: Rulebook, option
   } as Rule;
   if (!options.setBy) errors.push('Say who sets this rule (setBy) before confirming it: the authority the space granted the author.');
   else {
-    try { validateRule(draft, vocabularyOf(rulebook)); } catch (e) { return { draft: null, errors: [...errors, e instanceof DomainRulesError ? e.message : String(e)], ready: false }; }
+    try { validateRule(draft, vocabularyOf(rulebook)); } catch (e) { return { draft: null, errors: [...errors, e instanceof DomainRulesError ? e.message : String(e)], confidentDraft: false, ready: false }; }
   }
-  return { draft, errors, ready: !!options.setBy };
+  return { draft, errors, confidentDraft: !!options.setBy, ready: !!options.setBy };
 }

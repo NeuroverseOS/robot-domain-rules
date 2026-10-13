@@ -7,6 +7,13 @@
  * They must agree on every pair — overlap or not — and every witness the
  * checker produces must satisfy both formulas.
  *
+ * Reachability is cross-checked too (0.5.3): the rulebooks have three roles
+ * with different action lists, `who` selectors, never rules (some with
+ * conditions that can never fail, which count as unconditional), and every
+ * outcome. Z3 sees the same law: a request is lawful only when its role
+ * lists its action, and no unconditional never rule other than the pair —
+ * one whose `when` Z3 itself proves valid over the domain — covers it.
+ *
  * z3-solver (WASM) is a devDependency only: it is not in the published
  * package and never in the core. Runs in `npm test`; set Z3_ROUNDS to scale.
  */
@@ -22,7 +29,9 @@ type Expr = any;
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const MODES = ['a', 'b', 'c'];
-const ACTIONS = ['go', 'look'], AREAS = ['x', 'y'];
+const ACTIONS = ['go', 'look'], AREAS = ['x', 'y'], ROLES = ['bot', 'rover', 'drone'];
+/** What each role lists: the lawful (role, action) pairs. */
+const LISTS: Record<string, string[]> = { bot: ['go', 'look'], rover: ['go'], drone: ['look'] };
 
 const site = (rules: Array<Omit<Rule, 'source' | 'setBy'>>): CompileDomainInput => ({
   site: { id: 'z', name: 'Z' },
@@ -37,9 +46,9 @@ const site = (rules: Array<Omit<Rule, 'source' | 'setBy'>>): CompileDomainInput 
     { id: 'day', type: 'day', required: true },
     { id: 'name', type: 'string', default: 'x' },
   ],
-  limits: [],
+  limits: [{ id: 'speed', unit: 'm/s' }],
   areas: [{ id: 'x', name: 'X', tags: ['near'] }, { id: 'y', name: 'Y', tags: ['far'] }],
-  roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['go', 'look'] }],
+  roles: ROLES.map(id => ({ id, name: id, kind: 'robot', actions: LISTS[id], tags: id === 'drone' ? ['air'] : ['ground'] })),
   rules: rules.map(r => ({ ...r, setBy: 'high', source: { kind: 'manual', ref: r.id } })),
 });
 
@@ -49,9 +58,8 @@ let z3: Z3Api, Z3: Ctx;
 beforeAll(async () => { z3 = await init(); Z3 = z3.Context('crosscheck'); }, 60_000);
 afterAll(() => { /* the WASM module keeps a worker alive; vitest tears the process down */ });
 
-/** Encode one rule as a Z3 formula over the shared variables. */
-function encode(rule: Rule, rb: Rulebook, v: Record<string, Expr>): Expr {
-  const parts: Expr[] = [];
+/** One rule as two Z3 formulas over the shared variables: its selectors (who, does, where) and its conditions (when). */
+function encode(rule: Rule, rb: Rulebook, v: Record<string, Expr>): { selectors: Expr; when: Expr } {
   const members = (sel: Rule['does'], ids: string[], tagOf: (id: string) => string[], variable: Expr): Expr => {
     const entries = (Array.isArray(sel) ? sel : [sel]).map(e => e.trim()).filter(Boolean);
     const expand = (e: string) => e === '*' ? ids : e.startsWith('tag:') ? ids.filter(id => tagOf(id).includes(e.slice(4))) : [e];
@@ -60,10 +68,13 @@ function encode(rule: Rule, rb: Rulebook, v: Record<string, Expr>): Expr {
     for (const neg of negatives) set = set.filter(id => !expand(neg).includes(id));
     return set.length ? Z3.Or(...set.map(id => variable.eq(ids.indexOf(id)))) : Z3.Bool.val(false);
   };
-  parts.push(members(rule.does, ACTIONS, id => rb.actions.find(a => a.id === id)?.tags ?? [], v.action));
-  parts.push(members(rule.where, AREAS, id => rb.areas.find(a => a.id === id)?.tags ?? [], v.area));
-  for (const c of rule.when ?? []) parts.push(condition(c, v));
-  return Z3.And(...parts);
+  const selectors = Z3.And(
+    members(rule.who, ROLES, id => rb.roles.find(r => r.id === id)?.tags ?? [], v.role),
+    members(rule.does, ACTIONS, id => rb.actions.find(a => a.id === id)?.tags ?? [], v.action),
+    members(rule.where, AREAS, id => rb.areas.find(a => a.id === id)?.tags ?? [], v.area),
+  );
+  const when = Z3.And(Z3.Bool.val(true), ...(rule.when ?? []).map(c => condition(c, v)));
+  return { selectors, when };
 }
 
 function condition(c: Condition, v: Record<string, Expr>): Expr {
@@ -92,7 +103,7 @@ function condition(c: Condition, v: Record<string, Expr>): Expr {
 }
 
 function witnessFormula(w: Witness, v: Record<string, Expr>): Expr {
-  const parts: Expr[] = [v.action.eq(ACTIONS.indexOf(w.action)), v.area.eq(AREAS.indexOf(w.areaId))];
+  const parts: Expr[] = [v.role.eq(ROLES.indexOf(w.participant.roleId)), v.action.eq(ACTIONS.indexOf(w.action)), v.area.eq(AREAS.indexOf(w.areaId))];
   for (const [fact, value] of Object.entries(w.facts)) {
     if (fact === 'name') continue;   // strings are not encoded (no rule here conditions on them)
     const x = v[fact];
@@ -102,14 +113,18 @@ function witnessFormula(w: Witness, v: Record<string, Expr>): Expr {
 }
 
 describe('conflict analysis cross-checked with Z3: the checker and an SMT solver agree on every pair', () => {
-  it('overlap or not, on every generated pair; and every witness satisfies both rules', async () => {
+  it('overlap or not, on every generated pair, with reachability (roles, never rules, always-true conditions) in both; and every witness satisfies both rules', async () => {
     let seed = 0x5a3c2026;
     const rnd = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
     const int = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
     const hhmm = () => `${String(int(0, 23)).padStart(2, '0')}:${String(pick([0, 15, 30, 45])).padStart(2, '0')}`;
     const cond = (): Condition => {
-      switch (int(0, 8)) {
+      switch (int(0, 11)) {
+        // Conditions that can never fail: a never rule carrying only these is unconditional for reachability.
+        case 9: return { fact: 'n', op: '>=', value: 0 };
+        case 10: return { fact: 'flag', op: 'in', values: [true, false] };
+        case 11: return { fact: 'mode', op: 'in', values: MODES };
         case 0: return { fact: 'n', op: pick(['==', '!=', '>', '>=', '<', '<='] as const), value: int(0, 9) };
         case 1: return { fact: 'n', op: 'in', values: [int(0, 9), int(0, 9), int(0, 9)] };
         case 2: return { fact: 'm', op: pick(['>', '>=', '<', '<=', '!=', '=='] as const), value: int(0, 8) / 2 };
@@ -129,54 +144,64 @@ describe('conflict analysis cross-checked with Z3: the checker and an SMT solver
       if (r < 0.85) return ['*', `!${pick(ids)}`];
       return [pick(ids), pick(ids)];
     };
-    const randomRule = (id: string): Omit<Rule, 'source' | 'setBy'> => ({
-      id, text: id, who: '*', does: selector(ACTIONS, ['movement', 'sensing']), where: selector(AREAS, ['near', 'far']),
-      when: Array.from({ length: int(0, 3) }, cond), then: { answer: 'deny' },
-    });
+    const outcome = (never: boolean): Rule['then'] => never ? { answer: 'deny' } : pick([{ answer: 'deny' }, { answer: 'allow' }, { answer: 'wait', for: 'condition' }, { answer: 'wait', for: 'approval' }, { answer: 'limit', limits: { speed: 1 } }] as Rule['then'][]);
+    const randomRule = (id: string): Omit<Rule, 'source' | 'setBy'> => {
+      const never = rnd() < 0.25;
+      return {
+        id, text: id, who: selector(ROLES, ['ground', 'air']), does: selector(ACTIONS, ['movement', 'sensing']), where: selector(AREAS, ['near', 'far']),
+        when: Array.from({ length: int(0, 3) }, cond), then: outcome(never), ...(never ? { never: true } : {}),
+      };
+    };
 
     const v: Record<string, Expr> = {
-      action: Z3.Int.const('action'), area: Z3.Int.const('area'),
+      role: Z3.Int.const('role'), action: Z3.Int.const('action'), area: Z3.Int.const('area'),
       n: Z3.Int.const('n'), m: Z3.Real.const('m'), t: Z3.Int.const('t'), mode: Z3.Int.const('mode'), flag: Z3.Bool.const('flag'), day: Z3.Int.const('day'),
     };
     const domain = Z3.And(
-      v.action.ge(0), v.action.le(ACTIONS.length - 1), v.area.ge(0), v.area.le(AREAS.length - 1),
+      v.role.ge(0), v.role.le(ROLES.length - 1), v.action.ge(0), v.action.le(ACTIONS.length - 1), v.area.ge(0), v.area.le(AREAS.length - 1),
       v.n.ge(0), v.n.le(9), v.m.ge(0), v.t.ge(0), v.t.le(1439), v.mode.ge(0), v.mode.le(MODES.length - 1), v.day.ge(0), v.day.le(6),
     );
+    // A lawful request: the role lists the action (role_permits_action refuses every other one first).
+    const lawful = Z3.Or(...ROLES.map((r, ri) => Z3.And(v.role.eq(ri), Z3.Or(...LISTS[r].map(a => v.action.eq(ACTIONS.indexOf(a)))))));
     const solver = new Z3.Solver();
     solver.add(domain);
+    const sat = async (...formulas: Expr[]) => { solver.push(); solver.add(...formulas); const r = await solver.check(); solver.pop(); return r === 'sat'; };
 
     const rounds = Number(process.env.Z3_ROUNDS ?? 400);
     const RULES = 4;
-    let rulebooks = 0, pairs = 0, overlaps = 0, witnesses = 0;
+    let rulebooks = 0, pairs = 0, overlaps = 0, witnesses = 0, blockers = 0, blockedPairs = 0;
     const started = Date.now();
     for (let round = 0; round < rounds; round++) {
       let rb: Rulebook;
       try { rb = compileDomain(site(Array.from({ length: RULES }, (_, i) => randomRule(`r${i}`)))); } catch { continue; }   // impossible conditions are refused at compile time
       rulebooks++;
       const formulas = rb.rules.map(r => encode(r, rb, v));
+      // Z3 decides, on its own, which never rules are unconditional: those whose `when` holds for every value of the domain.
+      const unconditionalNever: boolean[] = [];
+      for (let k = 0; k < rb.rules.length; k++) unconditionalNever.push(!!rb.rules[k].never && !(await sat(Z3.Not(formulas[k].when))));
+      blockers += unconditionalNever.filter(Boolean).length;
       for (let i = 0; i < rb.rules.length; i++) for (let j = i + 1; j < rb.rules.length; j++) {
         pairs++;
         const ours = rulesOverlap(rb, rb.rules[i].id, rb.rules[j].id);
-        solver.push();
-        solver.add(formulas[i], formulas[j]);
-        const z3Says = (await solver.check()) === 'sat';
-        solver.pop();
-        expect(ours !== null, `checker and Z3 disagree on ${rb.rules[i].id}+${rb.rules[j].id} (checker: ${ours ? 'overlap' : 'disjoint'}, Z3: ${z3Says ? 'sat' : 'unsat'}): ${JSON.stringify([rb.rules[i], rb.rules[j]])}`).toBe(z3Says);
+        const both = [formulas[i].selectors, formulas[i].when, formulas[j].selectors, formulas[j].when];
+        const others = rb.rules.map((_, k) => k).filter(k => k !== i && k !== j && unconditionalNever[k]).map(k => Z3.Not(formulas[k].selectors));
+        const reachable = await sat(...both, lawful, ...others);
+        if (!reachable && await sat(...both)) blockedPairs++;
+        expect(ours !== null, `checker and Z3 disagree on ${rb.rules[i].id}+${rb.rules[j].id} (checker: ${ours ? 'overlap' : 'disjoint'}, Z3: ${reachable ? 'sat' : 'unsat'}): ${JSON.stringify(rb.rules)}`).toBe(reachable);
         if (!ours) continue;
         overlaps++;
         expect(ours.certainty).toBe('certain');
-        solver.push();
-        solver.add(formulas[i], formulas[j], witnessFormula(ours.witness, v));
-        const witnessOk = (await solver.check()) === 'sat';
-        solver.pop();
-        expect(witnessOk, `witness does not satisfy both rules in Z3: ${JSON.stringify({ rules: [rb.rules[i], rb.rules[j]], witness: ours.witness })}`).toBe(true);
+        const witnessOk = await sat(...both, lawful, ...others, witnessFormula(ours.witness, v));
+        expect(witnessOk, `witness does not satisfy both rules on a lawful, unblocked request in Z3: ${JSON.stringify({ rules: rb.rules, witness: ours.witness })}`).toBe(true);
         witnesses++;
       }
     }
     const seconds = (Date.now() - started) / 1000;
-    console.log(`z3 cross-check: ${rulebooks} rulebooks, ${pairs} pairs (${overlaps} overlapping, ${pairs - overlaps} disjoint), ${witnesses} witnesses, ${seconds.toFixed(1)} s`);
+    console.log(`z3 cross-check: ${rulebooks} rulebooks, ${pairs} pairs (${overlaps} overlapping, ${pairs - overlaps} disjoint; ${blockedPairs} overlapping on facts but unreachable), ${blockers} unconditional never rules, ${witnesses} witnesses, ${seconds.toFixed(1)} s`);
     expect(rulebooks).toBeGreaterThan(rounds * 0.5);
     expect(overlaps).toBeGreaterThan(100);
     expect(pairs - overlaps).toBeGreaterThan(100);
-  }, 120_000);
+    expect(blockedPairs).toBeGreaterThan(20);
+    expect(blockers).toBeGreaterThan(50);
+  }, 180_000);
 });

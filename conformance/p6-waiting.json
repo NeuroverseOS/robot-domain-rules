@@ -245,6 +245,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -518,6 +519,7 @@
         "approvedBy": "dana"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -790,6 +792,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -1057,6 +1060,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -1340,6 +1344,7 @@
         "approvedBy": "dana"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -1618,6 +1623,7 @@
         "approvedBy": "dana"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -1895,6 +1901,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -2187,6 +2194,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",

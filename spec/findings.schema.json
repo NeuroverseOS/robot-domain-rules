@@ -10,10 +10,10 @@
       "type": "object",
       "required": ["kind", "severity", "ruleIds", "certainty", "message"],
       "properties": {
-        "kind": { "enum": ["contradiction", "authority-override", "tightening", "shadowed", "duplicate", "limit_disagreement", "never_vs_rule"] },
+        "kind": { "enum": ["contradiction", "authority-override", "tightening", "shadowed", "duplicate", "limit_disagreement", "never_vs_rule", "unmatched_selector"] },
         "severity": { "enum": ["conflict", "warning", "info"] },
-        "ruleIds": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string" }, "description": "The looser (or narrower, for duplicates) rule first." },
-        "certainty": { "enum": ["certain", "possible"], "description": "certain: decided exactly, with a witness (between rules). possible: a rule in the pair has history conditions, which are not modelled; no witness." },
+        "ruleIds": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "string" }, "description": "Two rules, the looser (or narrower, for duplicates) first; one rule for unmatched_selector." },
+        "certainty": { "enum": ["certain", "possible"], "description": "certain: decided exactly, with a witness (between two rules). possible: a rule in the pair has history conditions, which are not modelled; no witness." },
         "witness": { "$ref": "common.schema.json#/$defs/witness" },
         "message": { "type": "string" }
       },

@@ -19,6 +19,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -61,6 +62,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -103,6 +105,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -145,6 +148,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -187,6 +191,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -229,6 +234,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -271,6 +277,7 @@
         "day": "funday"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -314,6 +321,7 @@
         "mode": "z"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -357,6 +365,7 @@
         "alarm": "no"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -400,6 +409,7 @@
         "speedAsked": -1
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -443,6 +453,7 @@
         "approvedBy": true
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -480,6 +491,7 @@
       "action": "go",
       "areaId": "floor"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -522,6 +534,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -564,6 +577,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -606,6 +620,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -648,6 +663,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -835,6 +851,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -877,6 +894,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -1090,6 +1108,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -1314,6 +1333,7 @@
         "approvedBy": "dana"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -1529,6 +1549,7 @@
         "alarm": true
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -1720,6 +1741,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -1931,6 +1953,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2128,6 +2151,7 @@
       "findings": [],
       "fingerprint": "1519f7b6fc4a9119947d9a25d00ba838da6fccb21e5f7b8dc4268c86db45c3b6"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"r\": fact \"speedAsked\" is optional with no default, so a rule cannot depend on it. Make it required or give it a default."
@@ -2155,6 +2179,7 @@
         "weather": "rain"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2329,6 +2354,7 @@
       "findings": [],
       "fingerprint": "c03fddfd26cc99e7203d06a8e11fa6bfa268a1df45e8a6b2137cef2c642889d9"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "otherwise must be \"deny\" or \"wait-for-approval\", got \"allow\"."

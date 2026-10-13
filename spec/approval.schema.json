@@ -22,13 +22,13 @@
     },
     "approval": {
       "type": "object",
-      "description": "facts.approvedBy as an object. Plain { id, authority?, roleId? } is accepted only when the rulebook declares no trustedKeys; otherwise a verified signedApproval.",
+      "description": "facts.approvedBy as an object. Plain { id, authority?, roleId? } is accepted only when the rulebook declares no trustedKeys; otherwise only the object verifyApproval returned clears a wait (object identity, never a member of the data). A /2 approval (requestDigest, or a 16-hex rulebookFingerprint) is refused with or without trustedKeys.",
       "required": ["id"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "authority": { "type": "string" },
         "roleId": { "type": "string" },
-        "verified": { "type": "boolean", "description": "Set by the caller's verifyApproval only after the signature checked out." },
+        "verified": { "type": "boolean", "deprecated": true, "description": "Ignored since 0.5.3: nothing in a request can assert verification. Kept so a 0.5.2 request still validates." },
         "spec": { "type": "string" },
         "ruleId": { "type": "string" },
         "rulebookFingerprint": { "type": "string" },

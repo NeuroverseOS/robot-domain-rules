@@ -209,6 +209,7 @@
         "alarm": true
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -421,6 +422,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -657,6 +659,7 @@
         "speedAsked": 1.4
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "LIMIT",

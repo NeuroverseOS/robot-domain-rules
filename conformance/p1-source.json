@@ -166,6 +166,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -352,6 +353,7 @@
       "findings": [],
       "fingerprint": "122233b22b540fedfd6a258c97379a2168c66fd8868113782c2d4842531d47c0"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"r\": source { kind, ref } is required."
@@ -526,6 +528,7 @@
       "findings": [],
       "fingerprint": "1a13663f75eb9980b608a926f49fcd86ebe4a3887ecd64e2b13d8e076a6d393f"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"r\": setBy is required — say which authority set this rule. Known: high, low."
@@ -761,6 +764,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "LIMIT",
@@ -978,6 +982,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",

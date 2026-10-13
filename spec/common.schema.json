@@ -33,7 +33,8 @@
       "oneOf": [
         { "properties": { "answer": { "const": "allow" } }, "additionalProperties": false },
         { "properties": { "answer": { "const": "limit" }, "limits": { "type": "object", "minProperties": 1, "additionalProperties": { "type": "number", "minimum": 0 } } }, "required": ["limits"], "additionalProperties": false },
-        { "properties": { "answer": { "const": "wait" }, "for": { "enum": ["approval", "condition"] }, "by": { "type": "string", "minLength": 1 } }, "required": ["for"], "additionalProperties": false },
+        { "properties": { "answer": { "const": "wait" }, "for": { "const": "approval" }, "by": { "type": "string", "minLength": 1, "description": "An authority ID (that or higher), a role ID, or tag:<role tag>. Absent: anyone." } }, "required": ["for"], "additionalProperties": false },
+        { "properties": { "answer": { "const": "wait" }, "for": { "const": "condition" } }, "required": ["for"], "additionalProperties": false, "description": "A condition wait names no approver: only a change in the facts clears it." },
         { "properties": { "answer": { "const": "deny" }, "instead": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
       ]
     },

@@ -25,11 +25,13 @@
 
 export * from './types';
 export { compileDomain, verifyFingerprint, validateRulebook, validateRule, validatePlanRule, BUILTIN_CHECKS, declarationAuthority } from './compile';
-export { fingerprint, canonicalJson, requestDigest, sha256, sha256Utf8, fingerprintVersion } from './canonical';
+export { fingerprint, canonicalJson, sha256, sha256Utf8, fingerprintVersion } from './canonical';
+export { RULEBOOK_FORMAT, RULEBOOK_VERSION_CHECK, rulebookVersionProblem } from './version';
+export { isVerified } from './verified';
 export { generateSigningKeys, publicKeyOf, signApproval, verifyApproval, verifyAndEvaluate, verifyAndEvaluatePlan, signRulebook, verifyRulebookSignature, signedText } from './approvals';
 export type { SigningKeys, VerifyResult, RulebookSignature } from './approvals';
 export type { CompileDomainInput, CompileOptions } from './compile';
-export { evaluateDomainAction, matchingRules, missingFacts } from './evaluate';
+export { evaluateDomainAction, matchingRules, missingFacts, versionRefusal } from './evaluate';
 export { backtest, compareBacktests } from './backtest';
 export type { BacktestEvent, BacktestOutcome, BacktestOptions, BacktestCounts, BacktestRow, BacktestStall, BacktestConflict, BacktestGap, BacktestMissingFact, BacktestDifference, BacktestReport, BacktestChange, BacktestComparison } from './backtest';
 export { evaluatePlan, applyEffects, planDigestOf } from './plan';
@@ -39,7 +41,7 @@ export { glassesZoneRules, OPEN_ZONE_RULES, GLASSES_ACTION_FIELDS } from './glas
 export type { GlassesBridgeOptions } from './glasses';
 export { draftRuleFromText, buildRuleDraftPrompt, parseRuleDraft } from './draft';
 export type { RuleDraft, DraftOptions, ParsedDraft } from './draft';
-export { DomainRulesError, isValidTime, isOpen, isTimestamp, parseTimestamp, resolveSelector, describeCondition, describeHistoryCondition } from './vocabulary';
+export { DomainRulesError, SEVERITY, isValidTime, isOpen, isTimestamp, parseTimestamp, timeOfDay, resolveSelector, describeCondition, describeHistoryCondition } from './vocabulary';
 export { mergeRules } from './zone-rules';
 export type { ZoneRules, ZoneCustomRule } from './zone-rules';
 export { TEMPLATES, GROCERY_STORE, WAREHOUSE, templateById, defaultAnswers } from './templates/index';
@@ -132,7 +134,7 @@ export class DomainRulesBuilder {
 
   /**
    * Draft a rule from plain words against the current vocabulary. Returns the
-   * draft; `confirm()` adds it. With `as()` set the draft is `ready` (the
+   * draft; `confirm()` adds it. With `as()` set the draft can be a `confidentDraft` (the
    * author holds a declared authority) and `confirm` is just the add; without
    * it, someone holding an authority must confirm.
    */

@@ -1,6 +1,6 @@
 {
   "name": "@neuroverseos/robot-domain-rules",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Rules for spaces shared by people, robots and AI: a declared-authority rulebook, a deterministic may-I decision with its reasons, whole-plan checking for AI planners, exact conflict analysis with witnesses, signed expiring approvals bound to rule, participant, action and area, a backtest of a rulebook against recorded activity, and a language-neutral spec (robot-domain-rules/3) with conformance tests.",
   "license": "MIT",
   "type": "module",

@@ -274,6 +274,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -575,6 +576,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -880,6 +882,7 @@
       ],
       "now": "2026-10-13T10:05:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -1160,6 +1163,7 @@
       ],
       "now": "2026-10-13T00:03:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -1445,6 +1449,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -1725,6 +1730,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -2010,6 +2016,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2290,6 +2297,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -2575,6 +2583,7 @@
       ],
       "now": "2026-10-13T00:03:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -2865,6 +2874,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "PAUSE",
@@ -3153,6 +3163,7 @@
       },
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -3448,6 +3459,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -3727,6 +3739,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -4007,6 +4020,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -4285,6 +4299,7 @@
       ],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "BLOCK",
@@ -4557,6 +4572,7 @@
         "day": "mon"
       }
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -4831,6 +4847,7 @@
       "history": [],
       "now": "2026-10-13T10:00:00Z"
     },
+    "client": true,
     "expect": {
       "decision": {
         "status": "ALLOW",
@@ -5088,6 +5105,7 @@
       ],
       "fingerprint": "bbcf8b1e16225dc6125944d6b2bd73d9a99b430796f01c8a8804adce3e9ac679"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"five_looks_an_hour\" history: does names unknown action \"fly\". Known: go, look."
@@ -5332,6 +5350,7 @@
       ],
       "fingerprint": "1ab649bfcd61a5a7da62514064218d460bb0ee70562e3a9d3b4ddbfc02e31398"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"five_looks_an_hour\": history.clock was removed in robot-domain-rules/3; a window is measured back from request.now (a timestamp with a date). Remove clock and recompile."
@@ -5574,6 +5593,7 @@
       ],
       "fingerprint": "4f629bbfdbc2f8320d053c5817dc87c3cfb9a9dace7cffb6244668d6e50dc643"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Rule \"five_looks_an_hour\": history.withinMinutes must be between 1 and 1440."

@@ -32,6 +32,12 @@
  * does not stop projection: the result lists every approval the plan would
  * need, so they can be collected up front, and the steps after a PAUSE are
  * checked as if the wait had been cleared.
+ *
+ * Approvals are consumed step by step: a nonce a step uses is in the
+ * consumed set every later step sees, so one single-use approval clears one
+ * step's wait and no other; `approvalsUsed` at plan level is every instance
+ * the plan would spend. A rulebook of another format is refused at the door
+ * (`rulebook_version`), never reinterpreted.
  */
 
 import type {
@@ -40,24 +46,26 @@ import type {
 } from './types';
 import { evaluateDomainAction } from './evaluate';
 import { fingerprint } from './canonical';
-import { addSeconds, isTimestamp, isValidTime, minutesOf, resolveSelector, timeOfDay, vocabularyOf, type Vocabulary } from './vocabulary';
-
-const SEVERITY: Record<DomainDecisionStatus, number> = { ALLOW: 0, LIMIT: 1, PAUSE: 2, BLOCK: 3 };
+import { RULEBOOK_VERSION_CHECK, rulebookVersionProblem } from './version';
+import { SEVERITY, addSeconds, hhmm, isTimestamp, isValidTime, minutesOf, resolveSelector, timeOfDay, vocabularyOf, type Vocabulary } from './vocabulary';
 
 export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
-  const vocab = vocabularyOf(rulebook);
   const planDigest = planDigestOf(plan);
-  const bad = (reason: string): PlanEvaluation => ({
+  const bad = (reason: string, ruleId = 'required_facts'): PlanEvaluation => ({
     status: 'BLOCK',
     steps: [],
     planChecks: [],
-    firstViolation: { stepIndex: 0, ruleId: 'required_facts', reason, setBy: 'builtin', from: 'plan' },
+    firstViolation: { stepIndex: 0, ruleId, reason, setBy: 'builtin', from: 'plan' },
     approvalRequests: [],
+    approvalsUsed: [],
     finalFacts: {},
     finalArea: '',
     planDigest,
-    fingerprint: rulebook.fingerprint,
+    fingerprint: typeof (rulebook as { fingerprint?: unknown } | null)?.fingerprint === 'string' ? rulebook.fingerprint : '',
   });
+  const versionProblem = rulebookVersionProblem(rulebook);
+  if (versionProblem) return bad(`This rulebook cannot be decided with: ${versionProblem}`, RULEBOOK_VERSION_CHECK);
+  const vocab = vocabularyOf(rulebook);
 
   // The plan must have a shape we can govern. A bad plan is a BLOCK, never a throw.
   if (!plan || typeof plan !== 'object' || !plan.participant || typeof plan.participant !== 'object') return bad('The plan is incomplete: participant is missing.');
@@ -92,8 +100,13 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
   // Then every step, on projected facts, until the first BLOCK.
   const steps: PlanStepResult[] = [];
   const approvalRequests: ApprovalRequest[] = [];
+  const approvalsUsed: Array<{ ruleId: string; nonce: string }> = [];
+  // Nonces spent so far: what the caller already consumed, plus every instance an earlier step of this plan used.
+  const consumed: string[] = Array.isArray(plan.consumedApprovals) ? [...plan.consumedApprovals] : [];
+  const consumedGiven = plan.consumedApprovals !== undefined && !Array.isArray(plan.consumedApprovals);   // not a list: passed as given so the step says so
   const history: HistoryEntry[] = [...(plan.history ?? [])];
   let facts: Record<string, unknown> = { ...plan.initialFacts };
+  // The clock starts at startTime, else at the wall-clock time `now` names in its own offset (the site's local evening is its evening).
   const startTime = plan.startTime ?? (plan.now !== undefined ? timeOfDay(plan.now) : undefined);
   const start = plan.clock && startTime ? minutesOf(startTime) : null;
   const duration = plan.stepDurationSeconds ?? 0;
@@ -107,13 +120,14 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
     const now = plan.now !== undefined ? addSeconds(plan.now, i * duration) : undefined;
     const request: DomainRequest = {
       participant: { ...plan.participant }, action: step.action, areaId, facts: stepFacts, history: [...history],
-      ...(now !== undefined ? { now } : {}), ...(plan.consumedApprovals !== undefined ? { consumedApprovals: plan.consumedApprovals } : {}),
+      ...(now !== undefined ? { now } : {}), ...(consumedGiven ? { consumedApprovals: plan.consumedApprovals } : consumed.length || plan.consumedApprovals !== undefined ? { consumedApprovals: [...consumed] } : {}),
     };
     const decision: DomainDecision = discontinuous[i]
       ? continuityRefusal(rulebook, step.action, step.area!, after[i - 1] ?? areas[0], vocab)
       : evaluateDomainAction(rulebook, request);
     steps.push({ index: i, action: step.action, areaId, facts: stepFacts, decision, ...(step.note !== undefined ? { note: step.note } : {}) });
     for (const a of decision.approvalRequests ?? []) if (!approvalRequests.some(x => x.ruleId === a.ruleId && x.action === a.action && x.areaId === a.areaId)) approvalRequests.push(a);
+    for (const u of decision.approvalsUsed ?? []) { approvalsUsed.push(u); consumed.push(u.nonce); }
     if (decision.status === 'BLOCK') { facts = stepFacts; break; }
     // Project the step's effects for the next step. The planner's own step facts persist into the projection.
     facts = applyEffects(stepFacts, step.action, vocab);
@@ -131,15 +145,17 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
   if (blocked) { const r = blocked.decision.reasons[0]; consider({ stepIndex: blocked.index, ruleId: r.ruleId, reason: r.reason, setBy: r.setBy, from: 'step' }); }
   for (const c of planChecks) if (c.status === 'BLOCK') consider({ stepIndex: c.stepIndex ?? plan.steps.length - 1, ruleId: c.ruleId, reason: c.reason, setBy: c.setBy, from: 'plan' });
 
-  // Where the participant is after the last evaluated step: a refused step leaves it where that step was asked.
+  // Where the participant is after the last evaluated step: a refused step leaves it where that step was asked — unless the
+  // refusal was that it is not there (plan_area_continuity), in which case it is where the earlier steps left it.
   const last = steps[steps.length - 1];
-  const finalArea = last.decision.status === 'BLOCK' ? last.areaId : after[evaluated - 1];
+  const finalArea = last.decision.status !== 'BLOCK' ? after[evaluated - 1] : discontinuous[last.index] ? (after[last.index - 1] ?? areas[0]) : last.areaId;
   return {
     status,
     steps,
     planChecks,
     ...(firstViolation ? { firstViolation } : {}),
     approvalRequests,
+    approvalsUsed,
     finalFacts: facts,
     finalArea,
     planDigest,
@@ -157,12 +173,16 @@ function continuityRefusal(rulebook: Rulebook, action: string, area: string, her
 /**
  * The plan's identity: `fingerprint` of the plan with every `approvedBy` (in
  * `initialFacts` and each step's `facts`) and `consumedApprovals` left out,
- * so collecting approvals for it does not change it. A value that is not an
+ * so collecting approvals for it does not change it. The plan is taken as
+ * JSON first (JSON.stringify semantics: NaN and infinities become null,
+ * functions and undefined members drop), so a plan that is not JSON still
+ * has a digest and is refused, never thrown on. A value that is not an
  * object digests as `null`.
  */
 export function planDigestOf(plan: unknown): string {
-  if (!plan || typeof plan !== 'object') return fingerprint(null);
-  const p = plan as Plan;
+  const asJson = plan === undefined ? undefined : JSON.parse(JSON.stringify(plan, (_k, v) => (typeof v === 'number' && !Number.isFinite(v) ? null : v)));
+  if (!asJson || typeof asJson !== 'object') return fingerprint(null);
+  const p = asJson as Plan;
   const strip = (facts: unknown) => { if (!facts || typeof facts !== 'object') return facts; const { approvedBy: _a, ...rest } = facts as Record<string, unknown>; return rest; };
   const { consumedApprovals: _c, ...rest } = p;
   // A step's `facts` that is empty once approvals are gone is dropped, so adding an approval to a step without facts changes nothing.
@@ -232,8 +252,4 @@ function checkPlanRules(rules: PlanRule[], plan: Plan, areas: string[], after: s
     }
   }
   return out;
-}
-
-function hhmm(t: number): string {
-  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }

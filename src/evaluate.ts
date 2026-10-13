@@ -30,14 +30,18 @@
  *
  * A PAUSE for approval carries `approvalRequests`: one per rule still
  * waiting, naming the rule, the rulebook, the participant, the action and
- * the area to sign for. When the rulebook declares `trustedKeys`, only a
- * verified signed approval (`verified: true`, see approvals.ts) bound to
- * exactly those, within its validity window at `request.now`, and whose
- * nonce is not in `request.consumedApprovals`, clears the wait.
+ * the area to sign for. When the rulebook declares `trustedKeys`, only the
+ * verified approval object `verifyApproval` returned (see verified.ts —
+ * request data can never assert verification; a `verified` member is
+ * ignored) bound to exactly those, within its validity window at
+ * `request.now`, and whose nonce is not in `request.consumedApprovals`,
+ * clears the wait. `facts.approvedBy` may be one approval or a list; each
+ * approval clears at most one wait in a decision.
  *
  * Missing or invalid facts are never permission: they BLOCK with
  * `required_facts`. Never rules and every matching rule apply to every
- * action, including an approved unknown one.
+ * action, including an approved unknown one. A rulebook of another format
+ * is refused at the door: BLOCK `rulebook_version`, never a reinterpretation.
  */
 
 import type {
@@ -45,14 +49,26 @@ import type {
 } from './types';
 import { APPROVAL_SPEC } from './types';
 import { fingerprintVersion } from './canonical';
+import { isVerified } from './verified';
+import { RULEBOOK_VERSION_CHECK, rulebookVersionProblem } from './version';
 import {
-  authorityRank, conditionHolds, factProblem, historyConditionHolds, historyProblems, parseTimestamp, resolveSelector, selectorExcludesId, selectorIsOpen, show, vocabularyOf,
+  SEVERITY, authorityRank, conditionHolds, factProblem, historyConditionHolds, historyProblems, parseTimestamp, resolveSelector, selectorExcludesId, selectorIsOpen, show, vocabularyOf,
   type Vocabulary,
 } from './vocabulary';
 
-const SEVERITY: Record<DomainDecisionStatus, number> = { ALLOW: 0, LIMIT: 1, PAUSE: 2, BLOCK: 3 };
+/** An approval as the evaluator sees it: the request's data plus whether it is the object `verifyApproval` produced. */
+interface SeenApproval extends Approval { handle: boolean }
+
+/** The refusal every door gives a rulebook of another format: a decision, never a throw. */
+export function versionRefusal(rulebook: unknown, problem: string): DomainDecision {
+  const check: DomainCheck = { ruleId: RULEBOOK_VERSION_CHECK, status: 'BLOCK', reason: `This rulebook cannot be decided with: ${problem}`, setBy: 'builtin' };
+  const claimed = (rulebook as { fingerprint?: unknown } | null)?.fingerprint;
+  return { status: 'BLOCK', reasons: [check], trace: [check], fingerprint: typeof claimed === 'string' ? claimed : '' };
+}
 
 export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest): DomainDecision {
+  const versionProblem = rulebookVersionProblem(rulebook);
+  if (versionProblem) return versionRefusal(rulebook, versionProblem);
   const vocab = vocabularyOf(rulebook);
   const trace: DomainCheck[] = [];
   const check = (ruleId: string, status: DomainDecisionStatus, reason: string, setBy = 'builtin') => { trace.push({ ruleId, status, reason, setBy }); };
@@ -83,7 +99,7 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
   const actionDef = vocab.actions.get(action);
 
   // 2. Every fact the decision needs must be supplied and valid. Missing is never permission.
-  const { problems, facts, approval, nowMs, consumed } = validateFacts(rulebook, vocab, request, actionDef?.requires ?? []);
+  const { problems, facts, approvals, nowMs, consumed } = validateFacts(rulebook, vocab, request, actionDef?.requires ?? []);
   const inScope = (r: Rule) => selectorsMatch(r, role.id, action, actionDef !== undefined, area.id, vocab);
   // A rule in scope that conditions on history needs the caller's history; a window also needs times and `now`.
   const needHistory = rulebook.rules.filter(r => r.history?.length && inScope(r));
@@ -121,15 +137,25 @@ export function evaluateDomainAction(rulebook: Rulebook, request: DomainRequest)
     check('required_facts', 'BLOCK', 'Facts missing or invalid: participant.id must be a non-empty string when an approval is needed (an approval binds to the participant).');
     return decide();
   }
+  // Each approval the request carries clears at most one wait in this decision; the first that is bound and sufficient is taken.
+  const spent = new Set<number>();
   const needsApproval = (ruleId: string, what: string, by: string | undefined, setBy: string) => {
     const ask = () => approvalRequests.push({ ruleId, ...(by ? { by } : {}), rulebookFingerprint: rulebook.fingerprint, participantId: participant.id, action, areaId: area.id, reason: what, setBy });
-    if (!approval) { check(ruleId, 'PAUSE', `${what} — needs a person's approval${by ? ` (${by})` : ''}.`, setBy); ask(); return; }
-    const unbound = approvalBound(approval, rulebook, ruleId, participant.id, action, area.id, nowMs, consumed);
-    if (unbound) { check(ruleId, 'PAUSE', `${what} — ${approval.id}'s approval does not count here: ${unbound}.`, setBy); ask(); return; }
-    const short = approvalSufficient(approval, by, vocab);
-    if (short) { check(ruleId, 'PAUSE', `${what} — approval needs ${by}; ${approval.id} doesn't hold it (${short}).`, setBy); ask(); return; }
-    check(ruleId, 'ALLOW', `${what} — approved by ${approval.id}.`, setBy);
-    if (approval.nonce !== undefined) approvalsUsed.push({ ruleId, nonce: approval.nonce });
+    if (!approvals.length) { check(ruleId, 'PAUSE', `${what} — needs a person's approval${by ? ` (${by})` : ''}.`, setBy); ask(); return; }
+    const why: string[] = [];
+    for (let i = 0; i < approvals.length; i++) {
+      const approval = approvals[i];
+      if (spent.has(i)) { why.push(`${approval.id}'s approval already cleared another wait in this decision`); continue; }
+      const unbound = approvalBound(approval, rulebook, ruleId, participant.id, action, area.id, nowMs, consumed);
+      if (unbound) { why.push(`${approval.id}'s approval does not count here: ${unbound}`); continue; }
+      const short = approvalSufficient(approval, by, vocab);
+      if (short) { why.push(`approval needs ${by}; ${approval.id} doesn't hold it (${short})`); continue; }
+      spent.add(i);
+      check(ruleId, 'ALLOW', `${what} — approved by ${approval.id}.`, setBy);
+      if (approval.nonce !== undefined) approvalsUsed.push({ ruleId, nonce: approval.nonce });
+      return;
+    }
+    check(ruleId, 'PAUSE', `${what} — ${why.join('; ')}.`, setBy); ask();
   };
   if (!actionDef) {
     if (rulebook.otherwise === 'deny') {
@@ -194,6 +220,7 @@ function selectorsMatch(r: Rule, roleId: string, action: string, actionDeclared:
  * it does not stop at a never rule. An incomplete or invalid request matches nothing.
  */
 export function matchingRules(rulebook: Rulebook, request: DomainRequest): string[] {
+  if (rulebookVersionProblem(rulebook)) return [];
   const vocab = vocabularyOf(rulebook);
   if (shapeProblems(request, vocab).length) return [];
   const areaId = request.areaId ?? request.zoneId!;
@@ -224,6 +251,7 @@ export function matchingRules(rulebook: Rulebook, request: DomainRequest): strin
  * names instead of sentences; used by `backtest`.
  */
 export function missingFacts(rulebook: Rulebook, request: DomainRequest): string[] {
+  if (rulebookVersionProblem(rulebook)) return [];
   const vocab = vocabularyOf(rulebook);
   if (shapeProblems(request, vocab).length) return ['request'];
   const areaId = request.areaId ?? request.zoneId!;
@@ -261,18 +289,19 @@ function finish(trace: DomainCheck[], fingerprint: string, limits: Record<string
 // ─── Approval authority ──────────────────────────────────────────────────────
 
 /**
- * When the rulebook declares trusted keys, an approval must be a verified /3
- * signed approval for this very rule, rulebook, participant, action and area,
- * valid at `now`, and not yet used. Why it is not, in plain words; null when
- * it is (or when no keys are declared).
+ * A /2 approval (requestDigest binding, or a 16-hex rulebook fingerprint),
+ * or one declaring another spec, is refused by name whether or not the
+ * rulebook declares trusted keys. When it does, an approval must further be
+ * the verified object `verifyApproval` produced, for this very rule,
+ * rulebook, participant, action and area, valid at `now`, and not yet used.
+ * Why it is not, in plain words; null when it is.
  */
-function approvalBound(approval: Approval, rulebook: Rulebook, ruleId: string, participantId: string, action: string, areaId: string, nowMs: number | null, consumed: Set<string>): string | null {
+function approvalBound(approval: SeenApproval, rulebook: Rulebook, ruleId: string, participantId: string, action: string, areaId: string, nowMs: number | null, consumed: Set<string>): string | null {
+  if (approval.requestDigest !== undefined || fingerprintVersion(approval.rulebookFingerprint) === 2) return `it is a robot-domain-rules/2 approval (bound by requestDigest); this implementation is /3 and does not reinterpret it — have it re-issued under ${APPROVAL_SPEC}`;
+  if (approval.spec !== undefined && approval.spec !== APPROVAL_SPEC) return `it declares spec ${JSON.stringify(approval.spec)}, not ${APPROVAL_SPEC}`;
   if (!rulebook.trustedKeys?.length) return null;
-  if (approval.spec !== APPROVAL_SPEC) {
-    if (approval.requestDigest !== undefined || fingerprintVersion(approval.rulebookFingerprint) === 2) return `it is a robot-domain-rules/2 approval (bound by requestDigest); this rulebook is /3 and does not reinterpret it — have it re-issued under ${APPROVAL_SPEC}`;
-    return `it does not declare spec ${APPROVAL_SPEC}`;
-  }
-  if (approval.verified !== true) return 'this rulebook accepts only signed approvals verified against its trusted keys';
+  if (approval.spec !== APPROVAL_SPEC) return `it does not declare spec ${APPROVAL_SPEC}`;
+  if (!approval.handle) return 'this rulebook accepts only approvals verified against its trusted keys, and nothing in a request can assert that — verify first with verifyApproval, or use verifyAndEvaluate';
   if (approval.ruleId !== ruleId) return `it is for rule "${approval.ruleId ?? ''}", not "${ruleId}"`;
   if (approval.rulebookFingerprint !== rulebook.fingerprint) return `it was given under another rulebook (${approval.rulebookFingerprint ?? 'missing'}, this one is ${rulebook.fingerprint})`;
   if (approval.participantId !== participantId) return `it is for participant "${approval.participantId ?? ''}", not "${participantId}"`;
@@ -288,7 +317,7 @@ function approvalBound(approval: Approval, rulebook: Rulebook, ruleId: string, p
 }
 
 /** Why the approval is not enough, in plain words; null when it is. */
-function approvalSufficient(approval: Approval, by: string | undefined, vocab: Vocabulary): string | null {
+function approvalSufficient(approval: SeenApproval, by: string | undefined, vocab: Vocabulary): string | null {
   if (!by) return null;
   const need = authorityRank(vocab, by);
   if (need >= 0) {
@@ -324,7 +353,7 @@ function shapeProblems(request: DomainRequest, vocab: Vocabulary): string[] {
 const APPROVAL_STRING_FIELDS = ['spec', 'ruleId', 'rulebookFingerprint', 'participantId', 'action', 'areaId', 'nonce', 'keyId', 'issuedAt', 'expiresAt', 'signature', 'requestDigest'] as const;
 
 function validateFacts(rulebook: Rulebook, vocab: Vocabulary, request: DomainRequest, alsoRequired: string[]):
-  { problems: string[]; problemFacts: string[]; facts: Record<string, FactValue>; approval: Approval | null; nowMs: number | null; consumed: Set<string> } {
+  { problems: string[]; problemFacts: string[]; facts: Record<string, FactValue>; approvals: SeenApproval[]; nowMs: number | null; consumed: Set<string> } {
   const problems: string[] = [];
   /** The IDs behind `problems`, in order, once each (`approvedBy` for the built-in approval, `now`, `consumedApprovals`). */
   const problemFacts: string[] = [];
@@ -352,31 +381,40 @@ function validateFacts(rulebook: Rulebook, vocab: Vocabulary, request: DomainReq
     if (!Array.isArray(request.consumedApprovals) || request.consumedApprovals.some(n => typeof n !== 'string')) { problems.push(`consumedApprovals must be a list of strings when given, got ${show(request.consumedApprovals)}`); flag('consumedApprovals'); }
     else for (const n of request.consumedApprovals) consumed.add(n);
   }
-  let approval: Approval | null = null;
-  const a = given.approvedBy;
-  if (a !== undefined) {
-    if (nonEmpty(a)) approval = { id: a };
-    else if (a && typeof a === 'object' && nonEmpty((a as Approval).id)) {
+  // approvedBy: one approval or a list of them. Any `verified` member is ignored: only object identity (verified.ts) says an approval was verified.
+  const approvals: SeenApproval[] = [];
+  const readApproval = (a: unknown, where: string): void => {
+    if (nonEmpty(a)) { approvals.push({ id: a, handle: false }); return; }
+    if (a && typeof a === 'object' && !Array.isArray(a) && nonEmpty((a as Approval).id)) {
       const o = a as Approval;
-      approval = { id: o.id };
+      const approval: SeenApproval = { id: o.id, handle: isVerified(a) };
       for (const field of APPROVAL_STRING_FIELDS) {
-        if (o[field] !== undefined) { if (typeof o[field] !== 'string') problems.push(`approvedBy.${field} must be a string when given, got ${show(o[field])}`); else approval[field] = o[field]; }
+        if (o[field] !== undefined) { if (typeof o[field] !== 'string') problems.push(`${where}.${field} must be a string when given, got ${show(o[field])}`); else approval[field] = o[field]; }
       }
-      if (o.verified !== undefined) { if (typeof o.verified !== 'boolean') problems.push(`approvedBy.verified must be true or false when given, got ${show(o.verified)}`); else approval.verified = o.verified; }
       if (o.authority !== undefined) {
-        if (authorityRank(vocab, String(o.authority)) < 0) problems.push(`approvedBy.authority "${String(o.authority)}" is not a declared authority`);
+        if (authorityRank(vocab, String(o.authority)) < 0) problems.push(`${where}.authority "${String(o.authority)}" is not a declared authority`);
         else approval.authority = o.authority;
       }
       if (o.roleId !== undefined) {
-        if (!vocab.roles.has(String(o.roleId))) problems.push(`approvedBy.roleId "${String(o.roleId)}" is not a declared role`);
+        if (!vocab.roles.has(String(o.roleId))) problems.push(`${where}.roleId "${String(o.roleId)}" is not a declared role`);
         else approval.roleId = o.roleId;
       }
       // A signed approval under a rulebook with trusted keys is checked against `now`: without it the validity window cannot be judged.
       if (rulebook.trustedKeys?.length && request.now === undefined) { problems.push('now is required to check the approval\'s validity window (issuedAt/expiresAt), got nothing'); flag('now'); }
-    } else problems.push(`approvedBy must be a non-empty string or { id, authority?, roleId?, ... } when given, got ${show(a)}`);
+      approvals.push(approval);
+      return;
+    }
+    problems.push(`${where} must be a non-empty string or { id, authority?, roleId?, ... } when given, got ${show(a)}`);
+  };
+  const a = given.approvedBy;
+  if (a !== undefined) {
+    if (Array.isArray(a)) {
+      if (a.length === 0) problems.push('approvedBy, when a list, must hold at least one approval');
+      a.forEach((x, i) => readApproval(x, `approvedBy[${i}]`));
+    } else readApproval(a, 'approvedBy');
     if (problems.some(x => x.startsWith('approvedBy'))) flag('approvedBy');
   }
-  return { problems, problemFacts, facts, approval, nowMs, consumed };
+  return { problems, problemFacts, facts, approvals, nowMs, consumed };
 }
 
 function describeType(def: Rulebook['facts'][number]): string {

@@ -7,7 +7,9 @@
  *                  strings and numbers serialised as ECMAScript JSON.stringify
  *                  does (JCS § 3.2.2 cites ES6 Number::toString). Members
  *                  whose value is `undefined` are dropped first (JSON has no
- *                  undefined). Non-finite numbers are refused, as JCS requires.
+ *                  undefined). Non-finite numbers, lone surrogates in strings
+ *                  and non-JSON values (functions, symbols, bigints) are
+ *                  refused with a clear error, as JCS requires.
  *   sha256:        FIPS 180-4, pure and synchronous, over bytes.
  *   fingerprint:   SHA-256 over the UTF-8 bytes of the canonical JSON, as 64
  *                  lowercase hex digits. Spec robot-domain-rules/3; the /2
@@ -15,14 +17,22 @@
  *                  (16 hex digits) and is recognised only to be refused.
  */
 
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
 export function canonicalJson(value: unknown): string {
   if (value === undefined) throw new Error('canonicalJson: undefined is not a JSON value');
+  if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint') throw new Error(`canonicalJson: a ${typeof value} is not a JSON value`);
   if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(`canonicalJson: ${String(value)} is not a JSON number (RFC 8785 § 3.2.2.3)`);
+  if (typeof value === 'string') {
+    if (LONE_SURROGATE.test(value)) throw new Error('canonicalJson: the string holds a lone surrogate, which is not Unicode text (RFC 8785 § 3.2.2.2 serialises Unicode strings only)');
+    return JSON.stringify(value);
+  }
   if (Array.isArray(value)) return `[${value.map(v => canonicalJson(v === undefined ? null : v)).join(',')}]`;
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
       .filter(([, v]) => v !== undefined)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    for (const [k] of entries) if (LONE_SURROGATE.test(k)) throw new Error('canonicalJson: an object key holds a lone surrogate');
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
   }
   return JSON.stringify(value);
@@ -99,14 +109,4 @@ export function fingerprintVersion(value: unknown): 2 | 3 | null {
   if (/^[0-9a-f]{64}$/.test(value)) return 3;
   if (/^[0-9a-f]{16}$/.test(value)) return 2;
   return null;
-}
-
-/**
- * What an approval is bound to besides the rule and the rulebook: the
- * participant, the action and the area — never the facts, which the live
- * evaluation always re-checks (SPEC.md § 9). `fingerprint({ participantId, action, areaId })`.
- */
-export function requestDigest(request: { participant: { id: string; kind: string; roleId: string }; action: string; areaId?: string; zoneId?: string }): string {
-  const p = request.participant;
-  return fingerprint({ participantId: p.id, action: request.action, areaId: request.areaId ?? request.zoneId });
 }

@@ -17,10 +17,14 @@
  *     (or its tag), or an authority the wearer holds (`options.wearerAuthority`,
  *     that authority or higher). Otherwise `blocked`: the device has no way to
  *     obtain a third party's approval on its own.
+ *   - under a rulebook that declares `trustedKeys`, every approval wait →
+ *     `blocked`: only a signed, verified approval clears such a wait, and an
+ *     on-device confirmation is not one — whoever the rule names.
  */
 
 import type { Rulebook } from './types';
 import { DomainRulesError, authorityRank, resolveSelector, vocabularyOf } from './vocabulary';
+import { rulebookVersionProblem } from './version';
 import { mergeRules, type ZoneRules } from './zone-rules';
 
 /** Least-restrictive spatial ZoneRules: the default base, so the rulebook alone decides. */
@@ -65,12 +69,16 @@ export function glassesZoneRules(rulebook: Rulebook, areaId: string, roleId: str
   const base = options.base ?? OPEN_ZONE_RULES;
   const kind = options.kind ?? 'person';
   const fields = options.fields ?? GLASSES_ACTION_FIELDS;
+  const versionProblem = rulebookVersionProblem(rulebook);
+  if (versionProblem) throw new DomainRulesError(versionProblem);
   const vocab = vocabularyOf(rulebook);
   const area = vocab.areas.get(areaId);
   if (!area) throw new DomainRulesError(`Area "${areaId}" is not declared in this rulebook.`);
   const role = vocab.roles.get(roleId);
   if (!role || role.kind !== kind) throw new DomainRulesError(`"${roleId}" is not a declared ${kind} role.`);
 
+  // With trusted keys declared, a confirmation on the device cannot satisfy an approval wait: only a verified signed approval can.
+  const signedOnly = (rulebook.trustedKeys?.length ?? 0) > 0;
   const overlay: ZoneRules = { ...base };
   for (const [action, field] of Object.entries(fields)) {
     if (!vocab.actions.has(action)) continue;
@@ -82,7 +90,7 @@ export function glassesZoneRules(rulebook: Rulebook, areaId: string, roleId: str
         if (!resolveSelector(r.where, 'where', vocab).has(area.id)) continue;
         if (r.then.answer === 'deny') { level = 'blocked'; break; }
         if (r.then.answer === 'wait') {
-          if (r.then.for === 'condition' || !wearerMayApprove(r.then.by, role, options.wearerAuthority, vocab)) { level = 'blocked'; break; }
+          if (r.then.for === 'condition' || signedOnly || !wearerMayApprove(r.then.by, role, options.wearerAuthority, vocab)) { level = 'blocked'; break; }
           level = 'confirm_each';
         }
       }

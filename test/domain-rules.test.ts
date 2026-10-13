@@ -9,7 +9,8 @@ import {
   DomainRulesError,
   draftRuleFromText,
   evaluateDomainAction,
-  glassesZoneRules, parseTimestamp, sha256Utf8, canonicalJson, fingerprint, signApproval, verifyApproval, verifyAndEvaluate, publicKeyOf, planDigestOf,
+  glassesZoneRules, parseTimestamp, sha256Utf8, canonicalJson, fingerprint, signApproval, verifyApproval, verifyAndEvaluate, verifyAndEvaluatePlan, publicKeyOf, planDigestOf,
+  validateRulebook, timeOfDay, isVerified, rulebookVersionProblem, GROCERY_STORE,
   isOpen,
   matchingRules,
   evaluatePlan,
@@ -654,10 +655,11 @@ describe('generic rulebook: drafting from plain words', () => {
     expect(miss.draft).toBeNull();
     expect(miss.confidence).toBe(0);
     expect(miss.notes.join(' ')).toMatch(/Could not find what the rule decides/);
+    // 0.5.3: "no dancing" names something that is not a declared action; a rule denying every action is not what it says, so nothing is drafted.
     const vague = draft('no dancing');
-    expect(vague.draft).toMatchObject({ who: '*', does: '*', then: { answer: 'deny' } });
+    expect(vague.draft).toBeNull();
     expect(vague.unmatched).toEqual(['dancing']);
-    expect(vague.confidence).toBeLessThan(0.7);
+    expect(vague.notes.join(' ')).toMatch(/No declared action matches "dancing"/);
     expect(draft('robots at most 9 km/h in checkout').notes.join(' ')).toMatch(/declares no matching limit/);
   });
 
@@ -691,7 +693,9 @@ describe('generic rulebook: drafting from plain words', () => {
     expect(b.compile().rules.find(r => r.id === 'g')).toMatchObject({ setBy: 'staff', source: { kind: 'text', ref: 'guests may not take photos' } });
     expect(() => b.confirm(draftRuleFromText('be nice', b.compile()))).toThrow(/no draft to confirm/);
     // The company's default answer already blocks capture, so the staff rule adds nothing — said as info, not hidden.
-    expect(b.check().map(f => [f.kind, f.severity, f.ruleIds])).toEqual([['duplicate', 'info', ['g', 'glasses_capture']]]);
+    expect(b.check().filter(f => f.kind !== 'unmatched_selector').map(f => [f.kind, f.severity, f.ruleIds])).toEqual([['duplicate', 'info', ['g', 'glasses_capture']]]);
+    // 0.5.3: template rules on area tags this small site does not carry (dock, restricted, …) are named, one warning per rule, never silent.
+    expect(b.check().filter(f => f.kind === 'unmatched_selector').every(f => f.severity === 'warning' && f.ruleIds.length === 1 && !f.witness)).toBe(true);
   });
 });
 
@@ -1036,10 +1040,10 @@ describe('0.5.2: the drafter refuses to guess', () => {
     expect(withCountFact.notes.join(' ')).toMatch(/read as a count on the fact "robotsInZone"/);
   });
 
-  it('"Don\'t let robots block the fire exit" is not ready: "block" is a verb the drafter does not model', () => {
+  it('"Don\'t let robots block the fire exit" is not drafted: "block" is a verb the drafter does not model, and a rule on every action is not what it says', () => {
     const d = draftRuleFromText("Don't let robots block the fire exit", grocery.rulebook, { setBy: 'site-manager', id: 'b' });
-    expect(d.ready).toBe(false);
-    expect(d.confidence).toBeLessThan(0.5);
+    expect(d.confidentDraft).toBe(false);
+    expect(d.draft).toBeNull();
     expect(d.notes.join(' ')).toMatch(/"block" is a verb the drafter does not model/);
     expect(d.notes.join(' ')).toMatch(/buildRuleDraftPrompt/);
     // A bare number with no unit, no speed word and nothing to count is refused too.
@@ -1087,7 +1091,7 @@ describe('0.5.2: approvals are authorisation, separate from the operational fact
     expect(await reasonFor({ approvedBy: await signApproval({ ...bind, participantId: 'other', nonce: 'n-3' }, { keyId: 'k', privateKey: SEED }) })).toMatch(/for participant "other"/);
     expect(await reasonFor({ approvedBy: await signApproval({ ...bind, rulebookFingerprint: '1'.repeat(64), nonce: 'n-4' }, { keyId: 'k', privateKey: SEED }) })).toMatch(/another rulebook/);
     // A tampered signature is passed through unverified and does not count.
-    expect(await reasonFor({ approvedBy: { ...signed, nonce: 'n-5' } })).toMatch(/only signed approvals verified/);
+    expect(await reasonFor({ approvedBy: { ...signed, nonce: 'n-5' } })).toMatch(/only approvals verified against its trusted keys/);
     // A /2 approval is refused by name, not reinterpreted.
     const v2 = { id: 'ann', authority: 'high', requestDigest: 'a972a032bcabeaaf', rulebookFingerprint: '96be85f891da7c40', issuedAt: '2026-10-12T09:00:00Z', keyId: 'k', signature: 'ab'.repeat(64) };
     expect((await verifyApproval(v2, rb)).reason).toMatch(/robot-domain-rules\/2 approval .* re-issued/);
@@ -1136,5 +1140,339 @@ describe('0.5.2: the conflict check', () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(300);
+  });
+});
+
+// ─── 0.5.3: the second audit ─────────────────────────────────────────────────
+
+describe('0.5.3: nothing in a request can assert that an approval was verified', () => {
+  const SEED = '0001020304050607080910111213141516171819202122232425262728293031';   // TEST ONLY
+  const OTHER = '2222222222222222222222222222222222222222222222222222222222222222';  // TEST ONLY, not trusted
+  const NOW = '2026-10-12T09:05:00Z';
+  async function signedSite(extra: Array<Omit<Rule, 'source' | 'setBy'> & { setBy?: string }> = []) {
+    const pub = await publicKeyOf(SEED);
+    return compileDomain(tiny([rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'y' }), ...extra], { trustedKeys: [{ keyId: 'k', publicKey: pub, authority: 'high' }] }));
+  }
+  const ask = (facts: Record<string, unknown> = {}, extra: Partial<DomainRequest> = {}): DomainRequest => ({ ...tinyReq('go', 'y', facts), now: NOW, ...extra });
+  const bindFor = (rb: Rulebook, nonce = 'n-1') => ({ id: 'ann', authority: 'high', ruleId: 'ask_high', rulebookFingerprint: rb.fingerprint, participantId: 'b', action: 'go', areaId: 'y', nonce, issuedAt: '2026-10-12T09:00:00Z', expiresAt: '2026-10-12T09:30:00Z' });
+
+  it('an unsigned object with the bound fields and verified: true clears nothing, through evaluateDomainAction and through verifyAndEvaluate (the 0.5.2 bypass)', async () => {
+    const rb = await signedSite();
+    const forged = { spec: 'robot-domain-rules-approval/3', ...bindFor(rb), keyId: 'k', verified: true };   // no signature at all
+    const pure = evaluateDomainAction(rb, ask({ approvedBy: forged }));
+    expect(pure.status).toBe('PAUSE');
+    expect(pure.reasons[0].reason).toMatch(/nothing in a request can assert that/);
+    const viaTrusted = await verifyAndEvaluate(rb, ask({ approvedBy: forged }));
+    expect(viaTrusted.status).toBe('PAUSE');
+    // A bogus signature: the same.
+    const bogus = { ...forged, signature: 'ab'.repeat(64) };
+    expect((await verifyAndEvaluate(rb, ask({ approvedBy: bogus }))).status).toBe('PAUSE');
+    expect(evaluateDomainAction(rb, ask({ approvedBy: bogus })).status).toBe('PAUSE');
+    // Signed by a key the rulebook does not trust, marked verified: the same.
+    const stranger = { ...await signApproval(bindFor(rb), { keyId: 'k', privateKey: OTHER }), verified: true };
+    expect((await verifyAndEvaluate(rb, ask({ approvedBy: stranger }))).status).toBe('PAUSE');
+  });
+
+  it('a valid signature clears the wait only through verifyAndEvaluate (or the object verifyApproval returned); the pure evaluator says so', async () => {
+    const rb = await signedSite();
+    const signed = await signApproval(bindFor(rb), { keyId: 'k', privateKey: SEED });
+    const pure = evaluateDomainAction(rb, ask({ approvedBy: signed }));
+    expect(pure.status).toBe('PAUSE');
+    expect(pure.reasons[0].reason).toMatch(/use verifyAndEvaluate/);
+    expect(evaluateDomainAction(rb, ask({ approvedBy: { ...signed, verified: true } })).status).toBe('PAUSE');   // the flag is ignored
+    const ok = await verifyAndEvaluate(rb, ask({ approvedBy: signed }));
+    expect(ok.status).toBe('ALLOW');
+    expect(ok.approvalsUsed).toEqual([{ ruleId: 'ask_high', nonce: 'n-1' }]);
+    // The object verifyApproval returned is the handle; a copy of it is not.
+    const r = await verifyApproval(signed, rb);
+    expect(r.ok && isVerified(r.approval)).toBe(true);
+    expect(isVerified({ ...r.approval })).toBe(false);
+    expect(evaluateDomainAction(rb, ask({ approvedBy: r.approval })).status).toBe('ALLOW');
+    expect(evaluateDomainAction(rb, ask({ approvedBy: { ...r.approval } })).status).toBe('PAUSE');
+    expect(evaluateDomainAction(rb, ask({ approvedBy: JSON.parse(JSON.stringify(r.approval)) })).status).toBe('PAUSE');
+  });
+
+  it('a /2 approval is refused by name with or without trusted keys', async () => {
+    const plain = compileDomain(tiny([rule('ask', { answer: 'wait', for: 'approval' }, { does: 'go', where: 'y' })]));
+    const v2 = { id: 'ann', authority: 'high', requestDigest: 'a972a032bcabeaaf', rulebookFingerprint: '96be85f891da7c40', issuedAt: '2026-10-12T09:00:00Z', keyId: 'k', signature: 'ab'.repeat(64) };
+    const d = evaluateDomainAction(plain, ask({ approvedBy: v2 }));
+    expect(d.status).toBe('PAUSE');
+    expect(d.reasons[0].reason).toMatch(/robot-domain-rules\/2 approval/);
+    expect(evaluateDomainAction(plain, ask({ approvedBy: { id: 'ann', spec: 'robot-domain-rules-approval/4' } })).reasons[0].reason).toMatch(/declares spec "robot-domain-rules-approval\/4"/);
+    expect(evaluateDomainAction(plain, ask({ approvedBy: { id: 'ann' } })).status).toBe('ALLOW');   // a plain approval still clears a plain wait (development only)
+  });
+
+  it('approvedBy may be a list; each approval clears at most one wait, so two waits need two approvals', async () => {
+    const rb = await signedSite([rule('ask_again', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'y' })]);
+    const a1 = await signApproval(bindFor(rb, 'n-1'), { keyId: 'k', privateKey: SEED });
+    const a2 = await signApproval({ ...bindFor(rb, 'n-2'), ruleId: 'ask_again' }, { keyId: 'k', privateKey: SEED });
+    const one = await verifyAndEvaluate(rb, ask({ approvedBy: a1 }));
+    expect(one.status).toBe('PAUSE');
+    expect(one.approvalRequests!.map(a => a.ruleId)).toEqual(['ask_again']);
+    const both = await verifyAndEvaluate(rb, ask({ approvedBy: [a1, a2] }));
+    expect(both.status).toBe('ALLOW');
+    expect(both.approvalsUsed).toEqual([{ ruleId: 'ask_high', nonce: 'n-1' }, { ruleId: 'ask_again', nonce: 'n-2' }]);
+    // Without trusted keys, two plain approvals in a list are each spent on one wait; one plain approval cannot clear two.
+    const plain = compileDomain(tiny([rule('a', { answer: 'wait', for: 'approval' }, { does: 'go' }), rule('b', { answer: 'wait', for: 'approval' }, { does: 'go' })]));
+    expect(evaluateDomainAction(plain, ask({ approvedBy: 'ann' })).status).toBe('PAUSE');
+    expect(evaluateDomainAction(plain, ask({ approvedBy: ['ann', 'bob'] })).status).toBe('ALLOW');
+    expect(ids(evaluateDomainAction(plain, ask({ approvedBy: [] })))).toEqual(['required_facts']);
+  });
+
+  it('a plan consumes approvals step by step: one single-use approval clears one step, and approvalsUsed is reported at plan level', async () => {
+    const rb = await signedSite();
+    const signed = await signApproval(bindFor(rb), { keyId: 'k', privateKey: SEED });
+    const plan = { participant: { id: 'b', kind: 'robot', roleId: 'bot' }, initialFacts: { n: 0, t: '10:00', day: 'mon', approvedBy: signed }, now: NOW, steps: [{ action: 'go', area: 'y' }, { action: 'go' }, { action: 'go' }] };
+    const p = await verifyAndEvaluatePlan(rb, plan);
+    expect(p.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'PAUSE', 'PAUSE']);
+    expect(p.steps[1].decision.reasons[0].reason).toMatch(/already used/);
+    expect(p.approvalsUsed).toEqual([{ ruleId: 'ask_high', nonce: 'n-1' }]);
+    // A nonce the caller already consumed is spent before the first step.
+    expect((await verifyAndEvaluatePlan(rb, { ...plan, consumedApprovals: ['n-1'] })).steps.map(s => s.decision.status)).toEqual(['PAUSE', 'PAUSE', 'PAUSE']);
+    // The pure evaluator never clears a trusted-keys wait inside a plan either.
+    expect(evaluatePlan(rb, plan).steps.map(s => s.decision.status)).toEqual(['PAUSE', 'PAUSE', 'PAUSE']);
+  });
+
+  it('signApproval refuses a window that ends before it starts', async () => {
+    const rb = await signedSite();
+    await expect(signApproval({ ...bindFor(rb), issuedAt: '2026-10-12T09:30:00Z', expiresAt: '2026-10-12T09:00:00Z' }, { keyId: 'k', privateKey: SEED })).rejects.toThrow(/expiresAt .* must be later than issuedAt/);
+    await expect(signApproval({ ...bindFor(rb), expiresAt: '2026-10-12T09:00:00Z' }, { keyId: 'k', privateKey: SEED })).rejects.toThrow(/later than/);
+  });
+
+  it('the glasses bridge blocks every approval wait under trusted keys: a confirmation on the device is not a signed approval', async () => {
+    const pub = await publicKeyOf(SEED);
+    const site = (trustedKeys?: CompileDomainInput['trustedKeys']): CompileDomainInput => ({
+      site: { id: 'g', name: 'G' }, authorities: [{ id: 'manager' }], kinds: ['person'], actions: [{ id: 'camera_capture', kinds: ['person'] }], facts: [],
+      areas: [{ id: 'a', name: 'A' }], roles: [{ id: 'wearer', name: 'Wearer', kind: 'person', actions: ['camera_capture'] }],
+      rules: [{ id: 'r', text: 'r', who: '*', does: 'camera_capture', where: '*', then: { answer: 'wait', for: 'approval' }, setBy: 'manager', source: { kind: 'manual', ref: 'r' } }],
+      ...(trustedKeys ? { trustedKeys } : {}),
+    });
+    expect(glassesZoneRules(compileDomain(site()), 'a', 'wearer').camera).toBe('confirm_each');
+    expect(glassesZoneRules(compileDomain(site([{ keyId: 'k', publicKey: pub, authority: 'manager' }])), 'a', 'wearer').camera).toBe('blocked');
+    expect(glassesZoneRules(compileDomain(site([{ keyId: 'k', publicKey: pub, authority: 'manager' }])), 'a', 'wearer', { wearerAuthority: 'manager' }).camera).toBe('blocked');
+  });
+});
+
+describe('0.5.3: a rulebook of another format is refused by name at every door', () => {
+  const v3 = compileDomain(tiny([rule('no_y', { answer: 'deny' }, { where: 'y' })]));
+  const v2 = { ...JSON.parse(JSON.stringify(v3)), format: 'neuroverse-domain-rules/2', fingerprint: '5f8c2e1a9b3d4c70' } as Rulebook;
+  const message = rulebookVersionProblem(v2)!;
+  it('evaluate, evaluatePlan, matchingRules, check, backtest and the glasses bridge all refuse it with validation\'s exact message', () => {
+    expect(validateRulebook(v2)).toEqual([message]);
+    expect(message).toMatch(/robot-domain-rules\/2.*recompile/i);
+    const d = evaluateDomainAction(v2, tinyReq('go', 'x'));
+    expect(d.status).toBe('BLOCK');
+    expect(d.reasons).toEqual([{ ruleId: 'rulebook_version', status: 'BLOCK', reason: `This rulebook cannot be decided with: ${message}`, setBy: 'builtin' }]);
+    expect(d.fingerprint).toBe('5f8c2e1a9b3d4c70');
+    const p = evaluatePlan(v2, { participant: { id: 'b', kind: 'robot', roleId: 'bot' }, initialFacts: { n: 0, t: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'x' }] });
+    expect(p.status).toBe('BLOCK');
+    expect(p.firstViolation).toMatchObject({ ruleId: 'rulebook_version', setBy: 'builtin', from: 'plan' });
+    expect(matchingRules(v2, tinyReq('go', 'x'))).toEqual([]);
+    expect(() => checkRulebook(v2)).toThrow(message);
+    expect(() => backtest(v2, [])).toThrow(message);
+    expect(() => glassesZoneRules(v2, 'x', 'bot', { kind: 'robot' })).toThrow(message);
+    // An unknown format string is refused the same way; a /3 rulebook is decided.
+    expect(evaluateDomainAction({ ...v3, format: 'neuroverse-domain-rules/9' } as unknown as Rulebook, tinyReq()).reasons[0].ruleId).toBe('rulebook_version');
+    expect(evaluateDomainAction(v3, tinyReq('go', 'y')).reasons[0].ruleId).toBe('no_y');
+  });
+});
+
+describe('0.5.3: validation re-derives what is derived', () => {
+  const wire = () => JSON.parse(JSON.stringify(grocery.rulebook)) as Rulebook;
+  const refingerprint = (rb: Rulebook) => { const { fingerprint: _f, findings: _x, ...body } = rb; rb.fingerprint = fingerprint(body); return rb; };
+  it('a stripped or altered area role-limit never rule is invalid even with a recomputed fingerprint', () => {
+    expect(validateRulebook(grocery.rulebook)).toEqual([]);
+    const area = grocery.rulebook.areas.find(a => a.allowRoles)!;
+    const stripped = refingerprint(wire());
+    stripped.rules = stripped.rules.filter(r => r.id !== `area_role_limits:${area.id}`);
+    refingerprint(stripped);
+    expect(verifyFingerprint(stripped)).toBe(true);
+    expect(validateRulebook(stripped).join(' ')).toMatch(new RegExp(`Rule "area_role_limits:${area.id}" is missing`));
+    // Before this check the stripped rulebook decided ALLOW for a role the area excludes.
+    const altered = wire();
+    const r = altered.rules.find(x => x.id === `area_role_limits:${area.id}`)!;
+    r.who = [area.allowRoles![0]];
+    refingerprint(altered);
+    expect(validateRulebook(altered).join(' ')).toMatch(/was altered/);
+    const impostor = wire();
+    impostor.rules.push({ ...r, id: 'area_role_limits:nowhere' });
+    refingerprint(impostor);
+    expect(validateRulebook(impostor).join(' ')).toMatch(/no area declares it/);
+  });
+
+  it('emptied or altered findings are invalid; reworded ones are not', () => {
+    const emptied = wire();
+    emptied.findings = [];
+    expect(verifyFingerprint(emptied)).toBe(true);
+    expect(validateRulebook(emptied).join(' ')).toMatch(/findings do not match.*missing/);
+    const reworded = wire();
+    reworded.findings = reworded.findings.map(f => ({ ...f, message: 'a port may word this differently' }));
+    expect(validateRulebook(reworded)).toEqual([]);
+    const downgraded = wire();
+    downgraded.findings = downgraded.findings.map(f => (f.kind === 'authority-override' ? { ...f, severity: 'info' as const } : f));
+    expect(validateRulebook(downgraded).join(' ')).toMatch(/not found by the check/);
+    const badWitness = wire();
+    const w = badWitness.findings.find(f => f.witness)!;
+    w.witness = { ...w.witness!, areaId: 'nowhere' };
+    expect(validateRulebook(badWitness).join(' ')).toMatch(/witness .* does not match both/);
+  });
+});
+
+describe('0.5.3: a plan\'s clock starts at the wall-clock time `now` names, in its own offset', () => {
+  const rb = compileDomain(tiny([rule('no_night', { answer: 'deny' }, { when: [{ fact: 't', op: 'between', from: '22:00', to: '06:00' }] })]));
+  const bot = { id: 'b', kind: 'robot', roleId: 'bot' };
+  it('21:00-05:00 is 21:00 on site (not 02:00 UTC); 05:00+09:00 is 05:00 on site (not 20:00 UTC)', () => {
+    expect(timeOfDay('2026-10-12T21:00:00-05:00')).toBe('21:00');
+    expect(timeOfDay('2026-10-12T05:00:00+09:00')).toBe('05:00');
+    expect(timeOfDay('2026-10-12T14:30Z')).toBe('14:30');
+    const at = (now: string) => evaluatePlan(rb, { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, clock: 't', now, steps: [{ action: 'go', area: 'x' }] });
+    expect(at('2026-10-12T21:00:00-05:00').steps[0].facts.t).toBe('21:00');
+    expect(at('2026-10-12T21:00:00-05:00').status).toBe('ALLOW');          // 0.5.2 read 02:00 and refused the step
+    expect(at('2026-10-12T05:00:00+09:00').steps[0].facts.t).toBe('05:00');
+    expect(at('2026-10-12T05:00:00+09:00').status).toBe('BLOCK');          // 0.5.2 read 20:00 and allowed it
+    expect(at('2026-10-12T05:00:00+09:00').firstViolation?.ruleId).toBe('no_night');
+  });
+});
+
+describe('0.5.3: smaller corrections', () => {
+  const bot = { id: 'b', kind: 'robot', roleId: 'bot' };
+  it('finalArea after a continuity refusal is where the plan left the participant, not the refused destination', () => {
+    const rb = compileDomain(tiny([], { actions: [{ id: 'go', kinds: ['robot'], tags: ['movement'], effects: [{ op: 'move' }] }, { id: 'look', kinds: ['robot'] }] }));
+    const p = evaluatePlan(rb, { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'y' }, { action: 'look', area: 'x' }] });
+    expect(p.firstViolation?.ruleId).toBe('plan_area_continuity');
+    expect(p.finalArea).toBe('y');
+    expect(p.steps[1].areaId).toBe('x');
+  });
+
+  it('evaluatePlan never throws on NaN or Infinity in stepDurationSeconds or facts: BLOCK, with a digest', () => {
+    const rb = compileDomain(tiny([]));
+    for (const plan of [
+      { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, stepDurationSeconds: NaN, steps: [{ action: 'go', area: 'x' }] },
+      { participant: bot, initialFacts: { n: Infinity, t: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'x' }] },
+      { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'x', facts: { n: NaN } }] },
+    ]) {
+      const p = evaluatePlan(rb, plan);
+      expect(p.status).toBe('BLOCK');
+      expect(p.firstViolation?.ruleId).toBe('required_facts');
+      expect(p.planDigest).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it('years 0000–0099 are those years; fractions past the millisecond are truncated, so a port with finer ticks compares the same', () => {
+    const d = new Date(parseTimestamp('0050-06-15T12:00:00Z')!);
+    expect(d.getUTCFullYear()).toBe(50);
+    expect(parseTimestamp('2026-10-12T09:30:00.0009Z')).toBe(parseTimestamp('2026-10-12T09:30:00.000Z'));
+    expect(parseTimestamp('2026-10-12T09:30:00.1239999Z')).toBe(parseTimestamp('2026-10-12T09:30:00.123Z'));
+    expect(parseTimestamp('2026-02-30T00:00Z')).toBeNull();
+    expect(parseTimestamp('2026-04-31T00:00Z')).toBeNull();
+  });
+
+  it('canonicalJson refuses lone surrogates and non-JSON values with a clear error', () => {
+    expect(() => canonicalJson({ s: '\uD800' })).toThrow(/lone surrogate/);
+    expect(() => canonicalJson({ s: 'ok \uDC00 no' })).toThrow(/lone surrogate/);
+    expect(() => canonicalJson({ ['\uD800']: 1 })).toThrow(/lone surrogate/);
+    expect(canonicalJson({ s: '🤖' })).toBe('{"s":"🤖"}');
+    expect(() => canonicalJson({ f: () => 1 })).toThrow(/function is not a JSON value/);
+    expect(() => canonicalJson([() => 1])).toThrow(/not a JSON value/);
+    expect(() => canonicalJson({ b: 10n })).toThrow(/bigint is not a JSON value/);
+    expect(canonicalJson({ a: undefined, b: 1 })).toBe('{"b":1}');   // JSON has no undefined: the member is dropped, as JSON.stringify does
+  });
+
+  it('deepFreeze reaches inside already-frozen parts: two rulebooks from one template share no mutable limits', () => {
+    const site = (): CompileDomainInput => ({ site: { id: 's', name: 'S', hours: { open: '08:00', close: '20:00' } }, template: GROCERY_STORE, areas: [{ id: 'a', name: 'A', tags: ['public'] }], roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['move'] }] });
+    const a = compileDomain(site()), b = compileDomain(site());
+    const limitRule = a.rules.find(r => r.then.answer === 'limit')!;
+    const limits = (limitRule.then as { limits: Record<string, number> }).limits;
+    expect(Object.isFrozen(limits)).toBe(true);
+    expect(() => { limits.maxSpeedMps = 99; }).toThrow();
+    expect((b.rules.find(r => r.id === limitRule.id)!.then as { limits: Record<string, number> }).limits).not.toBe(limits);
+    // A frozen object with an unfrozen child is frozen all the way down.
+    const shared = { limits: { x: 1 } };
+    Object.freeze(shared);
+    const frozen = compileDomain(tiny([rule('r', { answer: 'limit', limits: { speed: 1 } })]));
+    expect(Object.isFrozen((frozen.rules[0].then as { limits: object }).limits)).toBe(true);
+    expect(Object.isFrozen(shared.limits)).toBe(false);
+  });
+});
+
+describe('0.5.3: a selector that matches nothing is a finding', () => {
+  it('a rule on tag:staff-only where the area is tagged Staff-only is a warning naming the near miss; tags match exactly, case included', () => {
+    const site = tiny([rule('no_bots', { answer: 'deny' }, { where: 'tag:staff-only' })], { areas: [{ id: 'x', name: 'X' }, { id: 'y', name: 'Aisle 5', tags: ['Staff-only'] }], tags: { areas: ['staff-only'] } });
+    const rb = compileDomain(site);
+    expect(rb.findings.map(f => [f.kind, f.severity, f.ruleIds, f.certainty, f.witness])).toEqual([['unmatched_selector', 'warning', ['no_bots'], 'certain', undefined]]);
+    expect(rb.findings[0].message).toMatch(/tag "staff-only", which no area carries — tags match exactly, case included; Aisle 5 carries "Staff-only"/);
+    expect(rb.findings[0].message).toMatch(/binds nothing/);
+    expect(evaluateDomainAction(rb, tinyReq('go', 'y')).status).toBe('ALLOW');   // it binds nothing, as the finding says
+    // A partly empty selector: one entry matches nothing, the rule still binds the rest.
+    const partly = compileDomain(tiny([rule('r', { answer: 'deny' }, { where: ['tag:staff-only', 'x'] })], { tags: { areas: ['staff-only'] } }));
+    expect(partly.findings[0].message).toMatch(/binds less than it reads/);
+    expect(evaluateDomainAction(partly, tinyReq('go', 'x')).status).toBe('BLOCK');
+    // A kind no action has, and an exclusion that empties the set.
+    expect(compileDomain(tiny([rule('r', { answer: 'deny' }, { who: 'kind:drone' })], { kinds: ['drone'] })).findings[0].message).toMatch(/kind "drone", which no role has/);
+    expect(compileDomain(tiny([rule('r', { answer: 'deny' }, { where: ['*', '!x', '!y'] })])).findings[0].message).toMatch(/where resolves to no area at all/);
+    expect(compileDomain(tiny([rule('r', { answer: 'deny' }, { where: 'x' })])).findings).toEqual([]);
+  });
+});
+
+describe('0.5.3: a never rule whose conditions can never fail is unconditional for reachability', () => {
+  it('a clash entirely behind `never when people >= 0` (min 0) is unreachable, exactly as behind a never rule with no conditions', () => {
+    const behind = (when: Condition[] | undefined) => checkRulebook(tiny([rule('inv', { answer: 'deny' }, { never: true, where: 'y', ...(when ? { when } : {}) }), rule('yes', { answer: 'allow' }, { where: 'y' }), rule('no', { answer: 'deny' }, { where: 'y' })])).map(f => `${f.kind}:${f.ruleIds.join('+')}`);
+    expect(behind(undefined)).toEqual(['never_vs_rule:yes+inv']);
+    expect(behind([{ fact: 'n', op: '>=', value: 0 }])).toEqual(['never_vs_rule:yes+inv']);                 // 0.5.2 also reported contradiction:yes+no
+    expect(behind([{ fact: 'mode', op: 'in', values: ['a', 'b', 'c'] }])).toEqual(['never_vs_rule:yes+inv']);
+    expect(behind([{ fact: 'n', op: '>=', value: 1 }])).toEqual(['never_vs_rule:yes+inv', 'contradiction:yes+no']);   // a real condition: the clash is reachable when n is 0
+  });
+});
+
+describe('0.5.3: the drafter and the four audit sentences', () => {
+  const rb = grocery.rulebook;
+  const draft = (text: string, book = rb) => draftRuleFromText(text, book, { setBy: 'site-manager', id: 'd' });
+  it('"Robots may not go faster than 1 m/s" is a 1 m/s limit on movement, never deny-everything', () => {
+    const d = draft('Robots may not go faster than 1 m/s');
+    expect(d.draft).toMatchObject({ who: ['kind:robot'], does: 'tag:movement', then: { answer: 'limit', limits: { maxSpeedMps: 1 } } });
+    expect(d.confidentDraft).toBe(true);
+    expect(d.ready).toBe(d.confidentDraft);
+  });
+  it('"Never enter aisle 5 unless there is an emergency" is not drafted: "unless" is an exception the drafter cannot carry', () => {
+    const d = draft('Never enter aisle 5 unless there is an emergency');
+    expect(d.draft).toBeNull();
+    expect(d.confidentDraft).toBe(false);
+    expect(d.notes.join(' ')).toMatch(/"unless" carves an exception/);
+    expect(draft('robots may dock except in checkout').draft).toBeNull();
+    expect(draft('robots may dock but not in checkout').draft).toBeNull();
+  });
+  it('"No scanning while people are present" is not drafted: "scanning" is not a declared action, and a rule on every action is not what it says', () => {
+    const d = draft('No scanning while people are present');
+    expect(d.draft).toBeNull();
+    expect(d.notes.join(' ')).toMatch(/No declared action matches "scanning"/);
+    // The same sentence with the declared verb is a condition wait on scan alone.
+    const ok = draft('robots may not scan while people are present');
+    expect(ok.draft).toMatchObject({ who: ['kind:robot'], does: ['scan'], when: [{ fact: 'peopleInZone', op: '>', value: 0 }], then: { answer: 'deny' } });
+    // A "while" the drafter could not read as a condition is refused, not dropped.
+    expect(draft('robots may not scan while the band plays').draft).toBeNull();
+    expect(draft('robots may not scan while the band plays').notes.join(' ')).toMatch(/"while \.\.\." is a condition the drafter could not read/);
+  });
+  it('"At most 2 robots in aisle 5" with a count fact binds entering only: robots already inside can act and leave', () => {
+    const d = draft('At most 2 robots in aisle 5', sampleSite(2).rulebook);
+    expect(d.draft).toMatchObject({ who: ['kind:robot'], does: ['enter_zone', 'dock'], where: ['aisle-5'], when: [{ fact: 'robotsInZone', op: '>=', value: 2 }], then: { answer: 'wait', for: 'condition' } });
+    expect(d.notes.join(' ')).toMatch(/entering \(enter_zone, dock\) waits while robotsInZone >= 2; other actions, including leaving, are not bound/);
+    const compiled = new DomainRulesBuilder({ id: 's', name: 'S', hours: { open: '08:00', close: '20:00' } }).fromTemplate('grocery-store')
+      .area({ id: 'aisle-5', name: 'Aisle 5', tags: ['public'] }).role({ id: 'bot', name: 'Bot', kind: 'robot', actions: ['enter_zone', 'move', 'scan', 'dock'] })
+      .fact({ id: 'robotsInZone', type: 'number', integer: true, min: 0, required: true }).as('site-manager');
+    compiled.confirm(compiled.addRuleFromText('At most 2 robots in aisle 5', { id: 'cap' }));
+    const book = compiled.compile();
+    const inside = (action: string) => evaluateDomainAction(book, { participant: { id: 'r', kind: 'robot', roleId: 'bot' }, action, areaId: 'aisle-5', facts: { peopleInZone: 0, localTime: '10:00', robotsInZone: 2 } }).status;
+    expect(inside('enter_zone')).toBe('PAUSE');
+    expect(inside('move')).toBe('LIMIT');   // the template's speed cap, not the count: a robot inside may move (and leave)
+    expect(inside('scan')).toBe('ALLOW');
+  });
+  it('a comparison the drafter cannot turn into a limit is refused, and unmatched words keep a draft from being confident', () => {
+    expect(draft('robots may not go faster than the staff').draft).toBeNull();
+    expect(draft('robots may not go faster than the staff').notes.join(' ')).toMatch(/"faster than" is a comparison/);
+    const loose = draft('robots may dock quietly after 22:00');
+    expect(loose.draft).not.toBeNull();
+    expect(loose.unmatched).toEqual(['quietly']);
+    expect(loose.confidentDraft).toBe(false);
+    expect(loose.notes.join(' ')).toMatch(/Not a confident draft/);
   });
 });

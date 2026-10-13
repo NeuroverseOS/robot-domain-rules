@@ -15,6 +15,7 @@ const KIND_WORDS: Record<Finding['kind'], string> = {
   'duplicate': 'Two rules say the same thing',
   'limit_disagreement': 'Two limits on one thing disagree',
   'never_vs_rule': 'A rule tries to allow what a never-rule forbids',
+  'unmatched_selector': 'A rule names something no declared thing carries; it binds less than it reads',
 };
 
 export function ConflictsBadge({ findings, open, onToggle }: { findings: Finding[]; open: boolean; onToggle: () => void }) {
@@ -29,7 +30,7 @@ export function ConflictsBadge({ findings, open, onToggle }: { findings: Finding
 export function ConflictsPanel({ findings, onPick, onTry }: { findings: Finding[]; onPick: (ids: string[]) => void; onTry?: (w: Witness) => void }) {
   return (
     <section class="panel conflicts" id="conflicts" aria-label="Rules at odds">
-      <header><h2>Rules at odds</h2><span class="muted small">what the conflict check found, before anyone acts on this rulebook. The analysis is exact: every certain finding comes with an example request that triggers both rules.</span></header>
+      <header><h2>Rules at odds</h2><span class="muted small">what the conflict check found, before anyone acts on this rulebook. The analysis is exact: every certain finding between two rules comes with an example request that triggers both; a finding on one rule says what it fails to bind.</span></header>
       {findings.length === 0 && <div class="empty">None. Every rule can take effect, and no rule loosens a higher authority's.</div>}
       {findings.map((f, i) => (
         <div class={`finding ${f.severity}`} key={i}>

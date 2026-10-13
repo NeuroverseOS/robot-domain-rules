@@ -30,6 +30,7 @@
 import type { DomainDecisionStatus, DomainRequest, Finding, HistoryEntry, Rulebook } from './types';
 import { evaluateDomainAction, matchingRules, missingFacts } from './evaluate';
 import { DomainRulesError, isTimestamp } from './vocabulary';
+import { rulebookVersionProblem } from './version';
 
 /** What the site recorded after the request, if anything. Never used to decide; only reported. */
 export type BacktestOutcome = 'happened' | 'did_not_happen' | 'unknown';
@@ -164,6 +165,9 @@ export interface BacktestComparison {
 const counts = (): BacktestCounts => ({ events: 0, ALLOW: 0, LIMIT: 0, PAUSE: 0, BLOCK: 0, missingFacts: 0 });
 
 export function backtest(rulebook: Rulebook, events: BacktestEvent[], options: BacktestOptions = {}): BacktestReport {
+  // A rulebook of another format is bad input, refused by name like a bad log (never reinterpreted).
+  const versionProblem = rulebookVersionProblem(rulebook);
+  if (versionProblem) throw new DomainRulesError(`backtest: ${versionProblem}`);
   if (!Array.isArray(events)) throw new DomainRulesError('backtest: events must be a list of { at, request, outcome? }.');
   events.forEach((e, i) => {
     if (!e || typeof e !== 'object' || typeof e.at !== 'string' || !e.at || !('request' in e)) throw new DomainRulesError(`backtest: events[${i}] must be { at, request, outcome? } with a non-empty "at".`);

@@ -9,9 +9,12 @@
  */
 
 import type {
-  ActionDef, AreaDef, AuthorityDef, Condition, Day, FactDef, FactValue, HistoryCondition, HistoryEntry, LimitDef, RoleDef, Rulebook, Selector,
+  ActionDef, AreaDef, AuthorityDef, Condition, Day, DomainDecisionStatus, FactDef, FactValue, HistoryCondition, HistoryEntry, LimitDef, RoleDef, Rulebook, Selector,
 } from './types';
 import { DAYS } from './types';
+
+/** Strictness of a status: the decision is the strictest check (SPEC.md § 5). */
+export const SEVERITY: Readonly<Record<DomainDecisionStatus, number>> = { ALLOW: 0, LIMIT: 1, PAUSE: 2, BLOCK: 3 };
 
 /** Thrown when the input can't produce a valid rulebook. The message says what to fix. */
 export class DomainRulesError extends Error {
@@ -35,6 +38,11 @@ export function minutesOf(hhmm: string): number {
   return h * 60 + m;
 }
 
+/** Minutes since midnight as "HH:MM". */
+export function hhmm(t: number): string {
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
 /** Is "HH:MM" within opening hours? Handles overnight hours; open === close means always open. */
 export function isOpen(localTime: string, hours: { open: string; close: string }): boolean {
   const t = minutesOf(localTime), open = minutesOf(hours.open), close = minutesOf(hours.close);
@@ -50,10 +58,14 @@ export function inWindow(t: number, from: number, to: number): boolean {
 const TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})?$/;
 
 /**
- * An ISO 8601 timestamp with a date (`Timestamp`), as milliseconds since the
- * Unix epoch; null when it is not one. No offset means UTC, so every
- * implementation reads the same instant. Calendar validity is checked
- * (2026-02-30 is not a timestamp).
+ * An ISO 8601 timestamp with a date (`Timestamp`), as whole milliseconds
+ * since the Unix epoch; null when it is not one. No offset means UTC, so
+ * every implementation reads the same instant. Calendar validity is checked
+ * (2026-02-30 is not a timestamp). A fraction longer than three digits is
+ * TRUNCATED to milliseconds (SPEC.md § 1): two timestamps that differ only
+ * past the millisecond are the same instant to this layer, and a port with
+ * finer ticks must truncate the same way. Years 0000–0099 are those years,
+ * not 19xx.
  */
 export function parseTimestamp(value: unknown): number | null {
   if (typeof value !== 'string') return null;
@@ -62,8 +74,11 @@ export function parseTimestamp(value: unknown): number | null {
   const [, y, mo, d, h, mi, s, frac, zone] = m;
   const Y = Number(y), M = Number(mo), D = Number(d), H = Number(h), MI = Number(mi), S = Number(s ?? 0);
   if (M < 1 || M > 12 || D < 1 || H > 23 || MI > 59 || S > 59) return null;
-  const ms = Date.UTC(Y, M - 1, D, H, MI, S, frac ? Math.floor(Number(frac.padEnd(3, '0').slice(0, 3))) : 0);
-  if (new Date(ms).getUTCDate() !== D) return null;
+  const date = new Date(0);
+  date.setUTCFullYear(Y, M - 1, D);
+  date.setUTCHours(H, MI, S, frac ? Number(frac.padEnd(3, '0').slice(0, 3)) : 0);
+  const ms = date.getTime();
+  if (date.getUTCDate() !== D || date.getUTCMonth() !== M - 1) return null;
   let offset = 0;
   if (zone && zone !== 'Z') {
     const sign = zone[0] === '-' ? -1 : 1;
@@ -84,9 +99,14 @@ export function addSeconds(timestamp: string, seconds: number): string {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-/** The "HH:MM" of a timestamp, in UTC (its own offset applied). */
+/**
+ * The wall-clock "HH:MM" a timestamp names, in its OWN offset: the hour and
+ * minute written in it. `2026-10-12T21:00:00-05:00` is 21:00 — the local
+ * evening the site's time facts describe — not 02:00 UTC. A timestamp with
+ * no offset is UTC, and its wall clock is the one written.
+ */
 export function timeOfDay(timestamp: string): string {
-  return new Date(parseTimestamp(timestamp)!).toISOString().slice(11, 16);
+  return timestamp.slice(11, 16);
 }
 
 // ─── Vocabulary ──────────────────────────────────────────────────────────────
@@ -400,7 +420,7 @@ export type Constraint =
   | { shape: 'values'; values?: FactValue[]; excluded: FactValue[] }
   | { shape: 'minutes'; bits: boolean[] };
 
-function universeConstraint(def: FactDef): Constraint {
+export function universeConstraint(def: FactDef): Constraint {
   switch (def.type) {
     case 'number': return normaliseRange({ shape: 'range', lo: def.min ?? -Infinity, hi: def.max ?? Infinity, loOpen: false, hiOpen: false, excluded: [] }, def.integer === true);
     case 'time': return { shape: 'minutes', bits: new Array(1440).fill(true) };
@@ -609,8 +629,4 @@ export function describeConstraint(c: Constraint, def: FactDef): string {
       return windows.length === 1 && windows[0] === '00:00–24:00' ? `any ${def.id}` : `${def.id} in ${windows.join(', ')}`;
     }
   }
-}
-
-function hhmm(t: number): string {
-  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }

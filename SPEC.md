@@ -20,7 +20,7 @@ A **fact value** is a JSON number, string or boolean.
 
 A **time** is `"HH:MM"`, 24-hour, zero-padded (`^([01]\d|2[0-3]):[0-5]\d$`). A **day** is one of `mon tue wed thu fri sat sun`.
 
-A **timestamp** is ISO 8601 with a date: `YYYY-MM-DDTHH:MM`, optional `:SS` and `.fraction`, optional `Z` or `±HH:MM` offset (`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?$`), calendar-valid. **Without an offset it is read as UTC**, so every implementation reads the same instant. Timestamps are compared as instants.
+A **timestamp** is ISO 8601 with a date: `YYYY-MM-DDTHH:MM`, optional `:SS` and `.fraction`, optional `Z` or `±HH:MM` offset (`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?$`), calendar-valid. **Without an offset it is read as UTC**, so every implementation reads the same instant. Timestamps are compared as instants **at millisecond resolution: a fraction longer than three digits is truncated** (`09:30:00.0009` is the instant `09:30:00.000`), so a platform with finer ticks must truncate before comparing (cases `approvals-sub-millisecond-*`). Years `0000`–`0099` are those years. A timestamp's **wall-clock time** is the `HH:MM` written in it, in its own offset (§ 12).
 
 ## 2. Rulebook
 
@@ -34,7 +34,7 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `kinds` | string[] | yes | Participant kinds (`robot`, `person`, `agent`, …). MUST include every kind any role or action names. |
 | `authorities` | `{ id, name? }[]` | yes, ≥1 | **Highest first.** Unique IDs. |
 | `actions` | `{ id, name?, kinds (≥1), tags?, requires?, effects?, synonyms? }[]` | yes | `requires`: fact IDs that MUST be present when this action is requested. `effects`: what the action does to the facts when a plan is projected (§ 2.1); unused by the single-action decision. |
-| `areas` | `{ id, name, tags?, allowRoles?, denyRoles?, synonyms? }[]` | yes, ≥1 | `allowRoles`/`denyRoles` are informational in a compiled rulebook: their effect is already present as never rules `area_role_limits:<area>` and `area_role_limits:<area>:deny`. |
+| `areas` | `{ id, name, tags?, allowRoles?, denyRoles?, synonyms? }[]` | yes, ≥1 | `allowRoles`/`denyRoles` compile to the never rules `area_role_limits:<area>` and `area_role_limits:<area>:deny` (§ 2.2). Validation re-derives them from the areas and requires them present and unchanged; the id prefix `area_role_limits:` is reserved for them. |
 | `roles` | `{ id, name, kind, actions, inherits?, tags?, synonyms? }[]` | yes, ≥1 | `actions` is the **full** list (inheritance already resolved). Every listed action MUST declare the role's kind in its `kinds`. |
 | `facts` | `{ id, type, required?, default?, min?, max?, integer?, values?, description?, synonyms? }[]` | yes | `type` ∈ `number boolean time day enum string`. A fact MUST NOT be both `required` and have a `default`. `min/max/integer` only on numbers; `values` (≥1) required for enums. `default` MUST be valid for the type. The ID `approvedBy` is reserved and MUST NOT be declared. |
 | `limits` | `{ id, name?, unit?, requestedFact?, appliesTo?, synonyms? }[]` | yes | `requestedFact` MUST name a declared `number` fact. |
@@ -45,7 +45,7 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `rules` | Rule[] | yes | § 3. IDs unique across `rules` and `planRules`. |
 | `planRules` | PlanRule[] | no | § 3.5. Present only when non-empty. |
 | `builtin` | `{ id, text }[]` | yes | MUST include `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`, `plan_area_continuity`. |
-| `findings` | Finding[] | yes | § 7. What the conflict check found; MAY be empty; MUST NOT be hidden. **Not covered by the fingerprint** (their messages are free text). |
+| `findings` | Finding[] | yes | § 7. What the conflict check found; MAY be empty; MUST NOT be hidden — and validation checks that: it re-runs the check and compares (kind, severity, rule IDs, certainty, a valid witness; messages are free). **Not covered by the fingerprint** (their messages are free text). |
 | `fingerprint` | 64 lowercase hex | yes | § 8.2, over everything above except `findings`. |
 
 ### 2.1 Effects
@@ -61,7 +61,11 @@ An effect is one of:
 
 `fact` MUST be a declared fact. Effects are not clamped to the fact's range: a projected value outside it makes the next step BLOCK `required_facts`.
 
-**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: a format other than `neuroverse-domain-rules/3` (a `/1` or `/2` format MUST be refused with a message naming that version and the migration, § 11); empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; an effect on an undeclared fact or of the wrong type; a history condition that is malformed or carries the `/2` member `clock` (§ 3.4); a plan rule that is malformed or shares an ID with a rule (§ 3.5); an empty `planRules` list; a fingerprint that does not match (a 16-hex fingerprint never matches). (Reference: `validateRulebook`; cases: every `expect.error` case, `conformance/versions.json`.)
+### 2.2 Derived content
+
+Two parts of a rulebook are derived from the rest and are not covered by the fingerprint's protection against meaning change in the way the rules are: the **area role-limit never rules** (derivable from `areas[].allowRoles/denyRoles`, `roles` and `authorities`) and the **findings** (derivable from the rules by § 7). An attacker who recomputes the fingerprint could drop either. So validation RE-DERIVES both and compares. For each area with `denyRoles`, the rule `{ id: "area_role_limits:<area>:deny", never: true, setBy: <declaration authority>, text: "<role names> may never act in <area name>.", who: denyRoles, does: "*", where: <area id>, then: { answer: "deny" }, reason: <same as text>, source: { kind: "declaration", ref: "area:<area>.denyRoles" } }`; for each area with `allowRoles` and at least one other role, `{ id: "area_role_limits:<area>", never: true, setBy, text: "<area name> is limited to: <allowRoles joined by ', '>.", who: <every role id not in allowRoles, in declaration order>, does: "*", where: <area id>, then: { answer: "deny" }, reason: <same as text>, source: { kind: "declaration", ref: "area:<area>.allowRoles" } }`, where the declaration authority is `site-manager` if declared, else the last (lowest) authority, and role names are the roles' `name`s joined by `", "`. Each such rule MUST be present in `rules` and equal (as canonical JSON) to the derived one; no other rule may use the `area_role_limits:` prefix. The findings MUST equal, as a multiset of `(kind, severity, ruleIds, certainty)`, what § 7 produces for the rulebook, every `certain` finding between two rules MUST carry a witness that matches both (§ 6 step 4), and no other finding may carry one; messages are free. (Reference: `validateRulebook`; cases: `conformance/integrity.json`.) A rulebook signature (§ 9.6) protects everything, derived or not, in transit; validation protects the meaning of what is derived.
+
+**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: a format other than `neuroverse-domain-rules/3` (a `/1` or `/2` format MUST be refused with a message naming that version and the migration, § 11 — and the evaluator, the plan evaluator, the conflict check and the backtest MUST refuse it the same way, § 11); a derived never rule missing or altered, or findings that do not match the check (§ 2.2); empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; an effect on an undeclared fact or of the wrong type; a history condition that is malformed or carries the `/2` member `clock` (§ 3.4); a plan rule that is malformed or shares an ID with a rule (§ 3.5); an empty `planRules` list; a fingerprint that does not match (a 16-hex fingerprint never matches). (Reference: `validateRulebook`; cases: every `expect.error` case, `conformance/versions.json`.)
 
 ## 3. Rule
 
@@ -174,7 +178,7 @@ A plan rule judges the shape of a whole plan (§ 12) and can only reject:
   "consumedApprovals": [ "dana-glasses-17" ] }
 ```
 
-`zoneId` is accepted as a deprecated alias of `areaId`; a top-level `targetRobotId` is copied into `facts.targetRobotId` when that is absent. `facts` carries the declared facts by ID plus the built-in `approvedBy` (§ 9): a non-empty string (an unqualified approval) or an approval object. Undeclared facts are ignored. A request is never a reason to throw: every malformed request yields a BLOCK decision.
+`zoneId` is accepted as a deprecated alias of `areaId`; a top-level `targetRobotId` is copied into `facts.targetRobotId` when that is absent. `facts` carries the declared facts by ID plus the built-in `approvedBy` (§ 9): a non-empty string (an unqualified approval), an approval object, or a non-empty list of those — each approval clears at most one wait. Undeclared facts are ignored. A request is never a reason to throw: every malformed request yields a BLOCK decision. `participant.id` MUST be non-empty when an approval is needed (an approval binds to the participant); the evaluator decides a request without one when no approval is involved, and the schema describes a well-formed request as always naming it.
 
 `history` (optional) is a list of `{ action, areaId, at? }` — what this participant did recently, as the caller reports it; `at` is a timestamp (§ 1). It is needed only when a rule in scope has history conditions (§ 6 step 3).
 
@@ -197,7 +201,7 @@ A plan rule judges the shape of a whole plan (§ 12) and can only reject:
   "fingerprint": "fb1e4760…dfc8" }
 ```
 
-Statuses, strictest last: `ALLOW < LIMIT < PAUSE < BLOCK`. A **check** is `{ ruleId, status, reason, setBy }`; `setBy` is `"builtin"` for the evaluator's own checks. `reasons` are the checks at the strictest status, in trace order. `limits` is present iff some limit rule matched and the status is ALLOW or LIMIT. `then` is present iff the status is BLOCK and a matching deny rule had `instead` (the first one, never rules first). `approvalRequests` is present iff the status is PAUSE and at least one approval wait is unmet (§ 6 step 8). `approvalsUsed` is present iff the status is ALLOW or LIMIT and a signed approval cleared a wait: the caller records each nonce as consumed once it acts (§ 9.5). `fingerprint` is the rulebook's. The `reason` texts are free-form.
+Statuses, strictest last: `ALLOW < LIMIT < PAUSE < BLOCK`. A **check** is `{ ruleId, status, reason, setBy }`; `setBy` is `"builtin"` for the evaluator's own checks. One built-in check is not in the rulebook's `builtin` list: `rulebook_version`, the refusal of a rulebook of another format (§ 11) — a refused rulebook's own list cannot be trusted, and adding it to `builtin` would change every fingerprint. A decision with that reason carries the refused rulebook's claimed `fingerprint` string (or `""`). `reasons` are the checks at the strictest status, in trace order. `limits` is present iff some limit rule matched and the status is ALLOW or LIMIT. `then` is present iff the status is BLOCK and a matching deny rule had `instead` (the first one, never rules first). `approvalRequests` is present iff the status is PAUSE and at least one approval wait is unmet (§ 6 step 8). `approvalsUsed` is present iff the status is ALLOW or LIMIT and a signed approval cleared a wait: the caller records each nonce as consumed once it acts (§ 9.5). `fingerprint` is the rulebook's. The `reason` texts are free-form.
 
 ## 6. The decision algorithm
 
@@ -226,13 +230,16 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
       else facts[F.id] = value.
     now: absent → none; present but not a timestamp → problem.
     consumedApprovals: absent → empty; present but not a list of strings → problem.
-    approvedBy: absent → none. A non-empty string s → { id: s }. An object with a
-    non-empty string id → copy id, authority (MUST be a declared authority), roleId
-    (MUST be a declared role), verified (MUST be boolean), and the string members
+    approvedBy: absent → none. A non-empty string s → one approval { id: s }. An
+    object with a non-empty string id → one approval: copy id, authority (MUST be a
+    declared authority), roleId (MUST be a declared role), and the string members
     spec, ruleId, rulebookFingerprint, participantId, action, areaId, nonce, keyId,
     issuedAt, expiresAt, signature, requestDigest (each MUST be a string when given);
-    anything else → problem. Any other shape → problem. If the rulebook has trusted
-    keys and the approval is an object and now is absent: problem "now is required".
+    a `verified` member is IGNORED (it is request data; § 9.3); note whether the
+    object is a verified handle (§ 9.3). A non-empty list → each entry as above, in
+    order. Any other shape (an empty list, a member of another shape) → problem. If
+    the rulebook has trusted keys and any approval is an object and now is absent:
+    problem "now is required".
     History. Let N = the rules with a non-empty `history` whose three selectors
     cover this request (the selector part of step 4). If N is non-empty:
       if request.history is absent: problem "history is required"
@@ -282,28 +289,36 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
       ask() = append { ruleId, by (omitted when none), rulebookFingerprint:
                        rulebook.fingerprint, participantId: participant.id, action,
                        areaId: area.id, reason, setBy } to approvalRequests.
-      if no approval: check(ruleId, PAUSE, …, setBy); ask(); return.
-      if rulebook.trustedKeys is a non-empty list, the approval is BOUND only when
-      every one of these holds (the first failure is the reason given):
-        approval.spec == "robot-domain-rules-approval/3"   (a /2 approval — one with
-             requestDigest, or a 16-hex rulebookFingerprint — is refused by name, § 11)
-        approval.verified == true
+      if there are no approvals: check(ruleId, PAUSE, …, setBy); ask(); return.
+      For each approval in order that has not already cleared a wait in THIS
+      decision (each approval clears at most one wait), the approval is BOUND only
+      when every one of these holds (the first failure is that approval's reason):
+        it is not a /2 approval — one with requestDigest, or a 16-hex
+             rulebookFingerprint — and its spec, if given, is
+             "robot-domain-rules-approval/3"   (refused by name with or without
+             trusted keys, § 11)
+        and, when rulebook.trustedKeys is a non-empty list:
+        approval.spec == "robot-domain-rules-approval/3"
+        the approval is a VERIFIED HANDLE: the very object verifyApproval returned
+             (§ 9.3). Nothing in request data can satisfy this; `evaluate` alone on a
+             trusted-keys rulebook therefore never clears a wait, and says to use
+             verifyAndEvaluate.
         approval.ruleId == ruleId
         approval.rulebookFingerprint == rulebook.fingerprint
         approval.participantId == participant.id, approval.action == action,
              approval.areaId == area.id
         approval.nonce is a string not in consumedApprovals
         issuedAt and expiresAt are timestamps and issuedAt <= now < expiresAt
-      if not bound: check(ruleId, PAUSE, …, setBy); ask(); return.
       sufficient =
         by is none → true
         by is a declared authority → approval.authority is set and
              rank(approval.authority) <= rank(by)   (rank 0 = highest)
         by == "tag:" + t → approval.roleId names a role whose tags include t
         otherwise (by is a role ID) → approval.roleId == by
-      if sufficient: check(ruleId, ALLOW, …, setBy); if approval.nonce is set:
-             append { ruleId, nonce } to approvalsUsed
-      else check(ruleId, PAUSE, …, setBy); ask().
+      The first approval that is bound and sufficient is spent on this wait:
+             check(ruleId, ALLOW, …, setBy); if its nonce is set: append
+             { ruleId, nonce } to approvalsUsed; return.
+      None: check(ruleId, PAUSE, …, setBy) with every approval's reason; ask().
 
  9. (nothing)
 
@@ -315,11 +330,13 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
     fingerprint = rulebook.fingerprint.
 ```
 
-Consequences worth stating: a missing or invalid fact is never permission (step 3); an approved unknown action still faces every never rule and every matching rule (steps 5–7); **an approval clears only the approval wait of the rule it names** — approvals never clear a condition wait, never a deny, never a never rule, and every other check runs on the facts the request carries now (step 7); the strictest answer always wins, so a looser rule from a lower authority has no effect even before the conflict check names it.
+Consequences worth stating: a missing or invalid fact is never permission (step 3); an approved unknown action still faces every never rule and every matching rule (steps 5–7); **an approval clears only the approval wait of the rule it names, and clears at most one wait** — approvals never clear a condition wait, never a deny, never a never rule, and every other check runs on the facts the request carries now (step 7); two waits need two approvals (`approvedBy` as a list); the strictest answer always wins, so a looser rule from a lower authority has no effect even before the conflict check names it.
 
 ## 7. Conflict analysis
 
-`check(rulebook) → Finding[]` ([`spec/findings.schema.json`](spec/findings.schema.json)). A finding is `{ kind, severity, ruleIds: [first, second], certainty, witness?, message }` with kind ∈ `contradiction authority-override tightening shadowed duplicate limit_disagreement never_vs_rule`, severity ∈ `conflict warning info`, certainty ∈ `certain possible`. `message` is free-form and SHOULD name which rule wins and which never takes effect.
+`check(rulebook) → Finding[]` ([`spec/findings.schema.json`](spec/findings.schema.json)). A finding is `{ kind, severity, ruleIds: [first, second], certainty, witness?, message }` with kind ∈ `contradiction authority-override tightening shadowed duplicate limit_disagreement never_vs_rule unmatched_selector`, severity ∈ `conflict warning info`, certainty ∈ `certain possible`. `message` is free-form and SHOULD name which rule wins and which never takes effect. A rulebook of another format is refused by name (§ 11), never checked.
+
+**Unmatched selectors (one rule, § 7.6).** Before the pairs, every rule is checked on its own: a positive or negative selector entry `tag:<t>` that no declared thing carries, `kind:<k>` that no role (for `who`) or action (for `does`) has, or a whole selector that resolves to the empty set (an exclusion removed everything) is a `unmatched_selector` finding, severity `warning`, certainty `certain`, `ruleIds: [the rule]`, no witness. The rule still validates (a template may declare the tag; exclusions are legal) and still binds what it does resolve. **Tags match exactly, case included**; when a tag matches a declared tag only with case ignored, the message names it as the likely intent. Order: these findings come first, in rule order.
 
 **Why this is tractable, and what "complete" means.** A rule's conditions are AND-ed and each names ONE fact; facts are independent. So the set of requests matching a rule is a product of per-fact sets, each of a shape with exact intersection, emptiness and subset (§ 7.1), and "can two rules both match one request" reduces to per-fact intersections — no search, no enumeration over facts, no size bound. The analysis is **complete for that question**: two rules are reported if and only if some lawful request (§ 7.2) matches both. It does not reason about which rule a decision finally reaches when others intervene — a reported pair may, on a given request, both be outranked by a third rule; strictest-wins at decision time settles that, and the finding's `message` says only who wins between the two. History conditions are not modelled (§ 7.2).
 
@@ -338,7 +355,7 @@ For an integer fact every range is kept closed on whole numbers (`> v` becomes `
 
 ### 7.2 Overlap, reachability and certainty
 
-A triple `(role, action, area)` is **reachable** when the role lists the action (else `role_permits_action` refuses every such request before any rule is weighed) and no **unconditional never rule** other than the two being compared covers it (a never rule with no `when` and no `history`; else it refuses every such request first). Conditional never rules are compared like any rule.
+A triple `(role, action, area)` is **reachable** when the role lists the action (else `role_permits_action` refuses every such request before any rule is weighed) and no **unconditional never rule** other than the two being compared covers it (else it refuses every such request first). A never rule is unconditional when it has no `history` and its `when` can never fail: no conditions, or for every fact it names `constraint(R, f)` equals the fact's universe (`people >= 0` on a fact with `min: 0`; `in` every enum value; `in [true, false]`). Conditional never rules are compared like any rule.
 
 For rules `a`, `b` (every pair `i < j` in rulebook order):
 
@@ -382,11 +399,15 @@ An implementation MAY offer a strict mode that refuses a rulebook with any `conf
 
 ### 7.4 Witness
 
-`witness` is `{ participant: { id, kind, roleId }, action, areaId, facts }`: a request that matches both rules (§ 6 step 4, selectors and conditions, ignoring never-rule stopping) on a reachable triple. An implementation MUST produce a witness on every `certain` finding between rules and MAY choose any such request; the conformance cases judge a witness by validity (`conformance/README.md`). The reference chooses, deterministically: the first reachable triple in declaration order (roles, then actions, then areas); for every fact either rule names, the smallest value of the intersection (the first minute of the day for a time, the first in sorted order for a finite set, the lower end of a range or the first whole number above it, `"x"`/`"x1"`/… for a string that is "everything except"); every other fact the request needs (required, or required by the action) at a sample value (the default, else the minimum / `false` / `"00:00"` / `"mon"` / the first enum value / `"x"`); `participant.id` is `<roleId>-1`.
+`witness` is `{ participant: { id, kind, roleId }, action, areaId, facts }`: a request that matches both rules (§ 6 step 4, selectors and conditions, ignoring never-rule stopping) on a reachable triple. An implementation MUST produce a witness on every `certain` finding between two rules and MAY choose any such request; the conformance cases judge a witness by validity and the implementation's matching relation by agreement with the reference on the reference's witnesses (`conformance/README.md`). The reference chooses, deterministically: the first reachable triple in declaration order (roles, then actions, then areas); for every fact either rule names, the smallest value of the intersection (the first minute of the day for a time, the first in sorted order for a finite set, the lower end of a range or the first whole number above it, `"x"`/`"x1"`/… for a string that is "everything except"); every other fact the request needs (required, or required by the action) at a sample value (the default, else the minimum / `false` / `"00:00"` / `"mon"` / the first enum value / `"x"`); `participant.id` is `<roleId>-1`.
 
 ### 7.5 Plan rules
 
 Plan rules can only reject, so two of them never disagree. The check reports a `duplicate` (info, certain, no witness) for two plan rules with the same `check` (same kind, same resolved selectors, same `sameArea` / `count`) whose `who` selectors share a role. No other finding kind applies to plan rules, and a plan rule is never compared with a rule.
+
+### 7.6 Findings on one rule
+
+`unmatched_selector` (§ 7) is the one finding kind with a single rule ID and never a witness. Cases: `p7-unmatched-selector-is-a-finding`, `p7-unmatched-entry-in-a-wider-selector`, `p7-exclusion-that-empties-a-selector`.
 
 ## 8. Canonical JSON, SHA-256, fingerprint, request digest
 
@@ -396,11 +417,12 @@ Plan rules can only reject, so two of them never disagree. The check reports a `
 
 - array → `[` + elements joined by `,` + `]`, order kept;
 - object → `{` + members joined by `,` + `}`, members sorted by key comparing keys as sequences of UTF-16 code units (RFC 8785 § 3.2.3); each member is `JSON.stringify(key) + ":" + canonical(value)`;
-- string → as ECMAScript `JSON.stringify` writes it (RFC 8785 § 3.2.2.2): only `"`, `\` and U+0000–U+001F escaped (`\b \t \n \f \r`, else `\u00XX`), everything else literal, non-ASCII kept;
+- string → as ECMAScript `JSON.stringify` writes it (RFC 8785 § 3.2.2.2): only `"`, `\` and U+0000–U+001F escaped (`\b \t \n \f \r`, else `\u00XX`), everything else literal, non-ASCII kept. A string (or key) holding a **lone surrogate** is not Unicode text and MUST be refused with an error (JCS serialises Unicode strings; a port whose strings are UTF-8 or UTF-32 cannot even represent one — refusing keeps every port agreeing);
 - number → ECMAScript `Number::toString` shortest round-trip form (RFC 8785 § 3.2.2.3; `1`, `0.5`, `1e+21`, `1e-7`, `-0` as `0`). `NaN` and infinities are not JSON and MUST be refused;
-- `true`, `false`, `null` literally.
+- `true`, `false`, `null` literally;
+- anything that is not a JSON value (a function, a symbol, a bigint, `undefined` at the top level or inside an array) MUST be refused with an error — never written as `null` or as a token.
 
-No whitespace anywhere. (Cases: `conformance/fingerprint.json`.)
+No whitespace anywhere. **Hash the object as received**: every member present, including members this specification does not define — a typed deserialiser that drops unknown members changes the fingerprint. (Cases: `conformance/fingerprint.json`; number edges in `fp-number-edges`.)
 
 ### 8.2 SHA-256 and the fingerprint
 
@@ -408,11 +430,11 @@ No whitespace anywhere. (Cases: `conformance/fingerprint.json`.)
 
 `fingerprint(v)` = `sha256(UTF-8 bytes of canonical(v))`.
 
-A rulebook's `fingerprint` is `fingerprint(rulebook without its fingerprint and findings members)`. Findings are left out so that two conforming compilers, whose finding messages may differ, assign the same fingerprint to the same rulebook. It identifies a rulebook; it is not a security measure (§ 9.6 is). A fingerprint's version is recognisable by its length: 64 hex is `/3`; 16 hex is a `/2` FNV-1a value and is refused wherever a `/3` fingerprint is expected.
+A rulebook's `fingerprint` is `fingerprint(rulebook without its fingerprint and findings members)`. Findings are left out so that two conforming compilers, whose finding messages may differ, assign the same fingerprint to the same rulebook; validation re-derives them instead (§ 2.2). It identifies a rulebook; it is not a security measure (§ 9.6 is). A fingerprint's version is recognisable by its length: 64 hex is `/3`; 16 hex is a `/2` FNV-1a value and is refused wherever a `/3` fingerprint is expected.
 
-### 8.3 Request digest
+### 8.3 Request digest (removed)
 
-`requestDigest(request)` = `fingerprint({ participantId, action, areaId })` where `areaId` falls back to `zoneId`. It is a convenience key for logs and caches; approvals (§ 9) name the three fields themselves.
+`/3` up to 0.5.2 defined `requestDigest(request) = fingerprint({ participantId, action, areaId })` as a log key. It bound nothing (approvals name the three fields themselves) and is gone from the reference and the conformance cases; a port need not implement it.
 
 ## 9. Approvals
 
@@ -447,13 +469,13 @@ Returned on a PAUSE for approval, one per unmet approval wait:
 
 ### 9.3 Verification (before evaluation)
 
-`verifyApproval(approval, trustedKeys)` MUST: refuse an approval whose `spec` is not `robot-domain-rules-approval/3` (one carrying `requestDigest` or a 16-hex `rulebookFingerprint` is a `/2` approval and MUST be refused with a message naming that and the migration); check the required fields are non-empty strings and `rulebookFingerprint` is 64 hex; find the trusted key with `keyId`; if the approval claims an `authority`, require the key's `authority` to equal it; if it claims a `roleId`, require the key's `roleId` to equal it; verify the signature with the key. On success it returns the approval with `verified: true`, which the caller passes as `facts.approvedBy`. It does NOT check the binding fields, the window or the nonce: the evaluator does, against the real request and its `now`.
+`verifyApproval(approval, trustedKeys)` MUST: refuse an approval whose `spec` is not `robot-domain-rules-approval/3` (one carrying `requestDigest` or a 16-hex `rulebookFingerprint` is a `/2` approval and MUST be refused with a message naming that and the migration); check the required fields are non-empty strings and `rulebookFingerprint` is 64 hex; find the trusted key with `keyId`; if the approval claims an `authority`, require the key's `authority` to equal it; if it claims a `roleId`, require the key's `roleId` to equal it; verify the signature with the key. On success it returns a **verified handle**: an approval value of a kind that cannot be constructed from request data — in the reference, the very object it returns, registered by identity in a private `WeakSet`; in a typed port, a type (`VerifiedApproval`) with no public constructor that only `verifyApproval` produces. The caller passes that handle, not a copy, as `facts.approvedBy`. It does NOT check the binding fields, the window or the nonce: the evaluator does, against the real request and its `now`.
 
-**The `verified` flag is trusted as given.** It MUST be set only by the caller's trusted layer, from a successful `verifyApproval`, and that layer MUST be the only thing that assembles `facts`. The reference offers `verifyAndEvaluate(rulebook, request)` (and `verifyAndEvaluatePlan`) as the recommended entry: it verifies whatever signed approval the request carries and then evaluates; the evaluator itself stays pure and synchronous and never verifies a signature.
+**Nothing in a request can assert verification.** A `verified` member in the data is ignored wherever it appears (0.5.2 trusted it, and an unsigned object carrying it cleared a wait; that is closed). Under `trustedKeys` the evaluator clears a wait only for a verified handle, so `evaluate` on its own — given a request from JSON — never clears one and says so. The reference offers `verifyAndEvaluate(rulebook, request)` (and `verifyAndEvaluatePlan`) as the entry for the caller's trusted layer: it verifies every signed approval the request carries (one, or a list) and then evaluates with the handles; the evaluator itself stays pure and synchronous and never verifies a signature. Conformance judges both doors: `decision` cases run `evaluate`, `verifiedDecision` / `verifiedPlan` cases run the trusted entry.
 
 ### 9.4 What the evaluator checks
 
-§ 6 step 8, when `trustedKeys` is non-empty: `/3` spec, `verified`, rule, rulebook fingerprint, participant, action, area, an unconsumed nonce, and `issuedAt <= now < expiresAt`; then sufficiency for `by`. A request carrying an approval object under such a rulebook without `now` is BLOCK `required_facts`. When `trustedKeys` is absent or empty, plain approvals (`"name"` or `{ id, authority?, roleId? }`) are accepted: the development path.
+§ 6 step 8: a `/2` approval, or one declaring another `spec`, is refused with or without `trustedKeys`. When `trustedKeys` is non-empty: `/3` spec, the verified handle, rule, rulebook fingerprint, participant, action, area, an unconsumed nonce, and `issuedAt <= now < expiresAt`; then sufficiency for `by`. A request carrying an approval object under such a rulebook without `now` is BLOCK `required_facts`. When `trustedKeys` is absent or empty, plain approvals (`"name"` or `{ id, authority?, roleId? }`) are accepted — the development path, in which the approver's authority is **self-declared** and nothing checks it. `signApproval` refuses an `expiresAt` that is not later than `issuedAt`.
 
 ### 9.5 Replay, without hidden state
 
@@ -475,7 +497,7 @@ This specification is `robot-domain-rules/3`; the rulebook `format` string is `n
 
 | Artifact | How its version is known | A `/3` implementation… |
 |---|---|---|
-| Rulebook | `format` | accepts `neuroverse-domain-rules/3`; refuses `/1` and `/2` at validation with a message naming that version and the migration (recompile from the input). Cases: `conformance/versions.json`. |
+| Rulebook | `format` | accepts `neuroverse-domain-rules/3`; refuses `/1`, `/2` and any other value **at every door** with one message naming that version and the migration (recompile from the input): validation returns it; `evaluate` returns BLOCK `rulebook_version` with it (fingerprint: the refused rulebook's claimed string); `evaluatePlan` returns BLOCK with `firstViolation { ruleId: "rulebook_version", from: "plan" }`; the conflict check and the backtest treat it as bad input (an error). Cases: `conformance/versions.json`. |
 | Fingerprint / digest | length: 64 hex is `/3`, 16 hex is `/2` | a 16-hex fingerprint never verifies and never binds an approval. |
 | Signed approval | `spec` | accepts `robot-domain-rules-approval/3`; refuses an approval without it — in particular a `/2` one, recognisable by `requestDigest` or a 16-hex `rulebookFingerprint` — in `verifyApproval` and, if it is passed through anyway, in the evaluator, each time naming the migration (re-issue under `/3`). Cases: `approvals-verify-v2-approval-refused`, `approvals-v2-approval-does-not-clear`. |
 | History entry | `at` shape | a `/2` `"HH:MM"` `at` is not a timestamp: BLOCK `required_facts`, never a guess at the day. |
@@ -483,9 +505,13 @@ This specification is `robot-domain-rules/3`; the rulebook `format` string is `n
 
 **Migration from `/2`**: recompile every rulebook from its input with a `/3` compiler (fingerprints change; a rulebook's findings are unchanged); remove `clock` from history conditions; give history entries and backtest events dated timestamps and supply `request.now`; re-issue approvals under the `/3` contract (new fields, nonce, expiry) and start keeping a consumed-nonce set; add `plan_area_continuity` to `builtin` (the compiler does). Decisions for existing valid requests without history windows or approvals are unchanged except where a plan step changed area without a move (now refused) and where a finding's classification changed (§ 7).
 
+**Errata within `/3` (0.5.3).** The second audit found behaviours that contradicted this document's own text or its security requirements; they are corrected without a version bump because no format changed, no fingerprint changed, and each correction makes the implementation do what the specification already said. A port that passed the 0.5.2 cases must re-run the suite. What changed for an existing valid input: (1) an approval object carrying `verified: true` from request data no longer clears a wait under `trustedKeys` (§ 9.3 already required the flag to come only from the trusted layer); (2) a `/2` approval is refused with or without `trustedKeys` (§ 11 already said never reinterpreted); (3) in a plan, a single-use approval clears one step, not every step (§ 9.5, § 12 already said one use); (4) a `/1`, `/2` or unknown-format rulebook is refused by the evaluator, the plan evaluator, the check and the backtest, not only by validation (this section already said refused, never reinterpreted); (5) validation re-derives the area never rules and the findings (§ 2 already said findings MUST NOT be hidden and the areas' effect is the never rules); (6) a plan's default `startTime` is the wall-clock time `now` names in its own offset, not UTC (§ 12 said "time of day of `now`"; the UTC reading was wrong for every site not on UTC); (7) `finalArea` after a `plan_area_continuity` refusal is where the earlier steps left the participant; (8) a never rule whose conditions can never fail counts as unconditional for reachability (§ 7.2's intent); (9) one new finding kind, `unmatched_selector`, warning, on one rule (additive; findings are not in the fingerprint). Additions that change no existing output: `approvedBy` as a list; `approvalsUsed` on a plan evaluation; millisecond truncation and years 0000–0099 stated in § 1; `requestDigest` removed.
+
 ## 12. Plans
 
 `evaluatePlan(rulebook, plan) → PlanEvaluation` ([`spec/plan.schema.json`](spec/plan.schema.json), [`spec/plan-evaluation.schema.json`](spec/plan-evaluation.schema.json)). A plan is what a planner — an AI agent, a fleet manager, a person — proposes; the rulebook checks it and does not write it. Pure and synchronous, like § 6.
+
+The result is `{ status, steps, planChecks, firstViolation?, approvalRequests, approvalsUsed, finalFacts, finalArea, planDigest, fingerprint }` ([`spec/plan-evaluation.schema.json`](spec/plan-evaluation.schema.json)).
 
 ```json
 { "participant": { "id": "robot-9", "kind": "robot", "roleId": "restock_robot" },
@@ -503,9 +529,9 @@ This specification is `robot-domain-rules/3`; the rulebook `format` string is `n
 | `steps` | yes, ≥1 | `{ action, area?, facts?, note? }`. The first step MUST have `area`. A later step MAY name an area only if it is the area the participant is projected to be in, or its action has a `move` effect (§ 12 step 1). `facts` are laid over the projected facts for that step only, and persist into the projection after it. `note` is carried into the result. |
 | `history` | no | What the participant did before the plan; seeds each step's history and counts for `before` plan rules. |
 | `clock` | no | A declared `time` fact that advances. |
-| `startTime`, `stepDurationSeconds` | no | With `clock`: step *i* sees `clock = startTime + ⌊i · stepDurationSeconds / 60⌋` minutes, mod 1440. `startTime` defaults to the time of day of `now` (read as UTC) when `now` is given. |
+| `startTime`, `stepDurationSeconds` | no | With `clock`: step *i* sees `clock = startTime + ⌊i · stepDurationSeconds / 60⌋` minutes, mod 1440. `startTime` defaults to the **wall-clock time `now` names in its own offset** (the `HH:MM` written in it: `2026-10-12T21:00:00-05:00` → `21:00`, the site's evening) when `now` is given. Time facts describe the site's local clock; a planner on another clock states `startTime`. Cases `plan-clock-starts-at-the-wall-clock-of-now-*`. |
 | `now` | no | A timestamp: step *i*'s `request.now` is `now + i · stepDurationSeconds`; it also stamps the history entries the plan appends. Without it those entries carry no `at`, and a window rule in scope is `required_facts`. |
-| `consumedApprovals` | no | Passed to every step's request. |
+| `consumedApprovals` | no | The nonces already acted on. Every step's request receives them **plus every nonce an earlier step of this plan spent**, so one single-use approval clears one step (§ 12 step 3). |
 
 ```
  0. Shape. If the plan is not an object, has no participant, no steps, no initialFacts,
@@ -543,10 +569,12 @@ This specification is `robot-domain-rules/3`; the rulebook `format` string is `n
           participant is not in and its action does not move it
       else decision = evaluate(rulebook, { participant, action: step.action,
           areaId: areas[i], facts: stepFacts, history, now: now_i,
-          consumedApprovals: plan.consumedApprovals })                        (§ 6)
+          consumedApprovals: plan.consumedApprovals ∪ nonces spent by steps < i })  (§ 6)
       record { index: i, action, areaId: areas[i], facts: stepFacts, decision, note? }
       add each of decision.approvalRequests not already present (same ruleId,
         action and areaId) to approvalRequests
+      append each of decision.approvalsUsed to approvalsUsed, and its nonce to the
+        consumed set every later step receives
       if decision.status == BLOCK: facts = stepFacts; stop projecting
       facts = stepFacts with the action's effects applied, in order: set → the
         value; add/subtract → from the current value, or the fact's default when
@@ -557,12 +585,19 @@ This specification is `robot-domain-rules/3`; the rulebook `format` string is `n
     decision. firstViolation = among the first recorded step with status BLOCK
     (from "step", its first reason) and every plan check with status BLOCK (from
     "plan", at its stepIndex), the one with the smallest stepIndex; at equal
-    index the step's. finalFacts = facts. finalArea = the last recorded step's
-    areaId if its decision is BLOCK, else after[last recorded index].
-    planDigest = fingerprint(plan with `consumedApprovals` removed, `approvedBy`
-    removed from initialFacts and from every step's facts, and a step's facts
-    removed when empty after that) — so collecting approvals does not change it.
+    index the step's. finalFacts = facts. finalArea = after[last recorded index]
+    when its decision is not BLOCK; when it is BLOCK, the step's areaId — unless the
+    refusal is plan_area_continuity (the participant is not there), then
+    after[index − 1] (areas[0] for the first step). approvalsUsed as collected.
+    planDigest = fingerprint(plan taken as JSON — JSON.stringify semantics, so a
+    non-finite number becomes null and undefined members drop — with
+    `consumedApprovals` removed, `approvedBy` removed from initialFacts and from
+    every step's facts, and a step's facts removed when empty after that) — so
+    collecting approvals does not change it, and a plan that is not JSON still
+    has a digest (and is refused, never thrown on).
     fingerprint = rulebook.fingerprint.
+    A rulebook of another format: status BLOCK, firstViolation { stepIndex 0,
+    ruleId "rulebook_version", setBy "builtin", from "plan" }, no steps (§ 11).
 ```
 
 Consequences: nothing is projected past a refusal (the steps list is cut at the first BLOCK); a PAUSE does not stop projection, so a planner sees every approval the plan needs; the plan is judged on the effects the site declared and the facts the planner supplied, nothing else. **A plan verdict is a verdict on the plan as described.** Approvals collected for a plan step authorise that step's rule, participant, action and area (§ 9); at execution time each step MUST be asked again with `evaluate` on the facts then current — projected planning facts are never assumed to equal execution-time facts, and the same approval (one use, until it expires) is what clears that step's wait then.
@@ -668,23 +703,29 @@ Consequences: a row's status under a `missing` refusal is BLOCK, so a log that l
 
 ## 14. Porting notes
 
-**What a client needs** (a robot controller, a glasses runtime, an agent harness in Unity/C#, Rust, Python): `validate` (§ 2) with `verifyFingerprint` (§ 8), `evaluate` (§ 6), `verifyApproval` (§ 9.3) and the consumed-nonce set (§ 9.5), and `evaluatePlan` (§ 12) if it runs plans. That is the `decision`, `plan`, `error`, `canonical`/`fingerprint`/`sha256`, `requestDigest`, `verify`, `rulebookSignature` and `versions` cases. **Authoring tools** — the conflict check (§ 7: `findings` cases), the backtest (§ 13: `backtest`/`comparison` cases), text drafting — live wherever rulebooks are written and need not ship on the device; a client may trust the findings in a rulebook it was handed.
+**What a client needs** (a robot controller, a glasses runtime, an agent harness in Unity/C#, Rust, Python): `validate` (§ 2, which re-derives the area never rules and the findings, § 2.2) with `verifyFingerprint` (§ 8), `evaluate` (§ 6), `verifyApproval` with a verified-handle type (§ 9.3) and the consumed-nonce set (§ 9.5), and `evaluatePlan` (§ 12) if it runs plans. Every conformance case a client must pass is marked `client: true`: the `decision`, `verifiedDecision`, `plan`, `verifiedPlan`, `error`, `canonical`/`fingerprint`/`sha256`, `verify` and `rulebookSignature` cases, including `versions.json` and `integrity.json`; `node conformance/run-node.mjs --client` runs that subset. **Authoring tools** — the conflict check (§ 7: `findings` cases), the backtest (§ 13: `backtest`/`comparison` cases), text drafting — live wherever rulebooks are written. A client that validates a rulebook has, through § 2.2, checked its findings too; a client that only verifies a pinned signature (§ 9.6) may trust everything in it.
 
-**Numbers.** Canonical JSON needs ECMAScript `Number::toString` (RFC 8785 § 3.2.2.3): shortest round-trip, `1e+21` and `1e-7` thresholds, `-0` → `0`. In C# use `double.ToString("R")`-equivalent shortest round-trip and reformat exponents; Rust's `ryu`/`{}` for `f64` is shortest round-trip but writes `1e21`, so adjust the exponent form; Python's `repr(float)` is shortest round-trip with the same exponent thresholds as ECMAScript except for the `e+`/`e-` form and `1e16`-range integers — cover the `fp-numbers` case. Rulebook numbers are plain JSON numbers; an implementation MUST parse them as IEEE 754 doubles.
+**Numbers.** Canonical JSON requires a real ECMAScript `Number::toString` serialiser (RFC 8785 § 3.2.2.3): shortest round-trip digits, plain notation for 10⁻⁷ < |x| < 10²¹, exponent form `1e+21` / `1e-7` outside it, `-0` as `0`. The platform defaults are all wrong for JCS and MUST NOT be used as they are: .NET's `double.ToString("R")` / default writes `1E+15` (exponent form from 10¹⁵, capital `E`, no `+` on some runtimes); Rust's `{}` for `f64` never uses an exponent (`1e21` prints as `1000000000000000000000`, `5e-324` as 0.000…49); Python's `repr(float)` switches to exponent form at 10¹⁶ and below 10⁻⁴ (`1e16`, `1e-05`). Use a JCS library that implements the ES serialiser, or port the algorithm (Ryu/Grisu shortest digits, then ES formatting): .NET — the `Org.Webpki.JsonCanonicalizer` port of cyberphone's JCS reference; Rust — the `serde_jcs` crate; Python — the `rfc8785` package (Trail of Bits) or `jcs`. Whatever you use, prove it on the vectors rather than trusting its name. Then run `fp-numbers` and `fp-number-edges`: `-0` → `0`, `5e-324` (the smallest subnormal), `1e+21` versus `100000000000000000000`, `1e-7` versus `0.000001`, `2^53+1` → `9007199254740992`, `0.1+0.2` → `0.30000000000000004`, `1.7976931348623157e+308`. Rulebook numbers are plain JSON numbers; an implementation MUST parse them as IEEE 754 doubles.
 
-**Strings and hashing.** Sort object keys by UTF-16 code units (not by Unicode scalar, not by UTF-8 bytes: they differ above U+FFFF). Hash the **UTF-8 bytes** of the canonical text (`fp-strings`, `sha256-utf8`). Escape only what § 8.1 says.
+**Strings, keys and hashing.** Sort object members by key as sequences of **UTF-16 code units** (an ordinal comparison: `string.CompareOrdinal` in .NET, not a culture-aware sort; not by Unicode scalar, not by UTF-8 bytes — they differ above U+FFFF). Hash the **UTF-8 bytes** of the canonical text (`fp-strings`, `sha256-utf8`). Escape only what § 8.1 says. **Hash the object as received**: serialise every member, including ones your types do not know; a typed deserialiser that drops unknown members changes every fingerprint it checks — keep the raw JSON tree for hashing (`JsonNode`/`JsonDocument` in .NET, `serde_json::Value` in Rust). Refuse lone surrogates and non-JSON values (§ 8.1).
 
-**Ed25519.** Pure Ed25519 (RFC 8032), no pre-hash, no context; raw 32-byte public keys; 64-byte signatures; the message is the UTF-8 canonical JSON of the object without `signature`/`verified`. Any mainstream library works (libsodium, `ed25519-dalek`, `cryptography`, .NET's NSec/BouncyCastle); the vectors in `conformance/approvals.json` carry their TEST ONLY seeds so you can reproduce every signature byte for byte.
+**Ed25519.** Pure Ed25519 (RFC 8032), no pre-hash, no context; raw 32-byte public keys; 64-byte signatures; the message is the UTF-8 canonical JSON of the object without `signature`/`verified`. Any mainstream library works (libsodium, `ed25519-dalek`, `cryptography`). In Unity, prefer **BouncyCastle** (`Org.BouncyCastle.Crypto.Signers.Ed25519Signer`; managed code, no native dependency, works under IL2CPP); NSec needs native libsodium per platform. The vectors in `conformance/approvals.json` carry their TEST ONLY seeds so you can reproduce every signature byte for byte.
 
-**Timestamps.** Parse § 1's grammar yourself; read no offset as UTC; compare instants. Do not use a platform parser that assumes local time.
+**Verified handles.** Give `verifyApproval` a return type nothing else can make (a `VerifiedApproval` class with an internal constructor) and have `evaluate` accept only that type under `trustedKeys`; never read a `verified` member from JSON (§ 9.3). Cases `approvals-unsigned-verified-flag-clears-nothing*`, `approvals-evaluate-alone-never-clears`.
+
+**Unity and JSON.** `JsonUtility` cannot model a selector that is a string or an array (§ 3.1), optional members, or `Record<string, number>` limits; use Newtonsoft.Json (`com.unity.nuget.newtonsoft-json`) or `System.Text.Json`, and keep the raw tree for fingerprints as above.
+
+**Timestamps.** Parse § 1's grammar yourself; read no offset as UTC; truncate fractions to the millisecond before comparing (`DateTime.Ticks / 10000`); compare instants. Years 0000–0099 are literal. Do not use a platform parser that assumes local time. A plan's default clock start is the `HH:MM` written in `now` (§ 12).
+
+**Witnesses and `matches`.** A port that provides `matches(rulebook, request)` is judged on it: every witness it reports must match both rules, and on every reference witness its `matches` must return exactly the rule set the reference recorded (`witnessMatches`) — a `matches` that returns every rule, or the finding's own pair, fails (`conformance/README.md`).
 
 **Comparison.** Conformance is judged by deep semantic equality (`conformance/README.md`): object key order never matters; arrays are ordered.
 
 ## 15. What throws, what never does
 
-- `evaluate`, `evaluatePlan`, `matchingRules`, `missingFacts`: never throw for any request or plan value, given a valid rulebook; malformed input is a BLOCK decision (§ 4, § 12 step 0).
-- `compileDomain`, `validateRule`, `validatePlanRule`, `checkRulebook(input)` (when given an input rather than a compiled rulebook): throw `DomainRulesError` on configuration that cannot make a valid rulebook. `validateRulebook` returns problems instead of throwing.
+- `evaluate`, `evaluatePlan`, `matchingRules`, `missingFacts`: never throw for any request or plan value, given a valid rulebook — malformed input is a BLOCK decision (§ 4, § 12 step 0), a NaN or infinity in a plan included — and never throw on a rulebook of another format either: that is BLOCK `rulebook_version` (§ 11). Given a `/3` rulebook that was never validated and is malformed in some other way, behaviour is undefined (§ 6 step 0).
+- `compileDomain`, `validateRule`, `validatePlanRule`, `checkRulebook(input)` (when given an input rather than a compiled rulebook): throw `DomainRulesError` on configuration that cannot make a valid rulebook; `checkRulebook` and `backtest` throw `DomainRulesError` on a rulebook of another format. `validateRulebook` returns problems instead of throwing.
 - `backtest`, `compareBacktests`: throw `DomainRulesError` on bad input (§ 13.1, § 13.3); a malformed *request inside an event* is a row, not a throw.
-- `signApproval`: throws when a required field is missing; `verifyApproval`, `verifyRulebookSignature`: return `{ ok: false }` / `false`, never throw on bad data.
-- `canonicalJson`/`fingerprint`: throw on `undefined` at the top level or a non-finite number.
+- `signApproval`: throws when a required field is missing or `expiresAt` is not later than `issuedAt`; `verifyApproval`, `verifyRulebookSignature`: return `{ ok: false }` / `false`, never throw on bad data.
+- `canonicalJson`/`fingerprint`: throw on `undefined` at the top level, a non-finite number, a lone surrogate, or a non-JSON value (function, symbol, bigint).
 - `glassesZoneRules`: throws on an undeclared area or role (configuration).

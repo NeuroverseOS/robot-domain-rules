@@ -273,6 +273,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -371,6 +372,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -664,6 +666,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "ALLOW",
@@ -796,6 +799,7 @@
         ],
         "planChecks": [],
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -1085,6 +1089,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -1167,6 +1172,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 0,
           "time": "10:00",
@@ -1177,7 +1183,7 @@
             "authority": "high"
           }
         },
-        "finalArea": "floor",
+        "finalArea": "yard",
         "planDigest": "b761e5df795416d4f985ec0580d2f8eae38e0742c7760b97ac594240c95d3026",
         "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
@@ -1446,6 +1452,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "PAUSE",
@@ -1548,6 +1555,7 @@
             "setBy": "high"
           }
         ],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -1912,6 +1920,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -2131,6 +2140,7 @@
           "from": "plan"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 2,
           "time": "10:00",
@@ -2487,6 +2497,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "ALLOW",
@@ -2640,6 +2651,7 @@
           }
         ],
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -2985,6 +2997,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "ALLOW",
@@ -3059,6 +3072,7 @@
           }
         ],
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -3350,6 +3364,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "ALLOW",
@@ -3403,6 +3418,7 @@
         ],
         "planChecks": [],
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -3692,6 +3708,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -3830,6 +3847,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 3,
           "time": "10:00",
@@ -4135,6 +4153,7 @@
       "startTime": "21:58",
       "stepDurationSeconds": 90
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -4222,6 +4241,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 0,
           "time": "22:01",
@@ -4485,6 +4505,7 @@
       },
       "steps": []
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -4497,6 +4518,7 @@
           "from": "plan"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {},
         "finalArea": "",
         "planDigest": "39e60d97f6ab56416f08431d009439e889c4850114b65fbb3ed18e623e76ddf1",
@@ -4759,6 +4781,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -4771,6 +4794,7 @@
           "from": "plan"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {},
         "finalArea": "",
         "planDigest": "f19b9361329dac1976b5bb3c22e032dac7ca303109e3266e837e19fa05371998",
@@ -5036,6 +5060,7 @@
       "clock": "people",
       "startTime": "10:00"
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -5048,6 +5073,7 @@
           "from": "plan"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {},
         "finalArea": "",
         "planDigest": "a151f175299a8e7bf04102171ab34e37d846faea898bb21e157a9cdfc949d333",
@@ -5329,6 +5355,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -5427,6 +5454,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 1,
           "time": "10:00",
@@ -5678,6 +5706,7 @@
       "findings": [],
       "fingerprint": "467eb6bb46b30b0ec8c46d8bd5ca5845c652b9a7a03280cbc66d9a732856163c"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Action \"pick\" effect: names unknown fact \"nope\". Known: people, load, time, mode, alarm, day, speedAsked, loaded."
@@ -5916,6 +5945,7 @@
       "findings": [],
       "fingerprint": "0b1ffa937c97bb7e65742d642e98be1327a75c0c9390186bf2553741cdcf8a29"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Action \"pick\" effect: add applies to number facts; \"loaded\" is a boolean."
@@ -6223,6 +6253,7 @@
       "findings": [],
       "fingerprint": "dd64565911060ec6c341a8c55aeb218a0fa5d64df822623281108167eea70c1c"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Plan rule \"end_in_floor\": setBy is required — say which authority set this rule. Known: high, low."
@@ -6530,6 +6561,7 @@
       "findings": [],
       "fingerprint": "1298be00b9e30ddd582a573539c2e376c20d3617be6c1dd36dee03480c95d0e4"
     },
+    "client": true,
     "expect": {
       "error": true,
       "note": "Plan rule \"end_in_floor\" ends_in: where names unknown area \"roof\". Known: floor, yard."
@@ -6811,6 +6843,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -6880,6 +6913,7 @@
           "from": "step"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 0,
           "time": "10:00",
@@ -6889,7 +6923,7 @@
             "authority": "high"
           }
         },
-        "finalArea": "yard",
+        "finalArea": "floor",
         "planDigest": "144afdacec99ce82919a4734668e8f0425949693a8f66b86c9fbf2ff058128e7",
         "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
@@ -7169,6 +7203,7 @@
         }
       ]
     },
+    "client": true,
     "expect": {
       "plan": {
         "status": "ALLOW",
@@ -7278,6 +7313,7 @@
         ],
         "planChecks": [],
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {
           "people": 0,
           "time": "10:00",
@@ -7533,6 +7569,7 @@
       "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": null,
+    "client": true,
     "expect": {
       "plan": {
         "status": "BLOCK",
@@ -7545,10 +7582,673 @@
           "from": "plan"
         },
         "approvalRequests": [],
+        "approvalsUsed": [],
         "finalFacts": {},
         "finalArea": "",
         "planDigest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
         "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+      }
+    }
+  },
+  {
+    "id": "plan-clock-starts-at-the-wall-clock-of-now-west",
+    "principle": [
+      9,
+      3
+    ],
+    "description": "With clock and now but no startTime, the clock starts at the wall-clock time `now` names in its OWN offset: 21:00-05:00 is 21:00 on site, so the overnight rule does not fire (0.5.2 read 02:00 UTC and refused the step).",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ],
+          "effects": [
+            {
+              "op": "move"
+            }
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        },
+        {
+          "id": "pick",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": true
+            },
+            {
+              "op": "add",
+              "fact": "people",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "drop",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look",
+            "pick",
+            "drop"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 2,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        },
+        {
+          "id": "loaded",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "no_load_in_yard",
+          "text": "no_load_in_yard",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "deny",
+            "instead": "drop"
+          },
+          "when": [
+            {
+              "fact": "loaded",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_load_in_yard"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_before_look",
+          "text": "ask_before_look",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_before_look"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no_night",
+          "text": "no_night",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "22:00",
+              "to": "06:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_night"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
+    },
+    "plan": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "initialFacts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "steps": [
+        {
+          "action": "drop",
+          "area": "floor"
+        }
+      ],
+      "clock": "time",
+      "now": "2026-10-12T21:00:00-05:00"
+    },
+    "client": true,
+    "expect": {
+      "plan": {
+        "status": "ALLOW",
+        "steps": [
+          {
+            "index": 0,
+            "action": "drop",
+            "areaId": "floor",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
+            }
+          }
+        ],
+        "planChecks": [],
+        "approvalRequests": [],
+        "approvalsUsed": [],
+        "finalFacts": {
+          "people": 0,
+          "time": "21:00",
+          "day": "mon",
+          "loaded": false
+        },
+        "finalArea": "floor",
+        "planDigest": "debbd68eb5ae5b0345020ff1072075a9d843d3815d543b50b016837667999b92",
+        "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
+      }
+    }
+  },
+  {
+    "id": "plan-clock-starts-at-the-wall-clock-of-now-east",
+    "principle": [
+      9,
+      3
+    ],
+    "description": "The counterpart: 05:00+09:00 is 05:00 on site, inside the overnight window, so the step is refused (0.5.2 read 20:00 UTC and allowed it).",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ],
+          "effects": [
+            {
+              "op": "move"
+            }
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        },
+        {
+          "id": "pick",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": true
+            },
+            {
+              "op": "add",
+              "fact": "people",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "drop",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look",
+            "pick",
+            "drop"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 2,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        },
+        {
+          "id": "loaded",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "no_load_in_yard",
+          "text": "no_load_in_yard",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "deny",
+            "instead": "drop"
+          },
+          "when": [
+            {
+              "fact": "loaded",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_load_in_yard"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_before_look",
+          "text": "ask_before_look",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_before_look"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no_night",
+          "text": "no_night",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "time",
+              "op": "between",
+              "from": "22:00",
+              "to": "06:00"
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_night"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
+    },
+    "plan": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "initialFacts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "steps": [
+        {
+          "action": "drop",
+          "area": "floor"
+        }
+      ],
+      "clock": "time",
+      "now": "2026-10-12T05:00:00+09:00"
+    },
+    "client": true,
+    "expect": {
+      "plan": {
+        "status": "BLOCK",
+        "steps": [
+          {
+            "index": 0,
+            "action": "drop",
+            "areaId": "floor",
+            "decision": {
+              "status": "BLOCK",
+              "reasons": [
+                {
+                  "ruleId": "no_night",
+                  "status": "BLOCK",
+                  "setBy": "high"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                },
+                {
+                  "ruleId": "no_night",
+                  "status": "BLOCK",
+                  "setBy": "high"
+                }
+              ],
+              "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
+            }
+          }
+        ],
+        "planChecks": [],
+        "firstViolation": {
+          "stepIndex": 0,
+          "ruleId": "no_night",
+          "setBy": "high",
+          "from": "step"
+        },
+        "approvalRequests": [],
+        "approvalsUsed": [],
+        "finalFacts": {
+          "people": 0,
+          "time": "05:00",
+          "day": "mon"
+        },
+        "finalArea": "floor",
+        "planDigest": "5520ee65d7cba2ff0e9c8e3506cf92a95e80da5bb76763e36319fa0a5f880894",
+        "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
       }
     }
   },

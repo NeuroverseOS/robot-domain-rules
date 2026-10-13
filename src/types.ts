@@ -367,9 +367,11 @@ export interface PlanEvaluation {
   firstViolation?: { stepIndex: number; ruleId: string; reason: string; setBy: string; from: 'step' | 'plan' };
   /** Every approval a PAUSE step would need, so a planner can collect them up front. */
   approvalRequests: ApprovalRequest[];
+  /** Every approval instance a step of the plan would spend ({ ruleId, nonce }), in step order: the caller records them once the plan runs. A nonce a step uses is consumed for every later step. */
+  approvalsUsed: Array<{ ruleId: string; nonce: string }>;
   /** The projected facts after the last evaluated step. */
   finalFacts: Record<string, unknown>;
-  /** Where the participant is after the last evaluated step. */
+  /** Where the participant is after the last evaluated step: where it was asked to act, or — when that step was refused for not being there (plan_area_continuity) — where the earlier steps left it. */
   finalArea: string;
   /** `fingerprint` of the plan as described, with every `approvedBy` and `consumedApprovals` left out, so collecting approvals does not change it. */
   planDigest: string;
@@ -395,7 +397,8 @@ export type FindingKind =
   | 'shadowed'             // a rule fully covered by a stricter one; it can never change a decision
   | 'duplicate'            // same scope, same answer
   | 'limit_disagreement'   // two limits on the same name overlap with different values
-  | 'never_vs_rule';       // a rule tries to allow something a never rule forbids
+  | 'never_vs_rule'        // a rule tries to allow something a never rule forbids
+  | 'unmatched_selector';  // a selector entry (a tag, a kind) matches nothing declared, or a whole selector is empty: the rule binds less than it reads (one rule, no witness)
 
 export interface Finding {
   kind: FindingKind;
@@ -408,7 +411,7 @@ export interface Finding {
    * Rules that provably never match the same request produce no finding.
    */
   certainty: 'certain' | 'possible';
-  /** A concrete request that matches both rules. Present on every 'certain' finding between rules; a finding between two plan rules has none (it compares checks, not requests). */
+  /** A concrete request that matches both rules. Present on every 'certain' finding between two rules; a finding on one rule (unmatched_selector) or between two plan rules has none. */
   witness?: Witness;
   message: string;
 }
@@ -483,12 +486,14 @@ export const APPROVAL_SPEC = 'robot-domain-rules-approval/3';
 /**
  * Who approved an action. A plain string is accepted as an unqualified
  * approval (development only). When the rulebook declares `trustedKeys`,
- * only a `SignedApproval` that the caller has verified (`verified: true`,
- * see `verifyApproval`) and that is bound to this rule, this rulebook, this
- * participant, this action and this area, is within its validity window at
+ * only the verified approval object `verifyApproval` returned (object
+ * identity, never a flag in the data: a `verified` member in a request is
+ * ignored) that is bound to this rule, this rulebook, this participant,
+ * this action and this area, is within its validity window at
  * `request.now`, and whose `nonce` is not in `request.consumedApprovals`,
  * clears that rule's approval wait. It never clears anything else: every
  * other rule is decided on the facts the request carries now.
+ * `facts.approvedBy` may be one approval or a list; each clears at most one wait.
  */
 export interface Approval {
   id: string;
@@ -496,7 +501,7 @@ export interface Approval {
   authority?: string;
   /** The role the approver holds, by ID. */
   roleId?: string;
-  /** Set only by `verifyApproval` after the signature checked out against a trusted key. */
+  /** @deprecated Ignored on input since 0.5.3: verification is object identity (`verifyApproval`'s return value), never a member of the data. */
   verified?: boolean;
   /** `APPROVAL_SPEC` on a /3 signed approval. */
   spec?: string;
@@ -588,10 +593,10 @@ export interface DomainRequest {
   targetRobotId?: string;
   /**
    * The facts the rulebook declares, plus the built-in `approvedBy` (an
-   * `Approval` or a non-empty string, set when a person has approved this
-   * specific action). The evaluator never guesses a fact: a required fact
-   * that is missing or invalid gives BLOCK `required_facts`, never a crash
-   * and never permission.
+   * `Approval` or a non-empty string, or a list of them, set when a person
+   * has approved this specific action). The evaluator never guesses a fact:
+   * a required fact that is missing or invalid gives BLOCK `required_facts`,
+   * never a crash and never permission.
    */
   facts: Record<string, unknown>;
   /**

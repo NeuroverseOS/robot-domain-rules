@@ -134,8 +134,9 @@ function Drafter({ state, onChange }: { state: RulebookState; onChange: (s: Rule
   const [text, setText] = useState('');
   const [id, setId] = useState('');
   const [draft, setDraft] = useState<RuleDraft | { error: string } | null>(null);
+  const [read, setRead] = useState(false);
   const authorities = authoritiesOf(state);
-  const run = () => { if (text.trim()) setDraft(draftFromText(state, text.trim(), id.trim() || undefined)); };
+  const run = () => { setRead(false); if (text.trim()) setDraft(draftFromText(state, text.trim(), id.trim() || undefined)); };
   return (
     <div>
       <label class="field"><span>Try: "robots slow to 0.3 m/s in checkout", "no robots in the back room on Sundays", "shoppers may not record audio in aisle 3 between 12:00 and 13:00"</span>
@@ -157,19 +158,21 @@ function Drafter({ state, onChange }: { state: RulebookState; onChange: (s: Rule
             <>
               <div><span class="rule-id">{draft.draft.id}</span> · <AuthorityBadge id={state.actingAs} authorities={authorities} /></div>
               <div style="margin:4px 0"><DraftLine state={state} draft={draft} /></div>
-              <div class="small muted">Confidence <span class="conf" aria-hidden="true"><i style={`width:${Math.round(draft.confidence * 100)}%`} /></span> {Math.round(draft.confidence * 100)}%
-                {draft.unmatched.length > 0 && <> · could not place: <b>{draft.unmatched.join(' ')}</b></>}</div>
-              {draft.notes.map((n, i) => <div class="small muted" key={i}>note: {n}</div>)}
+              <div class="small muted">Confidence <span class="conf" aria-hidden="true"><i style={`width:${Math.round(draft.confidence * 100)}%`} /></span> {Math.round(draft.confidence * 100)}%</div>
+              {draft.unmatched.length > 0 && <div class="notice bad">Words the drafter could not place: <b>{draft.unmatched.join(' ')}</b>. The draft does not say what those words say.</div>}
+              {draft.notes.length > 0 && <div class={draft.confidentDraft ? 'small muted' : 'notice bad'}>{draft.notes.map((n, i) => <div key={i}>note: {n}</div>)}</div>}
+              {!draft.confidentDraft && <div class="small">This is a draft the drafter is not confident in. Read the rule line above and every note; it goes in only when you say so.</div>}
               <div class="row" style="margin-top:6px">
-                <button class="btn primary" onClick={() => { onChange(confirmDraft(state, draft)); setDraft(null); setText(''); setId(''); }}>Confirm as {authorities.find(a => a.id === state.actingAs)?.name ?? state.actingAs}</button>
+                <label class="small" style="display:flex;align-items:center;gap:6px"><input type="checkbox" checked={read} onChange={e => setRead((e.target as HTMLInputElement).checked)} /> I have read the draft and its notes</label>
+                <button class="btn primary" disabled={!read} onClick={() => { onChange(confirmDraft(state, draft)); setDraft(null); setText(''); setId(''); setRead(false); }}>Confirm as {authorities.find(a => a.id === state.actingAs)?.name ?? state.actingAs}</button>
                 <button class="btn" onClick={() => setDraft(null)}>Discard</button>
               </div>
             </>
           ) : (
             <>
-              <div class="notice bad">No rule could be made from that.</div>
-              {draft.notes.map((n, i) => <div class="small muted" key={i}>note: {n}</div>)}
-              {draft.unmatched.length > 0 && <div class="small muted">Could not place: {draft.unmatched.join(' ')}</div>}
+              <div class="notice bad">No rule could be made from that. The drafter refuses to guess; the notes say why.</div>
+              {draft.notes.map((n, i) => <div class="small" key={i}>note: {n}</div>)}
+              {draft.unmatched.length > 0 && <div class="small">Could not place: <b>{draft.unmatched.join(' ')}</b></div>}
             </>
           )}
         </div>

@@ -11,7 +11,7 @@
  */
 
 import type {
-  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, Effect, FactDef, LimitDef, PlanRule, RoleDef, Rule, Rulebook, SiteDef, TrustedKey,
+  ActionDef, AreaDef, AuthorityDef, BuiltinCheck, Effect, FactDef, Finding, LimitDef, PlanRule, RoleDef, Rule, Rulebook, SiteDef, TrustedKey,
 } from './types';
 import { isHexBytes } from './approvals';
 import {
@@ -19,8 +19,10 @@ import {
   validateFactDef, validateSelector, vocabularyOf, type Vocabulary,
 } from './vocabulary';
 import { checkRulebook } from './check';
-import { fingerprint } from './canonical';
+import { canonicalJson, fingerprint } from './canonical';
 import { isLegacyInput, fromLegacyInput, type LegacyCompileInput } from './legacy';
+import { matchingRules } from './evaluate';
+import { RULEBOOK_FORMAT, rulebookVersionProblem } from './version';
 import type { Template, TemplateContext } from './templates/template';
 import { templateById } from './templates/index';
 
@@ -122,7 +124,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
   const trustedKeys = input.trustedKeys === undefined ? undefined : validateTrustedKeys(input.trustedKeys, authorities, roles);
 
   const partial: RulebookBody = {
-    format: 'neuroverse-domain-rules/3',
+    format: RULEBOOK_FORMAT,
     site,
     ...(template ? { template: template.id } : {}),
     kinds: [...kinds],
@@ -142,11 +144,12 @@ export function assemble(input: CompileDomainInput): RulebookBody {
   if (template) {
     const ctx: TemplateContext = { site, answers, roles, areas, actions, facts, limits };
     if (template.requires?.includes('hours') && !site.hours) throw new DomainRulesError(`Template "${template.id}" needs site.hours { open, close }.`);
-    for (const r of template.rules?.(ctx) ?? []) rules.push({ ...r, source: { kind: 'template', ref: template.id } });
+    // Template rules are copied: a template may hand out the same `then` object every time, and a rulebook shares nothing with another.
+    for (const r of template.rules?.(ctx) ?? []) rules.push(clone({ ...r, source: { kind: 'template', ref: template.id } }));
     for (const q of template.questions) {
       const option = q.options.find(o => o.value === answers[q.id])!;
       if (option.otherwise && input.otherwise === undefined) otherwise = option.otherwise;
-      for (const r of option.rules?.(ctx) ?? []) rules.push({ setBy: q.setBy, ...r, source: { kind: 'question', ref: `${q.id}:${option.value}` } });
+      for (const r of option.rules?.(ctx) ?? []) rules.push(clone({ setBy: q.setBy, ...r, source: { kind: 'question', ref: `${q.id}:${option.value}` } }));
     }
     partial.otherwise = otherwise;
   }
@@ -277,20 +280,21 @@ export function validateRule(r: Rule, vocab: Vocabulary): void {
 /**
  * Is a rulebook received as JSON one this evaluator may govern with? Returns
  * the problems in plain words (empty when the rulebook is valid). Checks the
- * format, the vocabulary, every rule (`validateRule`), duplicate IDs, and the
- * fingerprint. It is the check the spec calls "rulebook validation"; other
+ * format, the vocabulary, every rule (`validateRule`), duplicate IDs, the
+ * fingerprint, and — because both are derived from the rest and could be
+ * edited without touching the fingerprint — RE-DERIVES the area role-limit
+ * never rules from `areas[].allowRoles/denyRoles` and the findings from the
+ * rules, and compares: a rulebook whose derived never rules were removed or
+ * altered, or whose findings were emptied or changed, is invalid even with
+ * a recomputed fingerprint. (Finding messages are free text and may differ;
+ * kind, severity, rule IDs, certainty and a valid witness must agree.)
+ * It is the check the spec calls "rulebook validation"; other
  * implementations run the same list before deciding anything.
  */
 export function validateRulebook(rulebook: unknown): string[] {
+  const versionProblem = rulebookVersionProblem(rulebook);
+  if (versionProblem) return [versionProblem];
   const rb = rulebook as Rulebook;
-  if (!rb || typeof rb !== 'object') return ['the rulebook is not an object'];
-  const format = rb.format as string;
-  if (format !== 'neuroverse-domain-rules/3') {
-    if (format === 'neuroverse-domain-rules/2' || format === 'neuroverse-domain-rules/1') {
-      return [`this rulebook declares format "${format}" (spec robot-domain-rules/${format.slice(-1)}); this implementation is robot-domain-rules/3 and does not reinterpret older rulebooks. Migration: recompile the rulebook from its input with a /3 compiler (its FNV-1a fingerprint becomes a SHA-256 one, history conditions lose "clock"), then re-issue approvals under the /3 approval contract. See SPEC.md § 11.`];
-    }
-    return [`format must be "neuroverse-domain-rules/3", got ${JSON.stringify(format)}`];
-  }
   const problems: string[] = [];
   try {
     const body = assemble({
@@ -299,6 +303,17 @@ export function validateRulebook(rulebook: unknown): string[] {
       roles: (rb.roles ?? []).map(r => ({ ...r, inherits: undefined })), otherwise: rb.otherwise, trustedKeys: rb.trustedKeys, rules: [],
     });
     const vocab = vocabularyOf(body);
+    // The area role-limit never rules, re-derived from the areas as received, must be present and unchanged.
+    if (Array.isArray(rb.rules) && Array.isArray(rb.areas) && Array.isArray(rb.roles) && Array.isArray(rb.authorities) && rb.authorities.length) {
+      const expected = rb.areas.flatMap(a => areaRoleLimitRules(a, rb.roles, rb.authorities));
+      const declared = rb.rules.filter(r => r && typeof r === 'object' && typeof r.id === 'string' && r.id.startsWith('area_role_limits:'));
+      for (const e of expected) {
+        const got = declared.find(r => r.id === e.id);
+        if (!got) problems.push(`Rule "${e.id}" is missing: an area's allowRoles/denyRoles compile to that never rule, and a rulebook without it does not say what its areas say.`);
+        else if (canonicalJson(got) !== canonicalJson(e)) problems.push(`Rule "${e.id}" differs from what area "${e.where}" declares (allowRoles/denyRoles): the derived never rule was altered.`);
+      }
+      for (const d of declared) if (!expected.some(e => e.id === d.id)) problems.push(`Rule "${d.id}" claims to be an area's role limit, but no area declares it.`);
+    }
     const seen = new Set<string>();
     if (!Array.isArray(rb.rules)) problems.push('rules must be a list');
     else {
@@ -318,10 +333,40 @@ export function validateRulebook(rulebook: unknown): string[] {
     }
     if (!Array.isArray(rb.builtin) || BUILTIN_CHECKS.some(b => !rb.builtin.some(x => x && x.id === b.id))) problems.push(`builtin must list ${BUILTIN_CHECKS.map(b => b.id).join(', ')}`);
     if (!Array.isArray(rb.findings)) problems.push('findings must be a list (empty when the check found nothing)');
+    else if (!problems.length) problems.push(...findingsProblems(rb));
   } catch (e) {
     problems.push(e instanceof Error ? e.message : String(e));
   }
   if (!problems.length && !verifyFingerprint(rb)) problems.push('the fingerprint does not match the contents');
+  return problems;
+}
+
+/**
+ * Re-run the conflict check on the rulebook as received and compare with
+ * the findings it carries: the same multiset of { kind, severity, ruleIds,
+ * certainty }, each certain finding between rules with a witness that
+ * matches both rules. Messages are free text and not compared; a witness
+ * need not be the reference's, only valid. Emptied or altered findings
+ * make the rulebook invalid: "findings MUST NOT be hidden" is checked, not hoped.
+ */
+function findingsProblems(rb: Rulebook): string[] {
+  const key = (f: Finding) => `${f.kind}|${f.severity}|${f.ruleIds.join('+')}|${f.certainty}`;
+  const expected = checkRulebook(rb).map(key).sort();
+  const got = rb.findings.map(f => (f && typeof f === 'object' && Array.isArray(f.ruleIds) ? key(f) : 'malformed')).sort();
+  if (JSON.stringify(expected) !== JSON.stringify(got)) {
+    const missing = expected.filter(k => !got.includes(k)), extra = got.filter(k => !expected.includes(k));
+    return [`findings do not match what the conflict check finds for these rules${missing.length ? `; missing: ${missing.join(', ')}` : ''}${extra.length ? `; not found by the check: ${extra.join(', ')}` : ''} (findings may be reworded, never removed or invented)`];
+  }
+  const problems: string[] = [];
+  for (const f of rb.findings) {
+    const betweenRules = f.ruleIds.length === 2 && f.ruleIds.every(id => rb.rules.some(r => r.id === id));
+    if (f.certainty === 'certain' && betweenRules && !f.witness) problems.push(`finding ${f.ruleIds.join('+')} is certain but carries no witness`);
+    if (f.certainty === 'possible' && f.witness) problems.push(`finding ${f.ruleIds.join('+')} is possible but carries a witness`);
+    if (f.witness && betweenRules) {
+      const hit = matchingRules(rb, f.witness);
+      if (!f.ruleIds.every(id => hit.includes(id))) problems.push(`the witness of finding ${f.ruleIds.join('+')} does not match both of its rules`);
+    }
+  }
   return problems;
 }
 
@@ -518,11 +563,12 @@ export function clone<T>(value: T): T {
   return value;
 }
 
-/** Freeze an object and everything inside it. */
-export function deepFreeze<T>(value: T): T {
-  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+/** Freeze an object and everything inside it — including inside parts that were already frozen (a frozen parent says nothing about its children). */
+export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
+  if (value && typeof value === 'object' && !seen.has(value)) {
+    seen.add(value);
     Object.freeze(value);
-    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v);
+    for (const v of Object.values(value as Record<string, unknown>)) deepFreeze(v, seen);
   }
   return value;
 }

@@ -255,6 +255,30 @@
     },
     {
       "setBy": "high",
+      "id": "ask_twice",
+      "text": "ask_twice",
+      "who": "*",
+      "does": "go",
+      "where": "yard",
+      "then": {
+        "answer": "wait",
+        "for": "approval",
+        "by": "high"
+      },
+      "when": [
+        {
+          "fact": "mode",
+          "op": "==",
+          "value": "b"
+        }
+      ],
+      "source": {
+        "kind": "manual",
+        "ref": "ask_twice"
+      }
+    },
+    {
+      "setBy": "high",
       "id": "ask_lead",
       "text": "ask_lead",
       "who": "bot",
@@ -366,6 +390,32 @@
       "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
     }
   ],
-  "findings": [],
-  "fingerprint": "ebd588da66ab5b8062c9092984dda9d1b6aa50258c2ba0dfe8a7792166094668"
+  "findings": [
+    {
+      "kind": "duplicate",
+      "severity": "info",
+      "ruleIds": [
+        "ask_twice",
+        "ask_high"
+      ],
+      "certainty": "certain",
+      "witness": {
+        "participant": {
+          "id": "bot-1",
+          "kind": "robot",
+          "roleId": "bot"
+        },
+        "action": "go",
+        "areaId": "yard",
+        "facts": {
+          "people": 0,
+          "time": "00:00",
+          "day": "mon",
+          "mode": "b"
+        }
+      },
+      "message": "`ask_twice` (set by high) is already covered by `ask_high` (set by high), which says the same thing (wait for approval by high) for Bot · go · Yard, when mode in b. `ask_twice` adds nothing. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\", mode=\"b\"."
+    }
+  ],
+  "fingerprint": "4d292f7d0087630db4d1f0e10f65a87ca0cad34fbbb165b6cd1f1bd5ca49c1e1"
 }

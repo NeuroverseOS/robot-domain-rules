@@ -2,13 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/plan-evaluation.schema.json",
   "title": "Plan evaluation (robot-domain-rules/3)",
-  "description": "The verdict on a plan: every evaluated step with its decision, the plan rules' verdicts, the first violation, the approvals needed, the final facts. SPEC.md § 12.",
+  "description": "The verdict on a plan: every evaluated step with its decision, the plan rules' verdicts, the first violation, the approvals needed, the final facts. SPEC.md \u00a7 12.",
   "type": "object",
   "required": [
     "status",
     "steps",
     "planChecks",
     "approvalRequests",
+    "approvalsUsed",
     "finalFacts",
     "finalArea",
     "planDigest",
@@ -123,18 +124,40 @@
         "$ref": "approval.schema.json#/$defs/approvalRequest"
       }
     },
+    "approvalsUsed": {
+      "type": "array",
+      "description": "Every approval instance a step would spend, in step order; a nonce a step uses is consumed for every later step.",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "nonce"
+        ],
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "finalFacts": {
       "type": "object"
     },
     "finalArea": {
-      "type": "string"
+      "type": "string",
+      "description": "Where the participant is after the last evaluated step: where it was asked to act, or \u2014 when that step was refused as plan_area_continuity \u2014 where the earlier steps left it. Empty when the plan was refused at the door."
     },
     "planDigest": {
       "$ref": "common.schema.json#/$defs/fingerprint",
       "description": "fingerprint of the plan with every approvedBy and consumedApprovals left out."
     },
     "fingerprint": {
-      "$ref": "common.schema.json#/$defs/fingerprint"
+      "type": "string",
+      "description": "The rulebook's fingerprint (64 hex), or its claimed fingerprint string when the rulebook was refused by version (rulebook_version), or empty."
     }
   },
   "additionalProperties": false
