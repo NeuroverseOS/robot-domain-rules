@@ -50,7 +50,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: adapters/cedar/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            adapters/cedar/package-lock.json
+      - name: Root install first (the adapter's tsconfig resolves @types/node from the repo root)
+        run: npm ci
       - run: npm ci
         working-directory: adapters/cedar
       - run: npm run typecheck && npm test
