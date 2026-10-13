@@ -1,17 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/approval.schema.json",
-  "title": "Approvals (robot-domain-rules/2)",
+  "title": "Approvals (robot-domain-rules/3)",
   "description": "What a PAUSE asks for, and what a person signs. SPEC.md § Approvals.",
   "$defs": {
     "approvalRequest": {
       "type": "object",
-      "required": ["ruleId", "requestDigest", "rulebookFingerprint", "reason", "setBy"],
+      "description": "What a PAUSE for approval returns: the rule, the rulebook, the participant, the action and the area to sign for.",
+      "required": ["ruleId", "rulebookFingerprint", "participantId", "action", "areaId", "reason", "setBy"],
       "properties": {
         "ruleId": { "type": "string" },
         "by": { "type": "string", "description": "An authority ID (that or higher), a role ID, or tag:<role tag>. Absent: anyone." },
-        "requestDigest": { "$ref": "common.schema.json#/$defs/fingerprint" },
         "rulebookFingerprint": { "$ref": "common.schema.json#/$defs/fingerprint" },
+        "participantId": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "areaId": { "type": "string", "minLength": 1 },
         "reason": { "type": "string" },
         "setBy": { "type": "string" }
       },
@@ -19,30 +22,44 @@
     },
     "approval": {
       "type": "object",
-      "description": "facts.approvedBy as an object. Plain { id, authority?, roleId? } is accepted only when the rulebook declares no trustedKeys.",
+      "description": "facts.approvedBy as an object. Plain { id, authority?, roleId? } is accepted only when the rulebook declares no trustedKeys; otherwise a verified signedApproval.",
       "required": ["id"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "authority": { "type": "string" },
         "roleId": { "type": "string" },
         "verified": { "type": "boolean", "description": "Set by the caller's verifyApproval only after the signature checked out." },
-        "requestDigest": { "$ref": "common.schema.json#/$defs/fingerprint" },
-        "rulebookFingerprint": { "$ref": "common.schema.json#/$defs/fingerprint" },
-        "keyId": { "type": "string" },
+        "spec": { "type": "string" },
+        "ruleId": { "type": "string" },
+        "rulebookFingerprint": { "type": "string" },
+        "participantId": { "type": "string" },
+        "action": { "type": "string" },
+        "areaId": { "type": "string" },
+        "nonce": { "type": "string" },
         "issuedAt": { "type": "string" },
-        "signature": { "$ref": "common.schema.json#/$defs/hex64" }
+        "expiresAt": { "type": "string" },
+        "keyId": { "type": "string" },
+        "signature": { "type": "string" },
+        "requestDigest": { "type": "string", "deprecated": true, "description": "A /2 binding. An approval carrying it is refused." }
       }
     },
     "signedApproval": {
       "type": "object",
-      "required": ["id", "requestDigest", "rulebookFingerprint", "issuedAt", "keyId", "signature"],
+      "description": "One authorisation: one rule's approval wait, one participant, action and area, under one rulebook, one use (nonce), within [issuedAt, expiresAt). SPEC.md § 9.2.",
+      "required": ["spec", "id", "ruleId", "rulebookFingerprint", "participantId", "action", "areaId", "nonce", "issuedAt", "expiresAt", "keyId", "signature"],
       "properties": {
+        "spec": { "const": "robot-domain-rules-approval/3" },
         "id": { "type": "string", "minLength": 1 },
         "authority": { "type": "string" },
         "roleId": { "type": "string" },
-        "requestDigest": { "$ref": "common.schema.json#/$defs/fingerprint" },
+        "ruleId": { "type": "string", "minLength": 1 },
         "rulebookFingerprint": { "$ref": "common.schema.json#/$defs/fingerprint" },
-        "issuedAt": { "type": "string", "description": "ISO 8601. Not checked by the evaluator." },
+        "participantId": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "areaId": { "type": "string", "minLength": 1 },
+        "nonce": { "type": "string", "minLength": 1, "description": "Unique per approval instance under the signing key." },
+        "issuedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "expiresAt": { "$ref": "common.schema.json#/$defs/timestamp", "description": "Refused by the evaluator at or after this instant (request.now)." },
         "keyId": { "type": "string", "minLength": 1 },
         "signature": { "$ref": "common.schema.json#/$defs/hex64", "description": "Ed25519 over the UTF-8 canonical JSON of every other field." }
       },

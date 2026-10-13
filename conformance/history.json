@@ -5,9 +5,9 @@
       4,
       9
     ],
-    "description": "Four looks in the hour: the rule needs five, so ALLOW.",
+    "description": "Four looks in the hour before now: the rule needs five, so ALLOW.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -138,7 +138,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -163,8 +162,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -219,6 +217,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -233,7 +235,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -252,24 +254,25 @@
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:00"
+          "at": "2026-10-13T09:00:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:01"
+          "at": "2026-10-13T09:01:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:02"
+          "at": "2026-10-13T09:02:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:03"
+          "at": "2026-10-13T09:03:00Z"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -288,7 +291,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -298,9 +301,9 @@
       4,
       9
     ],
-    "description": "Five looks in the hour before the time fact: the rule matches and denies.",
+    "description": "Five looks in the hour before now: the rule matches and denies.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -431,7 +434,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -456,8 +458,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -512,6 +513,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -526,7 +531,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -545,29 +550,30 @@
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:00"
+          "at": "2026-10-13T09:00:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:01"
+          "at": "2026-10-13T09:01:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:02"
+          "at": "2026-10-13T09:02:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:03"
+          "at": "2026-10-13T09:03:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:04"
+          "at": "2026-10-13T09:04:00Z"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -591,7 +597,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -600,9 +606,9 @@
     "principle": [
       9
     ],
-    "description": "Only entries within the window before the clock fact count: at 10:05 the 09:00 look is out, four remain, ALLOW.",
+    "description": "Only entries within the window before now count: at 10:05 the 09:00 look is out, four remain, ALLOW.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -733,7 +739,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -758,8 +763,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -814,6 +818,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -828,7 +836,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -847,29 +855,30 @@
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:00"
+          "at": "2026-10-13T09:00:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:01"
+          "at": "2026-10-13T09:01:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:02"
+          "at": "2026-10-13T09:02:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:03"
+          "at": "2026-10-13T09:03:00Z"
         },
         {
           "action": "look",
           "areaId": "floor",
-          "at": "09:04"
+          "at": "2026-10-13T09:04:00Z"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:05:00Z"
     },
     "expect": {
       "decision": {
@@ -888,18 +897,18 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
   {
-    "id": "history-window-wraps-midnight",
+    "id": "history-window-crosses-midnight",
     "principle": [
       9
     ],
-    "description": "The window is minute-of-day arithmetic that wraps: a go at 23:55 is eight minutes before 00:03.",
+    "description": "Windows are absolute time: a go at 23:55 yesterday is eight minutes before 00:03 today, so it counts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1030,7 +1039,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -1055,8 +1063,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -1111,6 +1118,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1125,7 +1136,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -1144,9 +1155,10 @@
         {
           "action": "go",
           "areaId": "floor",
-          "at": "23:55"
+          "at": "2026-10-12T23:55:00Z"
         }
-      ]
+      ],
+      "now": "2026-10-13T00:03:00Z"
     },
     "expect": {
       "decision": {
@@ -1170,18 +1182,18 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
   {
-    "id": "history-same-area-only",
+    "id": "history-yesterday-is-not-today",
     "principle": [
       9
     ],
-    "description": "sameArea counts only entries in the request's own area: the go was in the yard, so no wait.",
+    "description": "The midnight case: a go at 09:50 YESTERDAY is not within 15 minutes of 10:00 today (minute-of-day arithmetic would have said it was); ALLOW.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1312,7 +1324,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -1337,8 +1348,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -1393,6 +1403,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1407,7 +1421,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -1419,16 +1433,17 @@
       "areaId": "floor",
       "facts": {
         "people": 0,
-        "time": "00:03",
+        "time": "10:00",
         "day": "mon"
       },
       "history": [
         {
           "action": "go",
-          "areaId": "yard",
-          "at": "23:55"
+          "areaId": "floor",
+          "at": "2026-10-12T09:50:00Z"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -1447,18 +1462,18 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
   {
-    "id": "history-areas-selector-without-window",
+    "id": "history-today-counts",
     "principle": [
       9
     ],
-    "description": "A history condition without a window needs no times: three earlier goes into the yard make the next one wait for approval.",
+    "description": "The counterpart: the same go at 09:50 TODAY is ten minutes before 10:00 and counts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1589,7 +1604,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -1614,8 +1628,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -1670,6 +1683,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1684,7 +1701,1137 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "floor",
+          "at": "2026-10-13T09:50:00Z"
+        }
+      ],
+      "now": "2026-10-13T10:00:00Z"
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-future-entry-does-not-count",
+    "principle": [
+      9
+    ],
+    "description": "An entry later than now is not \"recent\": it does not count.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "floor",
+          "at": "2026-10-13T10:05:00Z"
+        }
+      ],
+      "now": "2026-10-13T10:00:00Z"
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-offset-is-applied",
+    "principle": [
+      9
+    ],
+    "description": "A timestamp with an offset is the instant it names: 11:50+02:00 is 09:50Z, ten minutes before 10:00Z.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "floor",
+          "at": "2026-10-13T11:50:00+02:00"
+        }
+      ],
+      "now": "2026-10-13T10:00:00Z"
+    },
+    "expect": {
+      "decision": {
+        "status": "PAUSE",
+        "reasons": [
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          },
+          {
+            "ruleId": "not_right_after_go",
+            "status": "PAUSE",
+            "setBy": "high"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-same-area-only",
+    "principle": [
+      9
+    ],
+    "description": "sameArea counts only entries in the request's own area: the go was in the yard, so no wait.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "00:03",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "go",
+          "areaId": "yard",
+          "at": "2026-10-12T23:55:00Z"
+        }
+      ],
+      "now": "2026-10-13T00:03:00Z"
+    },
+    "expect": {
+      "decision": {
+        "status": "ALLOW",
+        "reasons": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "role_permits_action",
+            "status": "ALLOW",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-areas-selector-without-window",
+    "principle": [
+      9
+    ],
+    "description": "A history condition without a window needs no times and no now: three earlier goes into the yard make the next one wait for approval.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -1743,12 +2890,14 @@
         "approvalRequests": [
           {
             "ruleId": "three_yard_visits",
-            "requestDigest": "a972a032bcabeaaf",
-            "rulebookFingerprint": "1e23af27d90edba8",
+            "rulebookFingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344",
+            "participantId": "b-1",
+            "action": "go",
+            "areaId": "yard",
             "setBy": "high"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -1759,7 +2908,7 @@
     ],
     "description": "A rule in scope that counts history, with no history supplied, is BLOCK required_facts: the engine keeps no history and never guesses.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1890,7 +3039,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -1915,8 +3063,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -1971,6 +3118,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1985,7 +3136,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -1999,7 +3150,8 @@
         "people": 0,
         "time": "10:00",
         "day": "mon"
-      }
+      },
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -2018,18 +3170,19 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
   {
-    "id": "history-entry-without-time-is-required-facts",
+    "id": "history-now-missing-is-required-facts",
     "principle": [
-      4
+      4,
+      9
     ],
-    "description": "When a rule in scope uses a window, an entry without \"at\" is incomplete: BLOCK required_facts.",
+    "description": "A rule in scope with a window needs now: without it the request is BLOCK required_facts (the engine has no clock).",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2160,7 +3313,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -2185,8 +3337,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -2241,6 +3392,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2255,7 +3410,301 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "2026-10-13T09:00:00Z"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "2026-10-13T09:01:00Z"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "2026-10-13T09:02:00Z"
+        },
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "2026-10-13T09:03:00Z"
+        }
+      ]
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-entry-without-time-is-required-facts",
+    "principle": [
+      4
+    ],
+    "description": "When a rule in scope uses a window, an entry without \"at\" is incomplete: BLOCK required_facts.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -2275,7 +3724,8 @@
           "action": "look",
           "areaId": "floor"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -2294,18 +3744,18 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
   {
-    "id": "history-malformed-entry-is-required-facts",
+    "id": "history-entry-without-date-is-required-facts",
     "principle": [
       4
     ],
-    "description": "An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.",
+    "description": "An \"at\" without a date (\"09:45\", the /2 form) is not a timestamp: BLOCK required_facts, never a guess at which day.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2436,7 +3886,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -2461,8 +3910,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -2517,6 +3965,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2531,7 +3983,287 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+    },
+    "request": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "action": "look",
+      "areaId": "floor",
+      "facts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "history": [
+        {
+          "action": "look",
+          "areaId": "floor",
+          "at": "09:45"
+        }
+      ],
+      "now": "2026-10-13T10:00:00Z"
+    },
+    "expect": {
+      "decision": {
+        "status": "BLOCK",
+        "reasons": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "trace": [
+          {
+            "ruleId": "required_facts",
+            "status": "BLOCK",
+            "setBy": "builtin"
+          }
+        ],
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
+      }
+    }
+  },
+  {
+    "id": "history-malformed-entry-is-required-facts",
+    "principle": [
+      4
+    ],
+    "description": "An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "five_looks_an_hour",
+          "text": "five_looks_an_hour",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "history": [
+            {
+              "actions": "look",
+              "withinMinutes": 60,
+              "op": ">=",
+              "value": 5
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "five_looks_an_hour"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "not_right_after_go",
+          "text": "not_right_after_go",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "condition"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "sameArea": true,
+              "withinMinutes": 15,
+              "op": ">=",
+              "value": 1
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "not_right_after_go"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "three_yard_visits",
+          "text": "three_yard_visits",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "history": [
+            {
+              "actions": "go",
+              "areas": "yard",
+              "op": ">=",
+              "value": 3
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "three_yard_visits"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "not_right_after_go",
+            "five_looks_an_hour"
+          ],
+          "certainty": "possible",
+          "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
+        }
+      ],
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -2550,7 +4282,8 @@
         {
           "action": "look"
         }
-      ]
+      ],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -2569,7 +4302,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -2578,9 +4311,9 @@
     "principle": [
       4
     ],
-    "description": "A request no history rule reaches (go on the floor) needs no history at all.",
+    "description": "A request no history rule reaches (go on the floor) needs no history and no now at all.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2711,7 +4444,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -2736,8 +4468,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -2792,6 +4523,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2806,7 +4541,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -2839,7 +4574,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -2850,7 +4585,7 @@
     ],
     "description": "An empty list is a history (nothing happened): the count is zero.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2981,7 +4716,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -3006,8 +4740,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -3062,6 +4795,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3076,7 +4813,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "1e23af27d90edba8"
+      "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
     },
     "request": {
       "participant": {
@@ -3091,7 +4828,8 @@
         "time": "10:00",
         "day": "mon"
       },
-      "history": []
+      "history": [],
+      "now": "2026-10-13T10:00:00Z"
     },
     "expect": {
       "decision": {
@@ -3110,7 +4848,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "1e23af27d90edba8"
+        "fingerprint": "2b8a4feaa2cad023e552cf13078777870334ee5a681bdef040714e58d0472344"
       }
     }
   },
@@ -3121,7 +4859,7 @@
     ],
     "description": "A history condition naming an undeclared action makes the rulebook invalid.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3275,8 +5013,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -3331,6 +5068,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3345,7 +5086,7 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "e7f1d832e4a23a6b"
+      "fingerprint": "bbcf8b1e16225dc6125944d6b2bd73d9a99b430796f01c8a8804adce3e9ac679"
     },
     "expect": {
       "error": true,
@@ -3353,14 +5094,14 @@
     }
   },
   {
-    "id": "history-window-without-clock-rejected",
+    "id": "history-clock-rejected",
     "principle": [
       4,
       9
     ],
-    "description": "A window without a clock fact is rejected: the engine has no clock of its own.",
+    "description": "The /2 \"clock\" member on a history condition is rejected with a message naming the change: windows are measured back from request.now.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3491,6 +5232,7 @@
             {
               "actions": "look",
               "withinMinutes": 60,
+              "clock": "time",
               "op": ">=",
               "value": 5
             }
@@ -3515,8 +5257,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -3571,6 +5312,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3585,21 +5330,21 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "6a44214395c12923"
+      "fingerprint": "1ab649bfcd61a5a7da62514064218d460bb0ee70562e3a9d3b4ddbfc02e31398"
     },
     "expect": {
       "error": true,
-      "note": "Rule \"five_looks_an_hour\": history.withinMinutes needs clock: the time fact that is \"now\"."
+      "note": "Rule \"five_looks_an_hour\": history.clock was removed in robot-domain-rules/3; a window is measured back from request.now (a timestamp with a date). Remove clock and recompile."
     }
   },
   {
-    "id": "history-clock-must-be-time-fact",
+    "id": "history-window-out-of-range-rejected",
     "principle": [
       4
     ],
-    "description": "A clock that is not a declared time fact is rejected.",
+    "description": "A window outside 1–1440 minutes is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3729,8 +5474,7 @@
           "history": [
             {
               "actions": "look",
-              "withinMinutes": 60,
-              "clock": "people",
+              "withinMinutes": 0,
               "op": ">=",
               "value": 5
             }
@@ -3755,8 +5499,7 @@
             {
               "actions": "go",
               "sameArea": true,
-              "withinMinutes": 10,
-              "clock": "time",
+              "withinMinutes": 15,
               "op": ">=",
               "value": 1
             }
@@ -3811,6 +5554,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3825,11 +5572,11 @@
           "message": "`not_right_after_go` (set by high) is fully covered by the stricter `five_looks_an_hour` (set by high): `not_right_after_go` (set by high) says wait for the situation to change; `five_looks_an_hour` (set by high) says deny. `not_right_after_go` can never change a decision. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "e26fd2924b03a552"
+      "fingerprint": "4f629bbfdbc2f8320d053c5817dc87c3cfb9a9dace7cffb6244668d6e50dc643"
     },
     "expect": {
       "error": true,
-      "note": "Rule \"five_looks_an_hour\": history.clock \"people\" is not a declared time fact."
+      "note": "Rule \"five_looks_an_hour\": history.withinMinutes must be between 1 and 1440."
     }
   }
 ]

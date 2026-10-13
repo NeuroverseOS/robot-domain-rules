@@ -8,6 +8,10 @@ export interface ConformanceCase {
   request?: unknown;
   plan?: unknown;
   value?: unknown;
+  text?: string;
+  events?: unknown;
+  options?: unknown;
+  proposed?: unknown;
   approval?: unknown;
   trustedKeys?: unknown;
   signature?: unknown;
@@ -24,13 +28,20 @@ export interface Impl {
   validate: (rulebook: unknown) => string[];
   canonical: (value: unknown) => string;
   fingerprint: (value: unknown) => string;
+  /** SHA-256 of the UTF-8 bytes of the text, 64 lowercase hex. */
+  sha256: (text: string) => string;
   requestDigest: (request: never) => string;
   verifyApproval: (approval: unknown, keys: never) => Promise<{ ok: boolean; reason?: string }>;
   verifyRulebookSignature: (rulebook: never, signature: never, publicKey: string) => Promise<boolean>;
+  backtest: (rulebook: never, events: never, options?: never) => unknown;
+  compareBacktests: (baseline: never, proposed: never) => unknown;
 }
 export function projectDecision(d: unknown): unknown;
 export function projectFindings(findings: unknown): unknown;
 export function projectPlan(p: unknown): unknown;
+/** Deep semantic equality: key order never matters. */
 export function deepEqual(a: unknown, b: unknown): boolean;
+/** The value with every object's keys sorted, recursively. */
+export function canon(v: unknown): unknown;
 export function runCase(c: ConformanceCase, impl: Impl, rulebook: unknown): Promise<string | null>;
 export function loadCases(fs: unknown, path: unknown, dir: string): Promise<LoadedCase[]>;

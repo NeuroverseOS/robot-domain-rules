@@ -195,10 +195,10 @@ export type Condition =
  * A condition over the participant's recent history, supplied by the caller
  * (`request.history`). The count of entries whose action is in `actions`
  * (and whose area is in `areas`, or is the request's own area when
- * `sameArea`), within the last `withinMinutes` of the `clock` fact when a
+ * `sameArea`), within the last `withinMinutes` before `request.now` when a
  * window is given, is compared with `value`. The core keeps no history and
  * no clock: without `request.history` a rule that needs it is BLOCK
- * `required_facts`.
+ * `required_facts`; with a window and no `request.now`, the same.
  */
 export interface HistoryCondition {
   actions: Selector;
@@ -206,10 +206,8 @@ export interface HistoryCondition {
   areas?: Selector;
   /** Only entries in the request's own area count. */
   sameArea?: boolean;
-  /** Only entries at most this many minutes before the `clock` fact count (minute-of-day arithmetic, wrapping at midnight). */
+  /** Only entries whose `at` is at most this many minutes before `request.now` count: absolute time, dates included (1–1440). */
   withinMinutes?: number;
-  /** The declared time fact that is "now" for the window. Required with `withinMinutes`. */
-  clock?: string;
   op: CompareOp;
   /** A whole number, 0 or more. */
   value: number;
@@ -219,9 +217,17 @@ export interface HistoryCondition {
 export interface HistoryEntry {
   action: string;
   areaId: string;
-  /** "HH:MM" local time. Required by rules that use a window. */
+  /** An ISO 8601 timestamp WITH a date (`YYYY-MM-DDTHH:MM[:SS[.sss]][Z|±HH:MM]`; no offset means UTC). Required by rules that use a window. */
   at?: string;
 }
+
+/**
+ * An ISO 8601 timestamp with a date: `YYYY-MM-DDTHH:MM`, optional seconds
+ * and fraction, optional `Z` or `±HH:MM` offset. Without an offset it is
+ * read as UTC, so every implementation reads it the same. Used for
+ * `request.now`, `history[].at`, approvals' `issuedAt`/`expiresAt`.
+ */
+export type Timestamp = string;
 
 /** What a rule says when it matches. */
 export type Outcome =
@@ -304,7 +310,12 @@ export interface PlanRule {
 /** One step of a plan an agent proposes. */
 export interface PlanStep {
   action: string;
-  /** The area of the step. Defaults to where the previous step left the participant. The first step must say. */
+  /**
+   * The area of the step. Defaults to where the previous step left the
+   * participant. The first step must say. A later step may name an area only
+   * when it is that place, or when its action has a `move` effect (it moves
+   * there); otherwise the step is BLOCK `plan_area_continuity`.
+   */
   area?: string;
   /** Facts the planner expects at this step (people counts, an approval), laid over the projected facts. */
   facts?: Record<string, unknown>;
@@ -321,9 +332,18 @@ export interface Plan {
   history?: HistoryEntry[];
   /** The declared time fact that advances as the plan runs. */
   clock?: string;
-  /** "HH:MM" at the first step. With `clock` and `stepDurationSeconds`, later steps advance. */
+  /** "HH:MM" at the first step. With `clock` and `stepDurationSeconds`, later steps advance. Defaults to the time of day of `now` when `now` is given. */
   startTime?: string;
   stepDurationSeconds?: number;
+  /**
+   * The instant of the first step (a `Timestamp`), advancing by
+   * `stepDurationSeconds` per step: each step's `request.now`, used for
+   * history windows and approval expiry, and the `at` of the history entries
+   * the plan appends. Without it those entries have no `at`.
+   */
+  now?: Timestamp;
+  /** Approval instances (nonces) already used, as for a request. */
+  consumedApprovals?: string[];
 }
 
 export interface PlanStepResult {
@@ -351,7 +371,7 @@ export interface PlanEvaluation {
   finalFacts: Record<string, unknown>;
   /** Where the participant is after the last evaluated step. */
   finalArea: string;
-  /** `fingerprint(plan)`: identifies the plan as described. */
+  /** `fingerprint` of the plan as described, with every `approvedBy` and `consumedApprovals` left out, so collecting approvals does not change it. */
   planDigest: string;
   /** The rulebook that decided. */
   fingerprint: string;
@@ -418,7 +438,8 @@ export interface BuiltinCheck {
  * as JSON and says whether it still matches.
  */
 export interface Rulebook {
-  format: 'neuroverse-domain-rules/2';
+  /** The rulebook's declared version. A `/2` rulebook is refused with a versioned message, never reinterpreted (SPEC.md § 11). */
+  format: 'neuroverse-domain-rules/3';
   site: SiteDef;
   /** The template this rulebook was built from, if any. */
   template?: string;
@@ -448,19 +469,26 @@ export interface Rulebook {
   /** Rules about whole plans (`evaluatePlan`). Omitted when there are none. */
   planRules?: PlanRule[];
   builtin: BuiltinCheck[];
-  /** What the conflict check found. Compile never hides these. */
+  /** What the conflict check found. Compile never hides these. Not part of the fingerprint: their messages are free text. */
   findings: Finding[];
-  /** Deterministic fingerprint of everything above. Cite it in logs to prove which rules decided. */
+  /** SHA-256 (64 hex) of the canonical JSON of everything above except `findings`. Cite it in logs to prove which rules decided. */
   fingerprint: string;
 }
 
 // ─── Requests and decisions ──────────────────────────────────────────────────
 
+/** The approval contract version carried by every signed approval. */
+export const APPROVAL_SPEC = 'robot-domain-rules-approval/3';
+
 /**
  * Who approved an action. A plain string is accepted as an unqualified
- * approval. When the rulebook declares `trustedKeys`, only a `SignedApproval`
- * that the caller has verified (`verified: true`, see `verifyApproval`) and
- * that is bound to this request and this rulebook clears an approval wait.
+ * approval (development only). When the rulebook declares `trustedKeys`,
+ * only a `SignedApproval` that the caller has verified (`verified: true`,
+ * see `verifyApproval`) and that is bound to this rule, this rulebook, this
+ * participant, this action and this area, is within its validity window at
+ * `request.now`, and whose `nonce` is not in `request.consumedApprovals`,
+ * clears that rule's approval wait. It never clears anything else: every
+ * other rule is decided on the facts the request carries now.
  */
 export interface Approval {
   id: string;
@@ -470,43 +498,68 @@ export interface Approval {
   roleId?: string;
   /** Set only by `verifyApproval` after the signature checked out against a trusted key. */
   verified?: boolean;
-  /** `requestDigest(request)` of the request this approval is for. */
-  requestDigest?: string;
+  /** `APPROVAL_SPEC` on a /3 signed approval. */
+  spec?: string;
+  /** The rule whose approval wait this clears. */
+  ruleId?: string;
   /** The fingerprint of the rulebook the approver saw. */
   rulebookFingerprint?: string;
+  participantId?: string;
+  action?: string;
+  areaId?: string;
+  /** The unique approval instance; the caller records it as consumed once acted on. */
+  nonce?: string;
+  issuedAt?: Timestamp;
+  expiresAt?: Timestamp;
   /** The trusted key that signed it. */
   keyId?: string;
-  issuedAt?: string;
   signature?: string;
+  /** @deprecated /2 binding; present only on a /2 approval, which is refused. */
+  requestDigest?: string;
 }
 
 /**
  * What a PAUSE for approval returns: everything a person (or their signing
- * tool) needs to produce a `SignedApproval` for exactly this request.
+ * tool) needs to produce a `SignedApproval` for exactly this rule, this
+ * participant, this action and this area under this rulebook.
  */
 export interface ApprovalRequest {
   /** The rule that is waiting. */
   ruleId: string;
   /** The authority (or higher), role, or `tag:<role tag>` the approver must hold. Absent: anyone. */
   by?: string;
-  /** `requestDigest(request)`: binds the approval to this participant, action and area. */
-  requestDigest: string;
   /** The rulebook the approver is approving under. */
   rulebookFingerprint: string;
+  participantId: string;
+  action: string;
+  areaId: string;
   reason: string;
   setBy: string;
 }
 
-/** An approval as data, signed with Ed25519. See `signApproval` / `verifyApproval`. */
+/**
+ * An approval as data, signed with Ed25519. See `signApproval` /
+ * `verifyApproval`. It authorises ONE rule's approval wait for ONE
+ * participant, action and area under ONE rulebook, for ONE use (`nonce`)
+ * within [`issuedAt`, `expiresAt`). It is not a statement about the facts:
+ * the live decision checks the facts current at evaluation time.
+ */
 export interface SignedApproval {
+  spec: typeof APPROVAL_SPEC;
   /** The approver's ID. */
   id: string;
   authority?: string;
   roleId?: string;
-  requestDigest: string;
+  ruleId: string;
   rulebookFingerprint: string;
-  /** ISO 8601. The evaluator has no clock; the caller decides how old is too old. */
-  issuedAt: string;
+  participantId: string;
+  action: string;
+  areaId: string;
+  /** Unique per approval instance (a UUID, a counter under the key — the signer's choice). */
+  nonce: string;
+  issuedAt: Timestamp;
+  /** Required. The evaluator refuses the approval at or after this instant (`request.now`). */
+  expiresAt: Timestamp;
   /** Which of the rulebook's `trustedKeys` signed it. */
   keyId: string;
   /** Ed25519 signature, 64 bytes as lowercase hex, over the canonical JSON of every other field. */
@@ -547,6 +600,19 @@ export interface DomainRequest {
    * it is BLOCK `required_facts`.
    */
   history?: HistoryEntry[];
+  /**
+   * The instant of this request, as the caller's trusted layer supplies it
+   * (the engine has no clock). Needed when a rule in scope has a history
+   * window, and when a signed approval is checked; without it in those cases
+   * the request is BLOCK `required_facts`.
+   */
+  now?: Timestamp;
+  /**
+   * Nonces of approvals the caller has already acted on. An approval whose
+   * nonce is listed here does not apply (replay). The caller keeps this set;
+   * `decision.approvalsUsed` says what to add to it after acting.
+   */
+  consumedApprovals?: string[];
 }
 
 /**
@@ -576,6 +642,12 @@ export interface DomainDecision {
   then?: string;
   /** When the status is PAUSE for approval: what to get signed, one per rule still waiting. */
   approvalRequests?: ApprovalRequest[];
+  /**
+   * The approval instances that cleared a wait in this decision, when the
+   * status is ALLOW or LIMIT: `{ ruleId, nonce }` for each. After acting, the
+   * caller adds each nonce to the `consumedApprovals` it supplies next time.
+   */
+  approvalsUsed?: Array<{ ruleId: string; nonce: string }>;
   /** Every check that ran, in order. */
   trace: DomainCheck[];
   /** The rulebook that decided. */

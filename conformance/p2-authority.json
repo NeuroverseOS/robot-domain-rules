@@ -6,7 +6,7 @@
     ],
     "description": "A rule set by an authority the rulebook does not declare is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -159,10 +159,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "6e15a71cec9962f4"
+      "fingerprint": "36baedbe31c579034b25f5b80018d11fe5a0299302b70cc69fb6e324d72ea6c3"
     },
     "expect": {
       "error": true,
@@ -176,7 +180,7 @@
     ],
     "description": "A rulebook with no authorities is rejected: the order is written down, never inferred.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -306,10 +310,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "c05faa50ddade355"
+      "fingerprint": "2549296c50b58579b61b5245cfb5daf9384d3b70ee9a20673877f1aeb12ca104"
     },
     "expect": {
       "error": true,
@@ -324,7 +332,7 @@
     ],
     "description": "A lower authority allowing what a higher one denies is an authority-override finding (certain).",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -492,6 +500,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -520,7 +532,7 @@
           "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "378a8f7d4f8ec110"
+      "fingerprint": "6c98c6d224d22048750339dbc7abaf4910630de2ad9bda5fd833727cb0c9b8bf"
     },
     "expect": {
       "findings": [
@@ -557,7 +569,7 @@
     ],
     "description": "At decision time the higher deny wins; the lower allow is cited nowhere in the reasons.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -725,6 +737,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -753,7 +769,7 @@
           "message": "`l_allow` set by low tries to loosen what `h_deny` set by high sets: `l_allow` (set by low) says allow; `h_deny` (set by high) says deny. Both apply to every role · look · Yard, always. A lower authority can only tighten, so `l_allow` never takes effect at all. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "378a8f7d4f8ec110"
+      "fingerprint": "6c98c6d224d22048750339dbc7abaf4910630de2ad9bda5fd833727cb0c9b8bf"
     },
     "request": {
       "participant": {
@@ -796,7 +812,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "378a8f7d4f8ec110"
+        "fingerprint": "6c98c6d224d22048750339dbc7abaf4910630de2ad9bda5fd833727cb0c9b8bf"
       }
     }
   },
@@ -807,7 +823,7 @@
     ],
     "description": "A lower authority denying what a higher one allows is tightening: info only.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -975,6 +991,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1003,7 +1023,7 @@
           "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "06d74df24bb771f8"
+      "fingerprint": "72cb3a77a1a3f739cdcfd9ecf59ee5709269f7ff08cda0d2737868d376158791"
     },
     "expect": {
       "findings": [
@@ -1040,7 +1060,7 @@
     ],
     "description": "The lower authority's stricter rule decides, and the decision says it was set by the lower authority.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1208,6 +1228,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1236,7 +1260,7 @@
           "message": "`l_deny` set by low tightens `h_allow` set by high: `h_allow` (set by high) says allow; `l_deny` (set by low) says deny. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "06d74df24bb771f8"
+      "fingerprint": "72cb3a77a1a3f739cdcfd9ecf59ee5709269f7ff08cda0d2737868d376158791"
     },
     "request": {
       "participant": {
@@ -1279,7 +1303,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "06d74df24bb771f8"
+        "fingerprint": "72cb3a77a1a3f739cdcfd9ecf59ee5709269f7ff08cda0d2737868d376158791"
       }
     }
   },
@@ -1291,7 +1315,7 @@
     ],
     "description": "A lower authority setting a looser value on the same limit is an authority-override.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1465,6 +1489,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1493,7 +1521,7 @@
           "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "3bf8a25971470019"
+      "fingerprint": "0abec3aa20d9804377aac98e16bb4ed4795060a080242c984c83e16cd77c8050"
     },
     "expect": {
       "findings": [
@@ -1530,7 +1558,7 @@
     ],
     "description": "The tighter (higher) limit applies; the looser rule is in the trace but not the reasons.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1704,6 +1732,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1732,7 +1764,7 @@
           "message": "`l_cap` set by low tries to loosen what `h_cap` set by high sets: `l_cap` (set by low) says limit speed 1; `h_cap` (set by high) says limit speed 0.5. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `l_cap` never takes effect at all. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "3bf8a25971470019"
+      "fingerprint": "0abec3aa20d9804377aac98e16bb4ed4795060a080242c984c83e16cd77c8050"
     },
     "request": {
       "participant": {
@@ -1779,7 +1811,7 @@
         "limits": {
           "speed": 0.5
         },
-        "fingerprint": "3bf8a25971470019"
+        "fingerprint": "0abec3aa20d9804377aac98e16bb4ed4795060a080242c984c83e16cd77c8050"
       }
     }
   },
@@ -1790,7 +1822,7 @@
     ],
     "description": "A never rule is an invariant whatever its authority: a higher authority's allow does not override it.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1959,6 +1991,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1987,7 +2023,7 @@
           "message": "`h_allow` (set by high) tries to allow what the never rule `inv` (set by low) forbids. Both apply to every role · every action · Yard, always. Nothing overrides a never rule, so `h_allow` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "68455b81eef932a7"
+      "fingerprint": "1b216b8471890fe19197872cb8ce2b26cf40c08e02ec796095b2ac9e8a9849f5"
     },
     "request": {
       "participant": {
@@ -2020,7 +2056,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "68455b81eef932a7"
+        "fingerprint": "1b216b8471890fe19197872cb8ce2b26cf40c08e02ec796095b2ac9e8a9849f5"
       }
     }
   },
@@ -2032,7 +2068,7 @@
     ],
     "description": "A wait for approval by \"high\" with no approval is PAUSE and asks for an approval by high.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2190,10 +2226,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -2235,12 +2275,14 @@
           {
             "ruleId": "ask_high",
             "by": "high",
-            "requestDigest": "a972a032bcabeaaf",
-            "rulebookFingerprint": "da131628bf320a5d",
+            "rulebookFingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98",
+            "participantId": "b-1",
+            "action": "go",
+            "areaId": "yard",
             "setBy": "high"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -2252,7 +2294,7 @@
     ],
     "description": "An approval from someone holding exactly the named authority clears the wait.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2410,10 +2452,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -2460,7 +2506,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -2472,7 +2518,7 @@
     ],
     "description": "An approval from a higher authority than the one named also clears the wait.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2630,10 +2676,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -2680,7 +2730,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -2692,7 +2742,7 @@
     ],
     "description": "An approval from a lower authority does not clear the wait; the decision still asks.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2850,10 +2900,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -2899,12 +2953,14 @@
           {
             "ruleId": "ask_high",
             "by": "high",
-            "requestDigest": "a972a032bcabeaaf",
-            "rulebookFingerprint": "da131628bf320a5d",
+            "rulebookFingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98",
+            "participantId": "b-1",
+            "action": "go",
+            "areaId": "yard",
             "setBy": "high"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -2916,7 +2972,7 @@
     ],
     "description": "A plain approval that names no authority does not clear a wait that names one.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3074,10 +3130,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -3120,12 +3180,14 @@
           {
             "ruleId": "ask_high",
             "by": "high",
-            "requestDigest": "a972a032bcabeaaf",
-            "rulebookFingerprint": "da131628bf320a5d",
+            "rulebookFingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98",
+            "participantId": "b-1",
+            "action": "go",
+            "areaId": "yard",
             "setBy": "high"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -3137,7 +3199,7 @@
     ],
     "description": "An approval claiming an authority the rulebook does not declare is an invalid fact: BLOCK required_facts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3295,10 +3357,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "da131628bf320a5d"
+      "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
     },
     "request": {
       "participant": {
@@ -3335,7 +3401,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "da131628bf320a5d"
+        "fingerprint": "4755315bdcd5c4ccac4ad7148ce2f4e99aecc3ca05e00da6522eaa4c9171eb98"
       }
     }
   },
@@ -3347,7 +3413,7 @@
     ],
     "description": "A wait \"by tag:lead\" is cleared by an approver whose role carries that tag.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3627,10 +3693,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "1ae228e2bab67ad5"
+      "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
     },
     "request": {
       "participant": {
@@ -3677,7 +3747,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "1ae228e2bab67ad5"
+        "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
       }
     }
   },
@@ -3689,7 +3759,7 @@
     ],
     "description": "An approver whose role is not the one named (and carries no such tag) does not clear the wait.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3969,10 +4039,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "1ae228e2bab67ad5"
+      "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
     },
     "request": {
       "participant": {
@@ -4018,12 +4092,14 @@
           {
             "ruleId": "ask_guard",
             "by": "guard",
-            "requestDigest": "06d4dcc6d0f1bebc",
-            "rulebookFingerprint": "1ae228e2bab67ad5",
+            "rulebookFingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b",
+            "participantId": "b-1",
+            "action": "look",
+            "areaId": "floor",
             "setBy": "high"
           }
         ],
-        "fingerprint": "1ae228e2bab67ad5"
+        "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
       }
     }
   },
@@ -4035,7 +4111,7 @@
     ],
     "description": "A wait \"by guard\" is cleared by an approver holding the guard role.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4315,10 +4391,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "1ae228e2bab67ad5"
+      "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
     },
     "request": {
       "participant": {
@@ -4365,7 +4445,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "1ae228e2bab67ad5"
+        "fingerprint": "0f0b1eafe8c86eda78c023bf4c0d72b0d1f3a932c4886ee5e74804ef4dbb128b"
       }
     }
   },
@@ -4377,7 +4457,7 @@
     ],
     "description": "A rule written by an AI agent (source.kind \"agent\") at the agent authority level tightens the manager's cap and takes effect; the decision cites it as set by agent.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4555,6 +4635,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -4583,7 +4667,7 @@
           "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "f53444a98064b931"
+      "fingerprint": "5e9f28547243d1e9fb37cf381af1170080d55c0a2eca552302a637fc59835d0c"
     },
     "request": {
       "participant": {
@@ -4630,7 +4714,7 @@
         "limits": {
           "speed": 0.4
         },
-        "fingerprint": "f53444a98064b931"
+        "fingerprint": "5e9f28547243d1e9fb37cf381af1170080d55c0a2eca552302a637fc59835d0c"
       }
     }
   },
@@ -4643,7 +4727,7 @@
     ],
     "description": "The agent's tighter cap is reported as tightening: information, not a conflict.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4821,6 +4905,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -4849,7 +4937,7 @@
           "message": "`agent_cap` set by AI agent tightens `manager_cap` set by site-manager: `manager_cap` (set by site-manager) says limit speed 1; `agent_cap` (set by AI agent) says limit speed 0.4. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `manager_cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "f53444a98064b931"
+      "fingerprint": "5e9f28547243d1e9fb37cf381af1170080d55c0a2eca552302a637fc59835d0c"
     },
     "expect": {
       "findings": [
@@ -4888,7 +4976,7 @@
     ],
     "description": "An agent-level rule that allows what the site manager denies is an authority-override.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5060,6 +5148,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -5088,7 +5180,7 @@
           "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "2120fd2a0a209b04"
+      "fingerprint": "edab31469d95d67dc927a7a150039f8e634482a8a3450f41185300ded38e56e9"
     },
     "expect": {
       "findings": [
@@ -5126,7 +5218,7 @@
     ],
     "description": "At decision time the manager's deny wins; the agent's allow is never a reason.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5298,6 +5390,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -5326,7 +5422,7 @@
           "message": "`agent_allows_yard` set by AI agent tries to loosen what `manager_no_yard` set by site-manager sets: `agent_allows_yard` (set by AI agent) says allow; `manager_no_yard` (set by site-manager) says deny. Both apply to every role · every action · Yard, always. A lower authority can only tighten, so `agent_allows_yard` never takes effect at all. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "2120fd2a0a209b04"
+      "fingerprint": "edab31469d95d67dc927a7a150039f8e634482a8a3450f41185300ded38e56e9"
     },
     "request": {
       "participant": {
@@ -5369,7 +5465,7 @@
             "setBy": "agent"
           }
         ],
-        "fingerprint": "2120fd2a0a209b04"
+        "fingerprint": "edab31469d95d67dc927a7a150039f8e634482a8a3450f41185300ded38e56e9"
       }
     }
   },
@@ -5381,7 +5477,7 @@
     ],
     "description": "An approval from an agent-level approver does not clear a wait that requires the site manager.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5540,10 +5636,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "f6cf5032765187e7"
+      "fingerprint": "054bdf5bb9dc6d852fa82037c07469b6d0b544d58bad04426bdb7df36193d9cc"
     },
     "request": {
       "participant": {
@@ -5589,12 +5689,14 @@
           {
             "ruleId": "ask_manager",
             "by": "site-manager",
-            "requestDigest": "a972a032bcabeaaf",
-            "rulebookFingerprint": "f6cf5032765187e7",
+            "rulebookFingerprint": "054bdf5bb9dc6d852fa82037c07469b6d0b544d58bad04426bdb7df36193d9cc",
+            "participantId": "b-1",
+            "action": "go",
+            "areaId": "yard",
             "setBy": "site-manager"
           }
         ],
-        "fingerprint": "f6cf5032765187e7"
+        "fingerprint": "054bdf5bb9dc6d852fa82037c07469b6d0b544d58bad04426bdb7df36193d9cc"
       }
     }
   },
@@ -5605,7 +5707,7 @@
     ],
     "description": "A rule from another system (source.kind \"system\") is a rule like any other: its weight is its declared authority.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5762,10 +5864,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "233a388cf7da1ec0"
+      "fingerprint": "aec4605daf367732442c209e1f5deef5e63dea0c3c6e428c04033e8618792fc2"
     },
     "request": {
       "participant": {
@@ -5803,7 +5909,7 @@
             "setBy": "staff"
           }
         ],
-        "fingerprint": "233a388cf7da1ec0"
+        "fingerprint": "aec4605daf367732442c209e1f5deef5e63dea0c3c6e428c04033e8618792fc2"
       }
     }
   },
@@ -5814,7 +5920,7 @@
     ],
     "description": "A wait that names an approver the rulebook does not declare (not an authority, role or role tag) is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5969,10 +6075,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "c180330f0e0df9df"
+      "fingerprint": "af168f468110014dc5a2dcf7d412a728b547a6599d11c5635eb3645d279d9132"
     },
     "expect": {
       "error": true,

@@ -22,7 +22,12 @@
  *
  * Honest limits: this predicts only the effects the site declared and
  * trusts the planner's description of the plan and the facts it supplies;
- * it checks plans, it does not write them. Nothing is projected past the
+ * it checks plans, it does not write them. A plan verdict is a verdict on
+ * the plan as described: at execution time each step is asked again, with
+ * `evaluateDomainAction`, on the facts then current — projected planning
+ * facts are never assumed to equal execution-time facts, and an approval
+ * collected for a step authorises that step's rule, participant, action and
+ * area only; the live facts still decide everything else. Nothing is projected past the
  * first BLOCK, because a plan does not continue past a refusal. A PAUSE
  * does not stop projection: the result lists every approval the plan would
  * need, so they can be collected up front, and the steps after a PAUSE are
@@ -35,13 +40,13 @@ import type {
 } from './types';
 import { evaluateDomainAction } from './evaluate';
 import { fingerprint } from './canonical';
-import { isValidTime, minutesOf, resolveSelector, vocabularyOf, type Vocabulary } from './vocabulary';
+import { addSeconds, isTimestamp, isValidTime, minutesOf, resolveSelector, timeOfDay, vocabularyOf, type Vocabulary } from './vocabulary';
 
 const SEVERITY: Record<DomainDecisionStatus, number> = { ALLOW: 0, LIMIT: 1, PAUSE: 2, BLOCK: 3 };
 
 export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
   const vocab = vocabularyOf(rulebook);
-  const planDigest = fingerprint(plan);
+  const planDigest = planDigestOf(plan);
   const bad = (reason: string): PlanEvaluation => ({
     status: 'BLOCK',
     steps: [],
@@ -66,13 +71,18 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
     if (plan.startTime !== undefined && !isValidTime(plan.startTime)) return bad(`The plan's startTime must be "HH:MM", got ${JSON.stringify(plan.startTime)}.`);
   }
   if (plan.history !== undefined && !Array.isArray(plan.history)) return bad('The plan\'s history must be a list of { action, areaId, at? }.');
+  if (plan.now !== undefined && !isTimestamp(plan.now)) return bad(`The plan's now must be a timestamp with a date ("YYYY-MM-DDTHH:MM", optional seconds and offset), got ${JSON.stringify(plan.now)}.`);
+  if (plan.stepDurationSeconds !== undefined && (typeof plan.stepDurationSeconds !== 'number' || !Number.isFinite(plan.stepDurationSeconds) || plan.stepDurationSeconds < 0)) return bad('The plan\'s stepDurationSeconds must be a number, 0 or more.');
 
-  // The plan's areas, as described: step.area, or where the previous step left the participant.
-  const areas: string[] = [], after: string[] = [];
+  // The plan's areas, as described: step.area, or where the previous step left the participant. A step that names
+  // another area without an action that moves there is a break in continuity, refused when that step is reached.
+  const areas: string[] = [], after: string[] = [], discontinuous: boolean[] = [];
   let here = plan.steps[0].area;
   for (const step of plan.steps) {
+    const moves = vocab.actions.get(step.action)?.effects?.some(e => e.op === 'move') ?? false;
+    discontinuous.push(step.area !== undefined && step.area !== here && !moves);
     areas.push(step.area ?? here);
-    if (vocab.actions.get(step.action)?.effects?.some(e => e.op === 'move')) here = step.area ?? here;
+    if (moves) here = step.area ?? here;
     after.push(here);
   }
 
@@ -84,23 +94,30 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
   const approvalRequests: ApprovalRequest[] = [];
   const history: HistoryEntry[] = [...(plan.history ?? [])];
   let facts: Record<string, unknown> = { ...plan.initialFacts };
-  const start = plan.clock && plan.startTime ? minutesOf(plan.startTime) : null;
+  const startTime = plan.startTime ?? (plan.now !== undefined ? timeOfDay(plan.now) : undefined);
+  const start = plan.clock && startTime ? minutesOf(startTime) : null;
+  const duration = plan.stepDurationSeconds ?? 0;
   let evaluated = 0;
   for (let i = 0; i < plan.steps.length; i++) {
     const step = plan.steps[i];
     const areaId = areas[i];
     evaluated = i + 1;
-    if (start !== null) facts[plan.clock!] = hhmm((start + Math.floor((i * (plan.stepDurationSeconds ?? 0)) / 60)) % 1440);
+    if (start !== null) facts[plan.clock!] = hhmm((start + Math.floor((i * duration) / 60)) % 1440);
     const stepFacts: Record<string, unknown> = { ...facts, ...(step.facts ?? {}) };
-    const request: DomainRequest = { participant: { ...plan.participant }, action: step.action, areaId, facts: stepFacts, history: [...history] };
-    const decision: DomainDecision = evaluateDomainAction(rulebook, request);
+    const now = plan.now !== undefined ? addSeconds(plan.now, i * duration) : undefined;
+    const request: DomainRequest = {
+      participant: { ...plan.participant }, action: step.action, areaId, facts: stepFacts, history: [...history],
+      ...(now !== undefined ? { now } : {}), ...(plan.consumedApprovals !== undefined ? { consumedApprovals: plan.consumedApprovals } : {}),
+    };
+    const decision: DomainDecision = discontinuous[i]
+      ? continuityRefusal(rulebook, step.action, step.area!, after[i - 1] ?? areas[0], vocab)
+      : evaluateDomainAction(rulebook, request);
     steps.push({ index: i, action: step.action, areaId, facts: stepFacts, decision, ...(step.note !== undefined ? { note: step.note } : {}) });
-    for (const a of decision.approvalRequests ?? []) if (!approvalRequests.some(x => x.ruleId === a.ruleId && x.requestDigest === a.requestDigest)) approvalRequests.push(a);
+    for (const a of decision.approvalRequests ?? []) if (!approvalRequests.some(x => x.ruleId === a.ruleId && x.action === a.action && x.areaId === a.areaId)) approvalRequests.push(a);
     if (decision.status === 'BLOCK') { facts = stepFacts; break; }
     // Project the step's effects for the next step. The planner's own step facts persist into the projection.
     facts = applyEffects(stepFacts, step.action, vocab);
-    const at = typeof stepFacts[plan.clock ?? ''] === 'string' ? { at: stepFacts[plan.clock!] as string } : {};
-    history.push({ action: step.action, areaId, ...at });
+    history.push({ action: step.action, areaId, ...(now !== undefined ? { at: now } : {}) });
   }
 
   let status: DomainDecisionStatus = 'ALLOW';
@@ -128,6 +145,33 @@ export function evaluatePlan(rulebook: Rulebook, plan: Plan): PlanEvaluation {
     planDigest,
     fingerprint: rulebook.fingerprint,
   };
+}
+
+/** A step that names an area the participant is not in, with an action that does not move it: BLOCK `plan_area_continuity`, by the evaluator. */
+function continuityRefusal(rulebook: Rulebook, action: string, area: string, here: string, vocab: Vocabulary): DomainDecision {
+  const name = (id: string) => vocab.areas.get(id)?.name ?? id;
+  const check = { ruleId: 'plan_area_continuity', status: 'BLOCK' as const, reason: `Step "${action}" is placed in ${name(area)}, but the plan leaves the participant in ${name(here)} and "${action}" does not move it (no \`move\` effect). Add a moving step, or drop the area.`, setBy: 'builtin' };
+  return { status: 'BLOCK', reasons: [check], trace: [check], fingerprint: rulebook.fingerprint };
+}
+
+/**
+ * The plan's identity: `fingerprint` of the plan with every `approvedBy` (in
+ * `initialFacts` and each step's `facts`) and `consumedApprovals` left out,
+ * so collecting approvals for it does not change it. A value that is not an
+ * object digests as `null`.
+ */
+export function planDigestOf(plan: unknown): string {
+  if (!plan || typeof plan !== 'object') return fingerprint(null);
+  const p = plan as Plan;
+  const strip = (facts: unknown) => { if (!facts || typeof facts !== 'object') return facts; const { approvedBy: _a, ...rest } = facts as Record<string, unknown>; return rest; };
+  const { consumedApprovals: _c, ...rest } = p;
+  // A step's `facts` that is empty once approvals are gone is dropped, so adding an approval to a step without facts changes nothing.
+  const step = (s: Plan['steps'][number]) => { if (!s || typeof s !== 'object' || s.facts === undefined) return s; const facts = strip(s.facts); const { facts: _f, ...other } = s; return facts && typeof facts === 'object' && Object.keys(facts).length === 0 ? other : { ...other, facts }; };
+  return fingerprint({
+    ...rest,
+    ...(p.initialFacts !== undefined ? { initialFacts: strip(p.initialFacts) } : {}),
+    ...(Array.isArray(p.steps) ? { steps: p.steps.map(step) } : {}),
+  });
 }
 
 /** The facts after an action's declared effects. Only declared facts change; unknown facts pass through untouched. */

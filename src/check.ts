@@ -18,7 +18,11 @@
  *               what the caller supplies and are not analysed: the overlap
  *               on facts is real, the history is unknown, and no witness is given.
  *
- * No enumeration is needed and no size bound applies: minutes are a 1440-bit
+ * Only requests a lawful request can reach count: the role must list the
+ * action (else the role check refuses first) and no unconditional never rule
+ * other than the pair may cover the triple (else it refuses first).
+ *
+ * No enumeration over facts is needed and no size bound applies: minutes are a 1440-bit
  * set, integers are closed intervals with excluded points, reals are
  * intervals, finite types are subsets, strings are "all but a finite set".
  * The seeded tests in test/ attack both directions (a disjoint claim with
@@ -43,17 +47,18 @@ type Body = Omit<Rulebook, 'fingerprint' | 'findings'> & Partial<Pick<Rulebook, 
 
 /** Run the conflict check on an input (compiles the vocabulary first) or on a compiled rulebook. */
 export function checkRulebook(input: CompileDomainInput | LegacyCompileInput | Rulebook): Finding[] {
-  const body: Body = 'format' in input && input.format === 'neuroverse-domain-rules/2'
+  const body: Body = 'format' in input && input.format === 'neuroverse-domain-rules/3'
     ? input
     : assemble(isLegacyInput(input) ? fromLegacyInput(input) : (input as CompileDomainInput));
   const vocab = vocabularyOf(body);
   const scopes = body.rules.map(r => scopeOf(r, vocab));
+  const blockers = blockersOf(body.rules, scopes);
   const findings: Finding[] = [];
   for (let i = 0; i < body.rules.length; i++) {
     if (scopes[i].empty) continue;
     for (let j = i + 1; j < body.rules.length; j++) {
       if (scopes[j].empty) continue;
-      const f = comparePair(body.rules[i], scopes[i], body.rules[j], scopes[j], vocab);
+      const f = comparePair(body.rules[i], scopes[i], body.rules[j], scopes[j], vocab, reachability(vocab, blockers, body.rules[i].id, body.rules[j].id));
       if (f) findings.push(f);
     }
   }
@@ -73,8 +78,31 @@ export function rulesOverlap(rulebook: Rulebook, ruleIdA: string, ruleIdB: strin
   if (!a || !b) return null;
   const sa = scopeOf(a, vocab), sb = scopeOf(b, vocab);
   if (sa.empty || sb.empty) return null;
-  const o = overlapOf(sa, sb, vocab);
+  const blockers = blockersOf(rulebook.rules, rulebook.rules.map(r => scopeOf(r, vocab)));
+  const o = overlapOf(sa, sb, vocab, reachability(vocab, blockers, a.id, b.id));
   return o ? { witness: o.witness, certainty: o.certainty } : null;
+}
+
+// ─── Reachability: which (role, action, area) a lawful request can reach ─────
+
+/** A never rule with no conditions: every request in its scope is refused before any other rule is weighed. */
+function blockersOf(rules: Rule[], scopes: Scope[]): Array<{ id: string; scope: Scope }> {
+  return rules.map((r, i) => ({ r, scope: scopes[i] })).filter(({ r, scope }) => r.never && !scope.when.length && !scope.history && !scope.empty).map(({ r, scope }) => ({ id: r.id, scope }));
+}
+
+/**
+ * Can a lawful request reach this role, action and area? It can when the
+ * role lists the action (else `role_permits_action` refuses it first) and no
+ * unconditional never rule other than the two being compared covers the
+ * triple (else that never rule refuses it first). Conditional never rules
+ * are not filtered: their conditions are compared like any rule's.
+ */
+function reachability(vocab: Vocabulary, blockers: Array<{ id: string; scope: Scope }>, idA: string, idB: string): (roleId: string, action: string, areaId: string) => boolean {
+  const others = blockers.filter(b => b.id !== idA && b.id !== idB);
+  return (roleId, action, areaId) => {
+    if (!vocab.roles.get(roleId)?.actions.includes(action)) return false;
+    return !others.some(b => b.scope.roles.has(roleId) && b.scope.actions.has(action) && b.scope.areas.has(areaId));
+  };
 }
 
 // ─── Scope ───────────────────────────────────────────────────────────────────
@@ -125,9 +153,18 @@ interface Overlap {
  * from the first ID (in declaration order) and the smallest value of each
  * overlap, with every other fact the request needs at a sample value.
  */
-function overlapOf(a: Scope, b: Scope, vocab: Vocabulary): Overlap | null {
-  const roles = meet(a.roles, b.roles), actions = meet(a.actions, b.actions), areas = meet(a.areas, b.areas);
-  if (!roles.size || !actions.size || !areas.size) return null;
+function overlapOf(a: Scope, b: Scope, vocab: Vocabulary, reachable: (roleId: string, action: string, areaId: string) => boolean): Overlap | null {
+  const roles0 = meet(a.roles, b.roles), actions0 = meet(a.actions, b.actions), areas0 = meet(a.areas, b.areas);
+  if (!roles0.size || !actions0.size || !areas0.size) return null;
+  // Only triples a lawful request can reach count; the first in declaration order is the witness.
+  const roles = new Set<string>(), actions = new Set<string>(), areas = new Set<string>();
+  let firstTriple: [string, string, string] | null = null;
+  for (const roleId of vocab.roles.keys()) for (const action of vocab.actions.keys()) for (const areaId of vocab.areas.keys()) {
+    if (!roles0.has(roleId) || !actions0.has(action) || !areas0.has(areaId) || !reachable(roleId, action, areaId)) continue;
+    roles.add(roleId); actions.add(action); areas.add(areaId);
+    firstTriple ??= [roleId, action, areaId];
+  }
+  if (!firstTriple) return null;
   const facts = [...new Set([...a.facts, ...b.facts])];
   const values: Record<string, FactValue> = {};
   for (const f of facts) {
@@ -136,7 +173,7 @@ function overlapOf(a: Scope, b: Scope, vocab: Vocabulary): Overlap | null {
     if (v === undefined) return null;
     values[f] = v;
   }
-  const roleId = first(roles, vocab.roles.keys()), action = first(actions, vocab.actions.keys()), areaId = first(areas, vocab.areas.keys());
+  const [roleId, action, areaId] = firstTriple;
   const role = vocab.roles.get(roleId)!;
   const witnessFacts: Record<string, FactValue> = {};
   for (const def of vocab.facts.values()) {
@@ -176,30 +213,34 @@ function sameAnswer(a: Outcome, b: Outcome): boolean {
 }
 
 /**
- * Which of the two is looser? Returns [looser, stricter, detail] or null when
- * they are not comparable (two limits on different names both apply).
+ * Which of the two is looser? Returns [looser, stricter, limit names] or
+ * null when they are not comparable (two limits on different names both
+ * apply). Two limit rules are compared on EVERY limit name they share: the
+ * names where they differ are returned, and `mixed` says each is looser on
+ * some of them (neither loosens the other outright).
  */
-function looser(a: Rule, b: Rule): [Rule, Rule, string] | null {
+function looser(a: Rule, b: Rule): [Rule, Rule, string[], boolean] | null {
   const ra = rank(a), rb = rank(b);
-  if (ra !== rb) return ra < rb ? [a, b, ''] : [b, a, ''];
+  if (ra !== rb) return ra < rb ? [a, b, [], false] : [b, a, [], false];
   if (a.then.answer === 'limit' && b.then.answer === 'limit') {
-    const shared = Object.keys(a.then.limits).filter(k => k in (b.then as { limits: Record<string, number> }).limits);
-    if (!shared.length) return null;
-    const name = shared[0];
-    const va = a.then.limits[name], vb = b.then.limits[name];
-    if (va === vb) return null;
-    return va > vb ? [a, b, name] : [b, a, name];
+    const la = a.then.limits, lb = b.then.limits;
+    const differing = Object.keys(la).filter(k => k in lb && la[k] !== lb[k]);
+    if (!differing.length) return null;
+    const aLooser = differing.filter(k => la[k] > lb[k]);
+    if (aLooser.length === differing.length) return [a, b, differing, false];
+    if (aLooser.length === 0) return [b, a, differing, false];
+    return [a, b, differing, true];
   }
   if (a.then.answer === 'wait' && b.then.answer === 'wait' && a.then.for === 'approval' && b.then.for === 'approval' && a.then.by !== b.then.by) {
     // An approval wait with no named approver is looser than one that names who must approve.
-    if (!a.then.by) return [a, b, ''];
-    if (!b.then.by) return [b, a, ''];
+    if (!a.then.by) return [a, b, [], false];
+    if (!b.then.by) return [b, a, [], false];
   }
   return null;
 }
 
-function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary): Finding | null {
-  const overlap = overlapOf(sa, sb, vocab);
+function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary, reachable: (roleId: string, action: string, areaId: string) => boolean): Finding | null {
+  const overlap = overlapOf(sa, sb, vocab, reachable);
   if (!overlap) return null;
   const where = describeOverlap(overlap, sa, sb, vocab);
   const aInB = scopeCovered(sa, sb, vocab), bInA = scopeCovered(sb, sa, vocab);
@@ -217,19 +258,23 @@ function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary):
 
   const pair = looser(a, b);
   if (!pair) return null;
-  const [L, S, limitName] = pair;
+  const [L, S, limitNames, mixed] = pair;
   const sL = L === a ? sa : sb, sS = S === a ? sa : sb;
   const covered = scopeCovered(sL, sS, vocab);   // L never takes effect anywhere
   const refines = scopeCovered(sS, sL, vocab);   // S is a stricter special case of L: normal layering
   const extent = covered ? `${idOf(L)} never takes effect at all` : `${idOf(L)} never takes effect there`;
   const rL = authorityRank(vocab, L.setBy), rS = authorityRank(vocab, S.setBy);
   const ids = [L.id, S.id];
-  const both = `${idOf(L)} (${by(L)}) says ${say(L, limitName)}; ${idOf(S)} (${by(S)}) says ${say(S, limitName)}`;
+  const both = `${idOf(L)} (${by(L)}) says ${say(L, limitNames)}; ${idOf(S)} (${by(S)}) says ${say(S, limitNames)}`;
   const scope = `Both apply to ${where}`;
 
+  if (mixed) {
+    // Each is looser on some shared limit and stricter on another: neither overrides the other; the lower value of each applies.
+    return finding('limit_disagreement', 'info', ids, overlap, `${both}. ${scope}. Each is tighter on a different limit, so the lower value of each limit applies where both match.`);
+  }
   // Only an allow, or a looser value on the same limit, can try to LOOSEN. Any other pair
   // (deny vs wait, wait vs limit, ...) is one restriction layered on another: normal.
-  const loosens = L.then.answer === 'allow' || limitName !== '';
+  const loosens = L.then.answer === 'allow' || limitNames.length > 0;
   if (!loosens) {
     if (covered) return finding('shadowed', 'warning', ids, overlap, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
     return null;
@@ -252,8 +297,8 @@ function comparePair(a: Rule, sa: Scope, b: Rule, sb: Scope, vocab: Vocabulary):
     return finding('shadowed', 'warning', ids, overlap, `${idOf(L)} (${by(L)}) is fully covered by the stricter ${idOf(S)} (${by(S)}): ${both}. ${idOf(L)} can never change a decision.`);
   }
   if (refines) return null;
-  const vL = (L.then as { limits: Record<string, number> }).limits[limitName], vS = (S.then as { limits: Record<string, number> }).limits[limitName];
-  return finding('limit_disagreement', 'info', ids, overlap, `${idOf(L)} (${by(L)}) and ${idOf(S)} (${by(S)}) both limit ${limitName} for ${where}: ${vL} and ${vS}. The lower value, ${vS}, applies where both match.`);
+  const lL = (L.then as { limits: Record<string, number> }).limits, lS = (S.then as { limits: Record<string, number> }).limits;
+  return finding('limit_disagreement', 'info', ids, overlap, `${idOf(L)} (${by(L)}) and ${idOf(S)} (${by(S)}) both limit ${limitNames.join(', ')} for ${where}: ${limitNames.map(n => `${n} ${lL[n]} and ${lS[n]}`).join('; ')}. The lower value applies where both match.`);
 }
 
 function finding(kind: Finding['kind'], severity: Finding['severity'], ruleIds: string[], overlap: Pick<Overlap, 'certainty' | 'witness'>, message: string): Finding {
@@ -300,14 +345,14 @@ function checkPlanRules(rules: PlanRule[], vocab: Vocabulary): Finding[] {
 
 // ─── Plain words ─────────────────────────────────────────────────────────────
 
-export function say(r: Rule, limitName?: string): string {
+export function say(r: Rule, limitNames: string[] = []): string {
   const t = r.then;
   switch (t.answer) {
     case 'allow': return 'allow';
     case 'deny': return r.never ? 'never (deny)' : 'deny';
     case 'wait': return t.for === 'approval' ? `wait for approval${t.by ? ` by ${t.by}` : ''}` : 'wait for the situation to change';
     case 'limit': {
-      const entries = Object.entries(t.limits).filter(([k]) => !limitName || k === limitName);
+      const entries = Object.entries(t.limits).filter(([k]) => !limitNames.length || limitNames.includes(k));
       return `limit ${entries.map(([k, v]) => `${k} ${v}`).join(', ')}`;
     }
   }

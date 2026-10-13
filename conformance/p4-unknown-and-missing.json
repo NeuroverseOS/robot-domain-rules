@@ -36,7 +36,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -78,7 +78,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -120,7 +120,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -162,7 +162,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -204,7 +204,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -246,7 +246,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -288,7 +288,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -331,7 +331,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -374,7 +374,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -417,7 +417,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -460,7 +460,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -497,7 +497,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -539,7 +539,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -581,7 +581,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -623,7 +623,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -665,7 +665,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -676,7 +676,7 @@
     ],
     "description": "A declared action the role does not list is BLOCK role_permits_action.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -812,10 +812,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "c7066c12d6a0a898"
+      "fingerprint": "b898bbd196408048dc220d77102ca62acfc0019c7814eef220535e0e6c89d335"
     },
     "request": {
       "participant": {
@@ -848,7 +852,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "c7066c12d6a0a898"
+        "fingerprint": "b898bbd196408048dc220d77102ca62acfc0019c7814eef220535e0e6c89d335"
       }
     }
   },
@@ -890,7 +894,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -902,7 +906,7 @@
     ],
     "description": "With otherwise \"wait-for-approval\", an unknown action is PAUSE unknown_action and asks for an approval (anyone).",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1063,10 +1067,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "0851b60a926197a6"
+      "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
     },
     "request": {
       "participant": {
@@ -1102,12 +1110,14 @@
         "approvalRequests": [
           {
             "ruleId": "unknown_action",
-            "requestDigest": "c0842c62ad027ca2",
-            "rulebookFingerprint": "0851b60a926197a6",
+            "rulebookFingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96",
+            "participantId": "b-1",
+            "action": "fly",
+            "areaId": "floor",
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "0851b60a926197a6"
+        "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
       }
     }
   },
@@ -1119,7 +1129,7 @@
     ],
     "description": "An approved unknown action is ALLOW when no rule matches it.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1280,10 +1290,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "0851b60a926197a6"
+      "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
     },
     "request": {
       "participant": {
@@ -1317,7 +1331,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "0851b60a926197a6"
+        "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
       }
     }
   },
@@ -1329,7 +1343,7 @@
     ],
     "description": "An approved unknown action still faces every never rule.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1490,10 +1504,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "0851b60a926197a6"
+      "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
     },
     "request": {
       "participant": {
@@ -1528,7 +1546,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "0851b60a926197a6"
+        "fingerprint": "c10d7742b1be28d140e8bb4ec212cc1921d2183af35926938b1d9d6f487fad96"
       }
     }
   },
@@ -1539,7 +1557,7 @@
     ],
     "description": "A fact an action requires (`requires`) is required for that action even though it is optional elsewhere.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1679,10 +1697,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "cae15f906d25fd08"
+      "fingerprint": "8bf4f39cb87a9d5c56e846b39fed74ae89fd849c2993a83600a30862247d2a56"
     },
     "request": {
       "participant": {
@@ -1715,7 +1737,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "cae15f906d25fd08"
+        "fingerprint": "8bf4f39cb87a9d5c56e846b39fed74ae89fd849c2993a83600a30862247d2a56"
       }
     }
   },
@@ -1726,7 +1748,7 @@
     ],
     "description": "Only a fact with a declared default is ever filled in: alarm absent means false, so the alarm rule does not match.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1886,10 +1908,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "5a80f4239218b91f"
+      "fingerprint": "f2aa2320fed39fd1979481d543082c09a1f1093c22c1390168a16fe6a6638994"
     },
     "request": {
       "participant": {
@@ -1922,7 +1948,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5a80f4239218b91f"
+        "fingerprint": "f2aa2320fed39fd1979481d543082c09a1f1093c22c1390168a16fe6a6638994"
       }
     }
   },
@@ -1933,7 +1959,7 @@
     ],
     "description": "A rule that conditions on an optional fact with no default is rejected: it could never be evaluated without guessing.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2093,10 +2119,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "1cfb9bc04c463f49"
+      "fingerprint": "1519f7b6fc4a9119947d9a25d00ba838da6fccb21e5f7b8dc4268c86db45c3b6"
     },
     "expect": {
       "error": true,
@@ -2142,7 +2172,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -2153,7 +2183,7 @@
     ],
     "description": "A rulebook whose `otherwise` is neither deny nor wait-for-approval is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2290,10 +2320,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "d89721063b5565d4"
+      "fingerprint": "c03fddfd26cc99e7203d06a8e11fa6bfa268a1df45e8a6b2137cef2c642889d9"
     },
     "expect": {
       "error": true,

@@ -19,25 +19,24 @@
  * evidence system, not a rulebook.
  *
  * History: a rule that counts what a participant did recently gets, for each
- * event, the earlier events of the same participant on the same day of this
- * log (action, area, and the time from the clock fact), unless the event's
- * own request carries `history`, which is then used as it is. Every earlier
- * event of the day counts, whatever was decided or recorded: the log is what
- * was asked. A day is the text of `at` before its first "T" (the whole log is
- * one day when there is none): windows are minute-of-day arithmetic, so
- * yesterday's actions must not count as today's.
+ * event, every earlier event of the same participant in this log (action,
+ * area, and the event's `at` as the entry's `at`), unless the event's own
+ * request carries `history`, which is then used as it is. Every earlier
+ * event counts, whatever was decided or recorded: the log is what was asked.
+ * Windows are absolute time (SPEC.md § 3.4), so an event's `at` must be a
+ * timestamp with a date; each request's `now`, when it has none, is its `at`.
  */
 
 import type { DomainDecisionStatus, DomainRequest, Finding, HistoryEntry, Rulebook } from './types';
 import { evaluateDomainAction, matchingRules, missingFacts } from './evaluate';
-import { DomainRulesError } from './vocabulary';
+import { DomainRulesError, isTimestamp } from './vocabulary';
 
 /** What the site recorded after the request, if anything. Never used to decide; only reported. */
 export type BacktestOutcome = 'happened' | 'did_not_happen' | 'unknown';
 
 /** One recorded request, in time order. */
 export interface BacktestEvent {
-  /** When it was asked: any string that sorts in time order; "YYYY-MM-DDTHH:MM" is the convention. Reported as given. */
+  /** When it was asked: a timestamp with a date ("YYYY-MM-DDTHH:MM", optional seconds and offset). Reported as given; it is each request's `now` and each built history entry's `at`. */
   at: string;
   /** Exactly what the participant asked, as `evaluateDomainAction` receives it. */
   request: DomainRequest;
@@ -46,8 +45,6 @@ export interface BacktestEvent {
 }
 
 export interface BacktestOptions {
-  /** The declared time fact whose value becomes each history entry's `at`. Default: the first declared `time` fact. */
-  clock?: string;
   /** How many example timestamps each finding keeps (the earliest). Default 3. */
   examples?: number;
 }
@@ -170,10 +167,10 @@ export function backtest(rulebook: Rulebook, events: BacktestEvent[], options: B
   if (!Array.isArray(events)) throw new DomainRulesError('backtest: events must be a list of { at, request, outcome? }.');
   events.forEach((e, i) => {
     if (!e || typeof e !== 'object' || typeof e.at !== 'string' || !e.at || !('request' in e)) throw new DomainRulesError(`backtest: events[${i}] must be { at, request, outcome? } with a non-empty "at".`);
+    if (!isTimestamp(e.at)) throw new DomainRulesError(`backtest: events[${i}].at must be a timestamp with a date ("YYYY-MM-DDTHH:MM", optional seconds and offset), got ${JSON.stringify(e.at)}.`);
     if (e.outcome !== undefined && !['happened', 'did_not_happen', 'unknown'].includes(e.outcome)) throw new DomainRulesError(`backtest: events[${i}].outcome must be happened, did_not_happen or unknown when given.`);
   });
-  const clock = options.clock ?? rulebook.facts.find(f => f.type === 'time')?.id;
-  if (clock !== undefined && !rulebook.facts.some(f => f.id === clock && f.type === 'time')) throw new DomainRulesError(`backtest: clock "${clock}" is not a declared time fact.`);
+  if ((options as { clock?: unknown }).clock !== undefined) throw new DomainRulesError('backtest: the clock option was removed in robot-domain-rules/3; each event\'s "at" is its request\'s now and its history entries\' at.');
   const keep = options.examples ?? 3;
 
   const totals = counts();
@@ -187,8 +184,7 @@ export function backtest(rulebook: Rulebook, events: BacktestEvent[], options: B
   const missing = new Map<string, BacktestMissingFact>();
   const differences: BacktestDifference[] = [];
   const rows: BacktestRow[] = [];
-  const prior = new Map<string, { day: string; entries: HistoryEntry[] }>();
-  const dayOf = (at: string) => { const t = at.indexOf('T'); return t < 0 ? '' : at.slice(0, t); };
+  const prior = new Map<string, HistoryEntry[]>();
   const tally = (c: BacktestCounts, status: DomainDecisionStatus, missingFacts: boolean) => { c.events++; if (missingFacts) c.missingFacts++; else c[status]++; };
   const bump = <T extends { count: number; examples: string[] }>(map: Map<string, T>, key: string, make: () => T, at: string) => {
     const item = map.get(key) ?? make();
@@ -202,11 +198,9 @@ export function backtest(rulebook: Rulebook, events: BacktestEvent[], options: B
     const p = raw && typeof raw === 'object' ? raw.participant : undefined;
     const participantId = p && typeof p === 'object' && typeof p.id === 'string' ? p.id : '';
     const areaId = raw && typeof raw === 'object' ? String(raw.areaId ?? raw.zoneId ?? '') : '';
-    // History: the earlier events of this participant in this log, unless the request brings its own.
-    const day = dayOf(event.at);
-    const earlier = prior.get(participantId);
-    const request: DomainRequest = raw && typeof raw === 'object' && raw.history === undefined && participantId
-      ? { ...raw, history: earlier && earlier.day === day ? [...earlier.entries] : [] }
+    // History: the earlier events of this participant in this log, unless the request brings its own; now: the event's at, unless the request brings its own.
+    const request: DomainRequest = raw && typeof raw === 'object'
+      ? { ...raw, ...(raw.history === undefined && participantId ? { history: [...(prior.get(participantId) ?? [])] } : {}), ...(raw.now === undefined ? { now: event.at } : {}) }
       : raw;
     const decision = evaluateDomainAction(rulebook, request);
     const isMissing = decision.status === 'BLOCK' && decision.reasons.some(r => r.ruleId === 'required_facts');
@@ -248,9 +242,8 @@ export function backtest(rulebook: Rulebook, events: BacktestEvent[], options: B
     if (event.outcome === 'did_not_happen' && (decision.status === 'ALLOW' || decision.status === 'LIMIT')) differences.push({ index, at: event.at, status: decision.status, outcome: 'did_not_happen', ruleIds });
 
     if (participantId && row.action) {
-      const at = clock && raw.facts && typeof raw.facts === 'object' && typeof (raw.facts as Record<string, unknown>)[clock] === 'string' ? { at: (raw.facts as Record<string, unknown>)[clock] as string } : {};
-      const list = earlier && earlier.day === day ? earlier : { day, entries: [] };
-      list.entries.push({ action: row.action, areaId, ...at });
+      const list = prior.get(participantId) ?? [];
+      list.push({ action: row.action, areaId, at: event.at });
       prior.set(participantId, list);
     }
   });

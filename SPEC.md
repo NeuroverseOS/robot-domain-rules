@@ -1,15 +1,16 @@
 # robot-domain-rules — specification
 
 ```
-spec: robot-domain-rules/2
-rulebook format string: neuroverse-domain-rules/2
+spec: robot-domain-rules/3
+rulebook format string: neuroverse-domain-rules/3
+approval contract: robot-domain-rules-approval/3
 ```
 
 This document is normative. It defines the rulebook, request, decision, plan, finding and approval formats, the decision algorithm, the plan algorithm, the conflict analysis, authority, and the canonical encoding another implementation must reproduce byte for byte. The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. Everything stated here is checked by the cases in [`conformance/`](conformance/); an implementation conforms when it passes them all. The TypeScript package in this repository is the reference implementation.
 
-Out of scope, and deliberately so: how a rulebook is *built* (templates, questions, plain-text drafting, the builder) is tooling of the reference implementation. The rulebook is the portable artifact; an implementation needs only to validate it, decide with it (one action or a whole plan), check it for conflicts, fingerprint it, and handle approvals. JSON Schemas for every format are in [`spec/`](spec/).
+Out of scope, and deliberately so: how a rulebook is *built* (templates, questions, plain-text drafting, the builder) is tooling of the reference implementation. The rulebook is the portable artifact; an implementation needs only to validate it, decide with it (one action or a whole plan), check it for conflicts, fingerprint it, and handle approvals. JSON Schemas for every format are in [`spec/`](spec/). § 14 says which parts a client needs and what a port must get right.
 
-What changed in `/2` (from `/1`): the conflict analysis is exact and every certain finding carries a `witness` (§ 7), which changes the certainty of some findings and the fingerprint of rulebooks that have findings; actions may declare `effects` (§ 2), rules may condition on `history` (§ 3.4), a rulebook may carry `planRules` (§ 3.5), a request may carry `history` (§ 4), and `evaluatePlan` (§ 12) checks a whole plan. A `/1` rulebook without findings is a valid `/2` rulebook with the same fingerprint and the same decisions.
+**What changed in `/3` (from `/2`), and the migration.** The fingerprint is SHA-256 over the UTF-8 bytes of RFC 8785 canonical JSON, 64 hex digits (was 64-bit FNV-1a over UTF-16 code units, 16 hex), and it no longer covers `findings` (§ 8). The approval contract is new: an approval names the rule it clears, the rulebook, the participant, the action and the area, carries a unique `nonce`, an `issuedAt` and a required `expiresAt`, and never binds to the facts (§ 9). History windows run on absolute time: `history[].at` is a timestamp with a date, measured back from the new `request.now`; the `clock` member of a history condition is gone (§ 3.4, § 4). A plan step may not change area without an action that moves there (§ 12). The conflict analysis compares limit rules on every shared limit name and reports only clashes a lawful request can reach (§ 7). `plan_area_continuity` joins the built-in checks. **Versions are explicit and never reinterpreted** (§ 11): a `/2` rulebook, fingerprint or approval is refused with a message that names its version and the migration — recompile the rulebook from its input with a `/3` compiler, drop `clock` from history conditions, give history entries dated timestamps, and re-issue approvals under the `/3` contract.
 
 ## 1. Vocabulary
 
@@ -19,13 +20,15 @@ A **fact value** is a JSON number, string or boolean.
 
 A **time** is `"HH:MM"`, 24-hour, zero-padded (`^([01]\d|2[0-3]):[0-5]\d$`). A **day** is one of `mon tue wed thu fri sat sun`.
 
+A **timestamp** is ISO 8601 with a date: `YYYY-MM-DDTHH:MM`, optional `:SS` and `.fraction`, optional `Z` or `±HH:MM` offset (`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?$`), calendar-valid. **Without an offset it is read as UTC**, so every implementation reads the same instant. Timestamps are compared as instants.
+
 ## 2. Rulebook
 
 A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schema.json)):
 
 | Field | Type | Req | Meaning |
 |---|---|---|---|
-| `format` | `"neuroverse-domain-rules/2"` | yes | |
+| `format` | `"neuroverse-domain-rules/3"` | yes | The declared version. Any other value is refused (§ 11). |
 | `site` | `{ id, name, spatialDomainId?, hours?: { open, close } }` | yes | `hours` are times; `close` earlier than `open` means overnight. |
 | `template` | string | no | The template it was built from. Informational. |
 | `kinds` | string[] | yes | Participant kinds (`robot`, `person`, `agent`, …). MUST include every kind any role or action names. |
@@ -40,10 +43,10 @@ A rulebook is one JSON object ([`spec/rulebook.schema.json`](spec/rulebook.schem
 | `otherwise` | `"deny"` \| `"wait-for-approval"` | yes | What an undeclared action gets. |
 | `trustedKeys` | `{ keyId, publicKey, authority?, roleId? }[]` | no | See § 9. `publicKey` is 32 bytes lowercase hex; `authority`/`roleId` MUST be declared. Declaring any key (non-empty list) switches approvals to signed-only. |
 | `rules` | Rule[] | yes | § 3. IDs unique across `rules` and `planRules`. |
-| `planRules` | PlanRule[] | no | § 3.5. Present only when non-empty (so a rulebook without plan rules has the same fingerprint as before `/2`). |
-| `builtin` | `{ id, text }[]` | yes | MUST include `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`. |
-| `findings` | Finding[] | yes | § 7. What the conflict check found; MAY be empty; MUST NOT be hidden. |
-| `fingerprint` | 16 lowercase hex | yes | § 8, over everything above. |
+| `planRules` | PlanRule[] | no | § 3.5. Present only when non-empty. |
+| `builtin` | `{ id, text }[]` | yes | MUST include `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`, `plan_area_continuity`. |
+| `findings` | Finding[] | yes | § 7. What the conflict check found; MAY be empty; MUST NOT be hidden. **Not covered by the fingerprint** (their messages are free text). |
+| `fingerprint` | 64 lowercase hex | yes | § 8.2, over everything above except `findings`. |
 
 ### 2.1 Effects
 
@@ -58,7 +61,7 @@ An effect is one of:
 
 `fact` MUST be a declared fact. Effects are not clamped to the fact's range: a projected value outside it makes the next step BLOCK `required_facts`.
 
-**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: unknown format; empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; an effect on an undeclared fact or of the wrong type; a history condition that is malformed (§ 3.4); a plan rule that is malformed or shares an ID with a rule (§ 3.5); an empty `planRules` list; a fingerprint that does not match. (Reference: `validateRulebook`; cases: every `expect.error` case.)
+**Validation.** An implementation MUST reject (refuse to decide with) a rulebook that violates any MUST in this document, including: a format other than `neuroverse-domain-rules/3` (a `/1` or `/2` format MUST be refused with a message naming that version and the migration, § 11); empty or duplicate authorities; a rule referencing an undeclared role, action, area, tag, kind, fact, limit or authority; a rule whose conditions on one fact can never all hold; a never rule that does not deny; a rule conditioning on a fact that is neither required nor defaulted; a `limit` outcome naming an unknown limit or a value below 0; a `wait.by` that is not an authority, a role, or `tag:<declared role tag>`; `wait.by` on a condition wait; a trusted key with a malformed public key or an undeclared authority/role; an `otherwise` outside the two values; an effect on an undeclared fact or of the wrong type; a history condition that is malformed or carries the `/2` member `clock` (§ 3.4); a plan rule that is malformed or shares an ID with a rule (§ 3.5); an empty `planRules` list; a fingerprint that does not match (a 16-hex fingerprint never matches). (Reference: `validateRulebook`; cases: every `expect.error` case, `conformance/versions.json`.)
 
 ## 3. Rule
 
@@ -126,7 +129,7 @@ Resolution to a set of IDs: trim entries and drop empty ones. Positives are entr
 ### 3.4 History conditions
 
 ```json
-{ "actions": "scan", "areas": "tag:aisle", "sameArea": true, "withinMinutes": 60, "clock": "localTime", "op": ">=", "value": 5 }
+{ "actions": "scan", "areas": "tag:aisle", "sameArea": true, "withinMinutes": 60, "op": ">=", "value": 5 }
 ```
 
 | Field | Req | Meaning |
@@ -134,11 +137,10 @@ Resolution to a set of IDs: trim entries and drop empty ones. Positives are entr
 | `actions` | yes | Selector over actions (§ 3.1). Entries of the history whose action is in it count. |
 | `areas` | no | Selector over areas. Only entries in these areas count. |
 | `sameArea` | no | Only entries in the request's own area count. |
-| `withinMinutes` | no | 1–1440. Only entries whose `at` is at most this many minutes before the `clock` fact count, by minute-of-day arithmetic that wraps at midnight: `(now − at + 1440) mod 1440 ≤ withinMinutes`. |
-| `clock` | with `withinMinutes` | A declared `time` fact that is required or has a default: "now". MUST NOT be given without `withinMinutes`. |
+| `withinMinutes` | no | 1–1440. Only entries whose `at` satisfies `0 <= (now − at) <= withinMinutes` minutes count, where `now` is `request.now` and both are instants (§ 1). An entry later than `now` does not count. |
 | `op`, `value` | yes | `op` ∈ `== != > >= < <=`; `value` a whole number ≥ 0. The condition holds when `count op value`. |
 
-History is what the caller supplies (§ 4); the engine keeps none. The conflict analysis does not model history conditions (§ 7.2).
+The `/2` member `clock` MUST NOT be present (the rulebook is invalid). History is what the caller supplies (§ 4); the engine keeps none and has no clock: a window needs `request.now`. The conflict analysis does not model history conditions (§ 7.2).
 
 ### 3.5 Plan rules
 
@@ -166,12 +168,19 @@ A plan rule judges the shape of a whole plan (§ 12) and can only reject:
 { "participant": { "id": "robot-7", "kind": "robot", "roleId": "inventory_robot" },
   "action": "move",
   "areaId": "aisle-3",
-  "facts": { "peopleInZone": 2, "localTime": "14:05", "requestedSpeedMps": 1.0, "approvedBy": … } }
+  "facts": { "peopleInZone": 2, "localTime": "14:05", "requestedSpeedMps": 1.0, "approvedBy": … },
+  "history": [ { "action": "scan", "areaId": "aisle-3", "at": "2026-10-12T13:40:00Z" } ],
+  "now": "2026-10-12T14:05:10Z",
+  "consumedApprovals": [ "dana-glasses-17" ] }
 ```
 
 `zoneId` is accepted as a deprecated alias of `areaId`; a top-level `targetRobotId` is copied into `facts.targetRobotId` when that is absent. `facts` carries the declared facts by ID plus the built-in `approvedBy` (§ 9): a non-empty string (an unqualified approval) or an approval object. Undeclared facts are ignored. A request is never a reason to throw: every malformed request yields a BLOCK decision.
 
-`history` (optional) is a list of `{ action, areaId, at? }` — what this participant did recently, as the caller reports it; `at` is a time. It is needed only when a rule in scope has history conditions (§ 6 step 3).
+`history` (optional) is a list of `{ action, areaId, at? }` — what this participant did recently, as the caller reports it; `at` is a timestamp (§ 1). It is needed only when a rule in scope has history conditions (§ 6 step 3).
+
+`now` (optional) is a timestamp: the instant of the request, from the caller's trusted layer — the engine has no clock. It is needed when a rule in scope has a window, and whenever a signed approval is to be judged. `consumedApprovals` (optional) lists the nonces of approvals the caller has already acted on (§ 9.5).
+
+**Every fact, `history`, `now` and `consumedApprovals` MUST come from the caller's trusted layer (the harness, the spatial system, the fleet manager), never from the participant or agent that asks.** The engine trusts them as given.
 
 ## 5. Decision
 
@@ -182,12 +191,13 @@ A plan rule judges the shape of a whole plan (§ 12) and can only reject:
   "reasons": [ { "ruleId": "robots_near_people", "status": "LIMIT", "reason": "…", "setBy": "law-and-safety" } ],
   "limits": { "maxSpeedMps": 0.3 },
   "then": "dock",
-  "approvalRequests": [ { "ruleId", "by"?, "requestDigest", "rulebookFingerprint", "reason", "setBy" } ],
+  "approvalRequests": [ { "ruleId", "by"?, "rulebookFingerprint", "participantId", "action", "areaId", "reason", "setBy" } ],
+  "approvalsUsed": [ { "ruleId": "robots_restricted_zones", "nonce": "dana-glasses-17" } ],
   "trace": [ …every check that ran, in order… ],
-  "fingerprint": "a8735228811c463a" }
+  "fingerprint": "fb1e4760…dfc8" }
 ```
 
-Statuses, strictest last: `ALLOW < LIMIT < PAUSE < BLOCK`. A **check** is `{ ruleId, status, reason, setBy }`; `setBy` is `"builtin"` for the evaluator's own checks. `reasons` are the checks at the strictest status, in trace order. `limits` is present iff some limit rule matched and the status is ALLOW or LIMIT. `then` is present iff the status is BLOCK and a matching deny rule had `instead` (the first one, never rules first). `approvalRequests` is present iff the status is PAUSE and at least one approval wait is unmet (§ 6 step 8). `fingerprint` is the rulebook's. The `reason` texts are free-form.
+Statuses, strictest last: `ALLOW < LIMIT < PAUSE < BLOCK`. A **check** is `{ ruleId, status, reason, setBy }`; `setBy` is `"builtin"` for the evaluator's own checks. `reasons` are the checks at the strictest status, in trace order. `limits` is present iff some limit rule matched and the status is ALLOW or LIMIT. `then` is present iff the status is BLOCK and a matching deny rule had `instead` (the first one, never rules first). `approvalRequests` is present iff the status is PAUSE and at least one approval wait is unmet (§ 6 step 8). `approvalsUsed` is present iff the status is ALLOW or LIMIT and a signed approval cleared a wait: the caller records each nonce as consumed once it acts (§ 9.5). `fingerprint` is the rulebook's. The `reason` texts are free-form.
 
 ## 6. The decision algorithm
 
@@ -214,17 +224,22 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
       else if the value is not valid for F (type; number finite, integer, min, max;
         time format; day set; enum values; string non-empty): problem
       else facts[F.id] = value.
+    now: absent → none; present but not a timestamp → problem.
+    consumedApprovals: absent → empty; present but not a list of strings → problem.
     approvedBy: absent → none. A non-empty string s → { id: s }. An object with a
     non-empty string id → copy id, authority (MUST be a declared authority), roleId
-    (MUST be a declared role), verified (MUST be boolean), requestDigest,
-    rulebookFingerprint, keyId, issuedAt, signature (MUST be strings); anything
-    else → problem. Any other shape → problem.
+    (MUST be a declared role), verified (MUST be boolean), and the string members
+    spec, ruleId, rulebookFingerprint, participantId, action, areaId, nonce, keyId,
+    issuedAt, expiresAt, signature, requestDigest (each MUST be a string when given);
+    anything else → problem. Any other shape → problem. If the rulebook has trusted
+    keys and the approval is an object and now is absent: problem "now is required".
     History. Let N = the rules with a non-empty `history` whose three selectors
     cover this request (the selector part of step 4). If N is non-empty:
       if request.history is absent: problem "history is required"
       else if it is not a list, or an entry is not { action, areaId, at? } with
-        non-empty strings and a valid time when `at` is given, or some rule in N
+        non-empty strings and a timestamp when `at` is given, or some rule in N
         has withinMinutes and an entry lacks `at`: problem.
+      if some rule in N has withinMinutes and now is absent: problem "now is required".
     If any problem: check("required_facts", BLOCK); stop.
 
  4. Matching. Rule R matches when:
@@ -233,22 +248,25 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
       else: R.does is open and R.does does not contain the entry "!<action>", and
       resolve(R.where, areas) contains area.id, and
       every condition in R.when holds for `facts` (§ 3.2), and
-      every condition in R.history holds for request.history (§ 3.4; an absent
-      history counts as empty only when no rule needed it, which step 3 ensures).
+      every condition in R.history holds for request.history at now (§ 3.4).
 
  5. Never rules. For each rule with never == true, in rulebook order, that matches:
     check(R.id, BLOCK, R.reason ?? R.text, R.setBy); if R.then.instead and `then`
     unset: then = R.then.instead. If any matched: stop.
 
- 6. The action. If A is absent:
+ 6. The action. Let M = non-never rules that match, in rulebook order. If A is
+    absent and otherwise == "wait-for-approval", or some R in M has
+    then = wait/approval, and participant.id is not a non-empty string:
+    check("required_facts", BLOCK, "participant.id is required when an approval
+    is needed"); stop.
+    If A is absent:
       if rulebook.otherwise == "deny": check("unknown_action", BLOCK); stop
       else: APPROVAL("unknown_action", by = none, setBy = "builtin")   (step 8)
     else if action ∉ role.actions: check("role_permits_action", BLOCK); stop
     else: check("role_permits_action", ALLOW).
 
- 7. Matching rules. Let M = non-never rules that match, in rulebook order.
-    effective = {}; for each R in M with answer "limit", for each (name, v) in
-    R.then.limits: effective[name] = min(effective[name], v).
+ 7. Matching rules. effective = {}; for each R in M with answer "limit", for each
+    (name, v) in R.then.limits: effective[name] = min(effective[name], v).
     For each R in M:
       allow:            check(R.id, ALLOW, reason, R.setBy)
       deny:             check(R.id, BLOCK, reason, R.setBy); set `then` as in step 5
@@ -260,22 +278,32 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
                             if asked is absent or asked > v: status = LIMIT
                         check(R.id, status, reason, R.setBy)
 
- 8. APPROVAL(ruleId, by, setBy) — with digest = requestDigest(request) (§ 8.3):
-      ask() = append { ruleId, by (omitted when none), requestDigest: digest,
-                       rulebookFingerprint: rulebook.fingerprint, reason, setBy }
-              to approvalRequests.
+ 8. APPROVAL(ruleId, by, setBy):
+      ask() = append { ruleId, by (omitted when none), rulebookFingerprint:
+                       rulebook.fingerprint, participantId: participant.id, action,
+                       areaId: area.id, reason, setBy } to approvalRequests.
       if no approval: check(ruleId, PAUSE, …, setBy); ask(); return.
-      if rulebook.trustedKeys is a non-empty list:
-        if approval.verified != true, or approval.requestDigest != digest, or
-           approval.rulebookFingerprint != rulebook.fingerprint:
-          check(ruleId, PAUSE, …, setBy); ask(); return.
+      if rulebook.trustedKeys is a non-empty list, the approval is BOUND only when
+      every one of these holds (the first failure is the reason given):
+        approval.spec == "robot-domain-rules-approval/3"   (a /2 approval — one with
+             requestDigest, or a 16-hex rulebookFingerprint — is refused by name, § 11)
+        approval.verified == true
+        approval.ruleId == ruleId
+        approval.rulebookFingerprint == rulebook.fingerprint
+        approval.participantId == participant.id, approval.action == action,
+             approval.areaId == area.id
+        approval.nonce is a string not in consumedApprovals
+        issuedAt and expiresAt are timestamps and issuedAt <= now < expiresAt
+      if not bound: check(ruleId, PAUSE, …, setBy); ask(); return.
       sufficient =
         by is none → true
         by is a declared authority → approval.authority is set and
              rank(approval.authority) <= rank(by)   (rank 0 = highest)
         by == "tag:" + t → approval.roleId names a role whose tags include t
         otherwise (by is a role ID) → approval.roleId == by
-      if sufficient: check(ruleId, ALLOW, …, setBy) else check(ruleId, PAUSE, …, setBy); ask().
+      if sufficient: check(ruleId, ALLOW, …, setBy); if approval.nonce is set:
+             append { ruleId, nonce } to approvalsUsed
+      else check(ruleId, PAUSE, …, setBy); ask().
 
  9. (nothing)
 
@@ -283,16 +311,17 @@ Pure and synchronous: no clock, no I/O, no model. `check(id, status, reason, set
     empty — it never is). reasons = trace entries with that status, in order.
     Include limits = effective iff effective is non-empty and status ∈ {ALLOW, LIMIT}.
     Include then iff set and status == BLOCK. Include approvalRequests iff non-empty
-    and status == PAUSE. fingerprint = rulebook.fingerprint.
+    and status == PAUSE. Include approvalsUsed iff non-empty and status ∈ {ALLOW, LIMIT}.
+    fingerprint = rulebook.fingerprint.
 ```
 
-Consequences worth stating: a missing or invalid fact is never permission (step 3); an approved unknown action still faces every never rule and every matching rule (steps 5–7); approvals never clear a condition wait (step 7); the strictest answer always wins, so a looser rule from a lower authority has no effect even before the conflict check names it.
+Consequences worth stating: a missing or invalid fact is never permission (step 3); an approved unknown action still faces every never rule and every matching rule (steps 5–7); **an approval clears only the approval wait of the rule it names** — approvals never clear a condition wait, never a deny, never a never rule, and every other check runs on the facts the request carries now (step 7); the strictest answer always wins, so a looser rule from a lower authority has no effect even before the conflict check names it.
 
 ## 7. Conflict analysis
 
 `check(rulebook) → Finding[]` ([`spec/findings.schema.json`](spec/findings.schema.json)). A finding is `{ kind, severity, ruleIds: [first, second], certainty, witness?, message }` with kind ∈ `contradiction authority-override tightening shadowed duplicate limit_disagreement never_vs_rule`, severity ∈ `conflict warning info`, certainty ∈ `certain possible`. `message` is free-form and SHOULD name which rule wins and which never takes effect.
 
-The analysis is **complete for the rule language**: two rules are reported as overlapping if and only if some request matches both. `certainty` is `certain` when the overlap was decided exactly, and then `witness` (§ 7.4) is a request that matches both rules; it is `possible` only when a rule in the pair has history conditions, which depend on what a caller supplies and are not modelled — then the overlap on facts is real, the history is unknown, and there is no witness.
+**Why this is tractable, and what "complete" means.** A rule's conditions are AND-ed and each names ONE fact; facts are independent. So the set of requests matching a rule is a product of per-fact sets, each of a shape with exact intersection, emptiness and subset (§ 7.1), and "can two rules both match one request" reduces to per-fact intersections — no search, no enumeration over facts, no size bound. The analysis is **complete for that question**: two rules are reported if and only if some lawful request (§ 7.2) matches both. It does not reason about which rule a decision finally reaches when others intervene — a reported pair may, on a given request, both be outranked by a third rule; strictest-wins at decision time settles that, and the finding's `message` says only who wins between the two. History conditions are not modelled (§ 7.2).
 
 ### 7.1 Scope and constraints
 
@@ -305,13 +334,15 @@ The **scope** of a rule is `(roles, actions, areas, when)` with the three select
 | boolean, day, enum | the finite value set | a finite subset |
 | string | all non-empty strings | "everything except" a finite set, or a finite set |
 
-For an integer fact every range is kept closed on whole numbers (`> v` becomes `≥ ⌊v⌋+1`, `< v` becomes `≤ ⌈v⌉−1`), and an integer range is empty when it is inverted or every whole number in it is excluded; a real range with `lo < hi` is never emptied by finitely many excluded points. Intersection, emptiness and subset over these representations are exact, so **overlap is decided exactly**: facts are independent, the requests matching a rule are a product of per-fact sets, and two rules can meet iff their selectors meet and every per-fact intersection is non-empty. No enumeration is needed and no size bound applies.
+For an integer fact every range is kept closed on whole numbers (`> v` becomes `≥ ⌊v⌋+1`, `< v` becomes `≤ ⌈v⌉−1`), and an integer range is empty when it is inverted or every whole number in it is excluded; a real range with `lo < hi` is never emptied by finitely many excluded points. Intersection, emptiness and subset over these representations are exact for every pair of shapes — including an integer range (or a single closed point) inside a finite set — so **overlap and coverage are decided exactly**.
 
-### 7.2 Overlap and certainty
+### 7.2 Overlap, reachability and certainty
+
+A triple `(role, action, area)` is **reachable** when the role lists the action (else `role_permits_action` refuses every such request before any rule is weighed) and no **unconditional never rule** other than the two being compared covers it (a never rule with no `when` and no `history`; else it refuses every such request first). Conditional never rules are compared like any rule.
 
 For rules `a`, `b` (every pair `i < j` in rulebook order):
 
-- **overlap** iff `roles_a ∩ roles_b`, `actions_a ∩ actions_b`, `areas_a ∩ areas_b` are all non-empty and, for every fact named by either rule, `constraint(a,f) ∩ constraint(b,f)` is non-empty. No overlap → no finding. (History conditions are ignored here.)
+- **overlap** iff some reachable triple lies in `roles_a ∩ roles_b`, `actions_a ∩ actions_b`, `areas_a ∩ areas_b` and, for every fact named by either rule, `constraint(a,f) ∩ constraint(b,f)` is non-empty. No overlap → no finding. (History conditions are ignored here.)
 - `implies(a, b)` iff for every fact `f` named by `b`, `constraint(a,f) ⊆ constraint(b,f)`.
 - `covered(a, b)` ("every request matching a matches b") iff `roles_a ⊆ roles_b`, `actions_a ⊆ actions_b`, `areas_a ⊆ areas_b` and `implies(a, b)`.
 - **certainty** = `possible` if either rule has a non-empty `history`, else `certain` (with a witness, § 7.4).
@@ -322,7 +353,7 @@ Strictness rank of an outcome: deny 4, wait/condition 3, wait/approval 2, limit 
 
 `sameAnswer(a, b)`: same `answer`; for waits also same `for` and same `by`; for limits the same keys with the same values.
 
-`looser(a, b)` → `(L, S, limitName)` or none: different ranks → the lower rank is L; both limits → take the first key of `a.limits` (in its key order) that also appears in `b.limits`; none shared or equal values → none; else the larger value is L and that key is `limitName`; both approval waits with different `by` → the one without `by` is L; otherwise none.
+`looser(a, b)` → `(L, S, names, mixed)` or none: different ranks → the lower rank is L, `names` empty; both limits → `names` = every key in both `limits` whose values differ (none → no result); if `a` is larger on all of them, L = a; if smaller on all, L = b; if larger on some and smaller on others, L = a with `mixed`; both approval waits with different `by` → the one without `by` is L; otherwise none.
 
 ```
 if sameAnswer(a, b):
@@ -331,9 +362,10 @@ if sameAnswer(a, b):
   elif covered(a,b):                 duplicate/info, ruleIds [a, b]
   elif covered(b,a):                 duplicate/info, ruleIds [b, a]
   else: no finding
-(L, S, name) = looser(a, b); if none: no finding.   ruleIds = [L, S] from here on.
+(L, S, names, mixed) = looser(a, b); if none: no finding.   ruleIds = [L, S] from here on.
+if mixed:                                    limit_disagreement/info   (each tighter on a different limit; the lower value of each applies)
 coveredL = covered(L, S); refines = covered(S, L)
-loosens = (L.then.answer == "allow") or (name != "")
+loosens = (L.then.answer == "allow") or (names non-empty)
 if not loosens:
   if coveredL: shadowed/warning  else: no finding
 elif S.never and L.then.answer == "allow":  never_vs_rule/conflict
@@ -350,36 +382,43 @@ An implementation MAY offer a strict mode that refuses a rulebook with any `conf
 
 ### 7.4 Witness
 
-`witness` is `{ participant: { id, kind, roleId }, action, areaId, facts }`: a request that matches both rules (§ 6 step 4, selectors and conditions, ignoring never-rule stopping). An implementation MUST produce a witness on every `certain` finding between rules and MAY choose any request that matches both; the conformance cases judge a witness by validity (`conformance/README.md`). The reference chooses, deterministically: the first role, action and area in declaration order that both rules cover; for every fact either rule names, the smallest value of the intersection (the first minute of the day for a time, the first in sorted order for a finite set, the lower end of a range or the first whole number above it, `"x"`/`"x1"`/… for a string that is "everything except"); every other fact the request needs (required, or required by the action) at a sample value (the default, else the minimum / `false` / `"00:00"` / `"mon"` / the first enum value / `"x"`); `participant.id` is `<roleId>-1`.
+`witness` is `{ participant: { id, kind, roleId }, action, areaId, facts }`: a request that matches both rules (§ 6 step 4, selectors and conditions, ignoring never-rule stopping) on a reachable triple. An implementation MUST produce a witness on every `certain` finding between rules and MAY choose any such request; the conformance cases judge a witness by validity (`conformance/README.md`). The reference chooses, deterministically: the first reachable triple in declaration order (roles, then actions, then areas); for every fact either rule names, the smallest value of the intersection (the first minute of the day for a time, the first in sorted order for a finite set, the lower end of a range or the first whole number above it, `"x"`/`"x1"`/… for a string that is "everything except"); every other fact the request needs (required, or required by the action) at a sample value (the default, else the minimum / `false` / `"00:00"` / `"mon"` / the first enum value / `"x"`); `participant.id` is `<roleId>-1`.
 
 ### 7.5 Plan rules
 
 Plan rules can only reject, so two of them never disagree. The check reports a `duplicate` (info, certain, no witness) for two plan rules with the same `check` (same kind, same resolved selectors, same `sameArea` / `count`) whose `who` selectors share a role. No other finding kind applies to plan rules, and a plan rule is never compared with a rule.
 
-## 8. Canonical JSON, fingerprint, request digest
+## 8. Canonical JSON, SHA-256, fingerprint, request digest
 
-### 8.1 Canonical JSON
+### 8.1 Canonical JSON (RFC 8785)
 
-`canonical(v)`:
+`canonical(v)` is the JSON Canonicalization Scheme, [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), applied after dropping object members whose value is `undefined` (JSON has none):
+
 - array → `[` + elements joined by `,` + `]`, order kept;
-- object → `{` + members joined by `,` + `}`, where members with value `undefined` are dropped and the rest are sorted by key, comparing keys as sequences of UTF-16 code units; each member is `JSON.stringify(key) + ":" + canonical(value)`;
-- anything else → `JSON.stringify(value)` as ECMAScript defines it: strings with only `"`, `\`, and control characters U+0000–U+001F escaped (`\n`, `\t`, `\uXXXX`, …), non-ASCII kept literal; numbers in ECMAScript shortest round-trip form (`1`, `0.5`, `1e+21`, `1e-7`, `-0` as `0`); `true`, `false`, `null`.
+- object → `{` + members joined by `,` + `}`, members sorted by key comparing keys as sequences of UTF-16 code units (RFC 8785 § 3.2.3); each member is `JSON.stringify(key) + ":" + canonical(value)`;
+- string → as ECMAScript `JSON.stringify` writes it (RFC 8785 § 3.2.2.2): only `"`, `\` and U+0000–U+001F escaped (`\b \t \n \f \r`, else `\u00XX`), everything else literal, non-ASCII kept;
+- number → ECMAScript `Number::toString` shortest round-trip form (RFC 8785 § 3.2.2.3; `1`, `0.5`, `1e+21`, `1e-7`, `-0` as `0`). `NaN` and infinities are not JSON and MUST be refused;
+- `true`, `false`, `null` literally.
 
 No whitespace anywhere. (Cases: `conformance/fingerprint.json`.)
 
-### 8.2 Fingerprint
+### 8.2 SHA-256 and the fingerprint
 
-`fingerprint(v)` = 64-bit FNV-1a over the **UTF-16 code units** of `canonical(v)` (so a character outside the BMP contributes two units), offset basis `0xcbf29ce484222325`, prime `0x100000001b3`, arithmetic mod 2^64, as 16 lowercase hex digits, zero-padded.
+`sha256(bytes)` is FIPS 180-4 SHA-256, as 64 lowercase hex digits (cases `sha256-*` in `conformance/fingerprint.json` are the standard's vectors plus a UTF-8 one).
 
-A rulebook's `fingerprint` is `fingerprint(rulebook without its fingerprint member)`. It identifies a rulebook; it is not a security measure (§ 9.4 is).
+`fingerprint(v)` = `sha256(UTF-8 bytes of canonical(v))`.
+
+A rulebook's `fingerprint` is `fingerprint(rulebook without its fingerprint and findings members)`. Findings are left out so that two conforming compilers, whose finding messages may differ, assign the same fingerprint to the same rulebook. It identifies a rulebook; it is not a security measure (§ 9.6 is). A fingerprint's version is recognisable by its length: 64 hex is `/3`; 16 hex is a `/2` FNV-1a value and is refused wherever a `/3` fingerprint is expected.
 
 ### 8.3 Request digest
 
-`requestDigest(request)` = `fingerprint({ participant: { id, kind, roleId }, action, areaId })` where `areaId` falls back to `zoneId`. It binds an approval to *what* was asked by *whom* and *where*, and deliberately not to the facts, which change between the request that paused and the one re-sent with the approval.
+`requestDigest(request)` = `fingerprint({ participantId, action, areaId })` where `areaId` falls back to `zoneId`. It is a convenience key for logs and caches; approvals (§ 9) name the three fields themselves.
 
 ## 9. Approvals
 
 [`spec/approval.schema.json`](spec/approval.schema.json)
+
+An approval is **authorisation, separate from the operational facts.** It says: holder `id` (with authority/role) authorises *this rule's* approval wait, for *this participant*, *this action*, in *this area*, under *this rulebook*, once, within a window. It says nothing about the facts: the live decision always checks the facts current at evaluation time, and an approval can never override a current BLOCK or a current condition wait (§ 6).
 
 ### 9.1 Approval request
 
@@ -387,38 +426,62 @@ Returned on a PAUSE for approval, one per unmet approval wait:
 
 ```json
 { "ruleId": "robots_restricted_zones", "by": "site-manager",
-  "requestDigest": "a972a032bcabeaaf", "rulebookFingerprint": "96be85f891da7c40",
+  "rulebookFingerprint": "fb1e4760…dfc8",
+  "participantId": "robot-9", "action": "enter_zone", "areaId": "7f2d9a10-…-000000000005",
   "reason": "This area is restricted.", "setBy": "company" }
 ```
 
-### 9.2 Signed approval
+### 9.2 Signed approval (`robot-domain-rules-approval/3`)
 
 ```json
-{ "id": "manager-dana", "authority": "site-manager",
-  "requestDigest": "a972a032bcabeaaf", "rulebookFingerprint": "96be85f891da7c40",
-  "issuedAt": "2026-10-12T09:00:00Z", "keyId": "dana-2026",
-  "signature": "8ab8…3006" }
+{ "spec": "robot-domain-rules-approval/3",
+  "id": "manager-dana", "authority": "site-manager",
+  "ruleId": "robots_restricted_zones", "rulebookFingerprint": "fb1e4760…dfc8",
+  "participantId": "robot-9", "action": "enter_zone", "areaId": "7f2d9a10-…-000000000005",
+  "nonce": "dana-glasses-17",
+  "issuedAt": "2026-10-12T09:21:00Z", "expiresAt": "2026-10-12T09:31:00Z",
+  "keyId": "dana-2026", "signature": "8ab8…3006" }
 ```
 
-`id`, `requestDigest`, `rulebookFingerprint`, `issuedAt`, `keyId`, `signature` are required; `authority` and `roleId` optional. The signature is Ed25519 (RFC 8032, pure, no pre-hash) over the UTF-8 bytes of `canonical(approval without "signature" and without "verified")`, encoded as 64 bytes lowercase hex. Public keys are the raw 32-byte Ed25519 key, lowercase hex. Ed25519 signatures are deterministic, so the vectors in `conformance/approvals.json` (with their TEST ONLY seeds) are reproducible exactly.
+`spec`, `id`, `ruleId`, `rulebookFingerprint`, `participantId`, `action`, `areaId`, `nonce`, `issuedAt`, `expiresAt`, `keyId`, `signature` are required; `authority` and `roleId` optional. `nonce` MUST be unique per approval instance under the signing key (a UUID, or a counter). `expiresAt` MUST be later than `issuedAt`; a signer SHOULD keep the window short. The signature is Ed25519 (RFC 8032, pure, no pre-hash) over the UTF-8 bytes of `canonical(approval without "signature" and without "verified")`, encoded as 64 bytes lowercase hex. Public keys are the raw 32-byte Ed25519 key, lowercase hex. Ed25519 signatures are deterministic, so the vectors in `conformance/approvals.json` (with their TEST ONLY seeds) are reproducible exactly.
 
 ### 9.3 Verification (before evaluation)
 
-`verifyApproval(approval, trustedKeys)` MUST: check the required fields are non-empty strings; find the trusted key with `keyId`; if the approval claims an `authority`, require the key's `authority` to equal it; if it claims a `roleId`, require the key's `roleId` to equal it; verify the signature with the key. On success it returns the approval with `verified: true`, which the caller passes as `facts.approvedBy`. It MUST NOT check `requestDigest` or `rulebookFingerprint` (the evaluator does, against the real request) and does not check `issuedAt` (no clock; age is the caller's policy).
+`verifyApproval(approval, trustedKeys)` MUST: refuse an approval whose `spec` is not `robot-domain-rules-approval/3` (one carrying `requestDigest` or a 16-hex `rulebookFingerprint` is a `/2` approval and MUST be refused with a message naming that and the migration); check the required fields are non-empty strings and `rulebookFingerprint` is 64 hex; find the trusted key with `keyId`; if the approval claims an `authority`, require the key's `authority` to equal it; if it claims a `roleId`, require the key's `roleId` to equal it; verify the signature with the key. On success it returns the approval with `verified: true`, which the caller passes as `facts.approvedBy`. It does NOT check the binding fields, the window or the nonce: the evaluator does, against the real request and its `now`.
 
-The evaluator (§ 6 step 8) then requires, when `trustedKeys` is non-empty: `verified === true`, matching `requestDigest`, matching `rulebookFingerprint`, and sufficiency for `by`. When `trustedKeys` is absent or empty, plain approvals (`"name"` or `{ id, authority?, roleId? }`) are accepted. This is the development path; a space that wants approvals it can audit declares keys.
+**The `verified` flag is trusted as given.** It MUST be set only by the caller's trusted layer, from a successful `verifyApproval`, and that layer MUST be the only thing that assembles `facts`. The reference offers `verifyAndEvaluate(rulebook, request)` (and `verifyAndEvaluatePlan`) as the recommended entry: it verifies whatever signed approval the request carries and then evaluates; the evaluator itself stays pure and synchronous and never verifies a signature.
 
-### 9.4 Rulebook signature
+### 9.4 What the evaluator checks
 
-`signRulebook(rulebook, key)` → `{ keyId, fingerprint, signature }`: Ed25519 over the UTF-8 bytes of `canonical(rulebook)` — the whole rulebook, fingerprint included. `verifyRulebookSignature(rulebook, signature, publicKey)` verifies with a public key the deployment pins **outside** the rulebook; a rulebook's own `trustedKeys` are for approvals and cannot vouch for the rulebook.
+§ 6 step 8, when `trustedKeys` is non-empty: `/3` spec, `verified`, rule, rulebook fingerprint, participant, action, area, an unconsumed nonce, and `issuedAt <= now < expiresAt`; then sufficiency for `by`. A request carrying an approval object under such a rulebook without `now` is BLOCK `required_facts`. When `trustedKeys` is absent or empty, plain approvals (`"name"` or `{ id, authority?, roleId? }`) are accepted: the development path.
+
+### 9.5 Replay, without hidden state
+
+The engine keeps nothing between calls, so replay is detected from two things the caller supplies and receives: it passes `request.consumedApprovals` (the nonces it has already acted on) and, when a decision is ALLOW or LIMIT, reads `decision.approvalsUsed` and adds those nonces to its set **once it acts**. An approval whose nonce is in `consumedApprovals` does not apply. The window (`expiresAt`) bounds how long the caller must remember a nonce. A caller that does not keep the set gets one-use-per-window-per-request only from `expiresAt`; the set is what makes an approval single-use.
+
+### 9.6 Rulebook signature
+
+`signRulebook(rulebook, key)` → `{ keyId, fingerprint, signature }`: Ed25519 over the UTF-8 bytes of `canonical(rulebook)` — the whole rulebook, fingerprint and findings included. `verifyRulebookSignature(rulebook, signature, publicKey)` verifies with a public key the deployment pins **outside** the rulebook; a rulebook's own `trustedKeys` are for approvals and cannot vouch for the rulebook.
 
 ## 10. Authority
 
 The `authorities` list is a total order, highest first; `rank(id)` is the index. Every rule's `setBy` is a declared authority. The order governs three things and nothing else: which of two overlapping rules is reported as overriding versus tightening (§ 7.3); whether an approval claiming an authority satisfies a `wait.by` that names one (§ 6 step 8: equal or higher rank); and which key may sign an approval claiming an authority (§ 9.3). It does not reorder evaluation: strictest-wins makes a looser lower-authority rule ineffective without consulting rank. An authority may be held by a person, a system or an AI agent; the rulebook does not know or care which.
 
-## 11. Versioning and conformance
+## 11. Versioning and explicit version handling
 
-This specification is `robot-domain-rules/2`. The rulebook `format` string is `neuroverse-domain-rules/2` and changes only with the rulebook's shape; `/2` of this document added optional members (`effects`, `history`, `planRules`, `witness`) and did not change it. § 13 (backtest) was added to `/2` without a version change: it is a new function over existing formats, defined entirely in terms of § 6 and § 7, and alters no decision, finding, fingerprint or signature. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. (`/2` did: the exact analysis changed the certainty of some findings and, through `witness`, the fingerprint of rulebooks that have findings.) An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
+This specification is `robot-domain-rules/3`; the rulebook `format` string is `neuroverse-domain-rules/3`; the approval contract is `robot-domain-rules-approval/3`. Changes to this document that alter any decision, finding, fingerprint or signature for an existing valid rulebook bump the spec major version and come with new conformance cases; clarifications do not. An implementation claims conformance to a spec version by passing every case in `conformance/` at that version; how to run them is in [`conformance/README.md`](conformance/README.md).
+
+**Every artifact declares its version, and an implementation MUST NOT reinterpret an older one under newer rules.** What a `/3` implementation does with each:
+
+| Artifact | How its version is known | A `/3` implementation… |
+|---|---|---|
+| Rulebook | `format` | accepts `neuroverse-domain-rules/3`; refuses `/1` and `/2` at validation with a message naming that version and the migration (recompile from the input). Cases: `conformance/versions.json`. |
+| Fingerprint / digest | length: 64 hex is `/3`, 16 hex is `/2` | a 16-hex fingerprint never verifies and never binds an approval. |
+| Signed approval | `spec` | accepts `robot-domain-rules-approval/3`; refuses an approval without it — in particular a `/2` one, recognisable by `requestDigest` or a 16-hex `rulebookFingerprint` — in `verifyApproval` and, if it is passed through anyway, in the evaluator, each time naming the migration (re-issue under `/3`). Cases: `approvals-verify-v2-approval-refused`, `approvals-v2-approval-does-not-clear`. |
+| History entry | `at` shape | a `/2` `"HH:MM"` `at` is not a timestamp: BLOCK `required_facts`, never a guess at the day. |
+| Backtest event | `at` shape | a non-timestamp `at` is an input error. |
+
+**Migration from `/2`**: recompile every rulebook from its input with a `/3` compiler (fingerprints change; a rulebook's findings are unchanged); remove `clock` from history conditions; give history entries and backtest events dated timestamps and supply `request.now`; re-issue approvals under the `/3` contract (new fields, nonce, expiry) and start keeping a consumed-nonce set; add `plan_area_continuity` to `builtin` (the compiler does). Decisions for existing valid requests without history windows or approvals are unchanged except where a plan step changed area without a move (now refused) and where a finding's classification changed (§ 7).
 
 ## 12. Plans
 
@@ -428,29 +491,36 @@ This specification is `robot-domain-rules/2`. The rulebook `format` string is `n
 { "participant": { "id": "robot-9", "kind": "robot", "roleId": "restock_robot" },
   "initialFacts": { "localTime": "09:30", "peopleInZone": 0 },
   "steps": [ { "action": "enter_zone", "area": "aisle-3" }, { "action": "scan" }, { "action": "manipulate", "facts": { "peopleInZone": 2 }, "note": "…" } ],
-  "history": [ { "action": "dock", "areaId": "dock-a", "at": "09:00" } ],
-  "clock": "localTime", "startTime": "09:30", "stepDurationSeconds": 120 }
+  "history": [ { "action": "dock", "areaId": "dock-a", "at": "2026-10-12T09:00:00Z" } ],
+  "clock": "localTime", "startTime": "09:30", "stepDurationSeconds": 120,
+  "now": "2026-10-12T09:30:00Z", "consumedApprovals": [] }
 ```
 
 | Field | Req | Meaning |
 |---|---|---|
 | `participant` | yes | As in a request. |
 | `initialFacts` | yes | The facts before the first step; undeclared facts are ignored, as in a request. |
-| `steps` | yes, ≥1 | `{ action, area?, facts?, note? }`. The first step MUST have `area`. `facts` are laid over the projected facts for that step only, and persist into the projection after it. `note` is carried into the result. |
+| `steps` | yes, ≥1 | `{ action, area?, facts?, note? }`. The first step MUST have `area`. A later step MAY name an area only if it is the area the participant is projected to be in, or its action has a `move` effect (§ 12 step 1). `facts` are laid over the projected facts for that step only, and persist into the projection after it. `note` is carried into the result. |
 | `history` | no | What the participant did before the plan; seeds each step's history and counts for `before` plan rules. |
 | `clock` | no | A declared `time` fact that advances. |
-| `startTime`, `stepDurationSeconds` | no | With `clock`: step *i* sees `clock = startTime + ⌊i · stepDurationSeconds / 60⌋` minutes, mod 1440. |
+| `startTime`, `stepDurationSeconds` | no | With `clock`: step *i* sees `clock = startTime + ⌊i · stepDurationSeconds / 60⌋` minutes, mod 1440. `startTime` defaults to the time of day of `now` (read as UTC) when `now` is given. |
+| `now` | no | A timestamp: step *i*'s `request.now` is `now + i · stepDurationSeconds`; it also stamps the history entries the plan appends. Without it those entries carry no `at`, and a window rule in scope is `required_facts`. |
+| `consumedApprovals` | no | Passed to every step's request. |
 
 ```
  0. Shape. If the plan is not an object, has no participant, no steps, no initialFacts,
     a step without an action, a first step without an area, a clock that is not a
-    declared time fact, a startTime that is not a time, or a history that is not a
-    list: status BLOCK, firstViolation { stepIndex 0, ruleId "required_facts",
-    setBy "builtin", from "plan" }, no steps, no planChecks; stop.
+    declared time fact, a startTime that is not a time, a now that is not a timestamp,
+    a stepDurationSeconds that is not a number >= 0, or a history that is not a list:
+    status BLOCK, firstViolation { stepIndex 0, ruleId "required_facts", setBy
+    "builtin", from "plan" }, no steps, no planChecks; stop. (A plan that is not an
+    object is never a throw; its planDigest is fingerprint(null).)
 
  1. Areas, as described. here = steps[0].area. For each step i:
+      moves = the step's action is declared and has a `move` effect
+      broken[i] = step.area is given and step.area != here and not moves
       areas[i] = step.area ?? here
-      if the step's action is declared and has a `move` effect: here = areas[i]
+      if moves: here = areas[i]
       after[i] = here
 
  2. Plan rules. For each plan rule whose `who` selects the participant's role
@@ -467,16 +537,21 @@ This specification is `robot-domain-rules/2`. The rulebook `format` string is `n
  3. Steps. facts = initialFacts; history = plan.history ?? []. For each step i:
       if clock and startTime: facts[clock] = startTime + ⌊i · stepDurationSeconds / 60⌋ min (mod 1440)
       stepFacts = facts ⊕ step.facts
-      decision = evaluate(rulebook, { participant, action: step.action, areaId: areas[i],
-                                      facts: stepFacts, history })             (§ 6)
+      now_i = plan.now + i · stepDurationSeconds, if plan.now is given
+      if broken[i]: decision = { BLOCK, reasons = trace = [ { "plan_area_continuity",
+          BLOCK, …, "builtin" } ], fingerprint }   — the step names an area the
+          participant is not in and its action does not move it
+      else decision = evaluate(rulebook, { participant, action: step.action,
+          areaId: areas[i], facts: stepFacts, history, now: now_i,
+          consumedApprovals: plan.consumedApprovals })                        (§ 6)
       record { index: i, action, areaId: areas[i], facts: stepFacts, decision, note? }
-      add each of decision.approvalRequests not already present (same ruleId and
-        requestDigest) to approvalRequests
+      add each of decision.approvalRequests not already present (same ruleId,
+        action and areaId) to approvalRequests
       if decision.status == BLOCK: facts = stepFacts; stop projecting
       facts = stepFacts with the action's effects applied, in order: set → the
         value; add/subtract → from the current value, or the fact's default when
         the current value is not a number, or left untouched when neither exists
-      history += { action, areaId: areas[i], at: stepFacts[clock] if it is a string }
+      history += { action, areaId: areas[i], at: now_i if given }
 
  4. Finish. status = the strictest of every plan check and every recorded step
     decision. firstViolation = among the first recorded step with status BLOCK
@@ -484,10 +559,13 @@ This specification is `robot-domain-rules/2`. The rulebook `format` string is `n
     "plan", at its stepIndex), the one with the smallest stepIndex; at equal
     index the step's. finalFacts = facts. finalArea = the last recorded step's
     areaId if its decision is BLOCK, else after[last recorded index].
-    planDigest = fingerprint(plan) (§ 8.2). fingerprint = rulebook.fingerprint.
+    planDigest = fingerprint(plan with `consumedApprovals` removed, `approvedBy`
+    removed from initialFacts and from every step's facts, and a step's facts
+    removed when empty after that) — so collecting approvals does not change it.
+    fingerprint = rulebook.fingerprint.
 ```
 
-Consequences: nothing is projected past a refusal (the steps list is cut at the first BLOCK); a PAUSE does not stop projection, so a planner sees every approval the plan needs; the plan is judged on the effects the site declared and the facts the planner supplied, nothing else; approvals are bound per step, by that step's request digest, exactly as for a single request.
+Consequences: nothing is projected past a refusal (the steps list is cut at the first BLOCK); a PAUSE does not stop projection, so a planner sees every approval the plan needs; the plan is judged on the effects the site declared and the facts the planner supplied, nothing else. **A plan verdict is a verdict on the plan as described.** Approvals collected for a plan step authorise that step's rule, participant, action and area (§ 9); at execution time each step MUST be asked again with `evaluate` on the facts then current — projected planning facts are never assumed to equal execution-time facts, and the same approval (one use, until it expires) is what clears that step's wait then.
 
 ## 13. Backtest
 
@@ -496,28 +574,26 @@ Consequences: nothing is projected past a refusal (the steps list is cut at the 
 ### 13.1 Input
 
 ```json
-{ "events": [ { "at": "2026-10-05T09:00", "request": { …a request, § 4… }, "outcome": "happened" }, … ],
-  "options": { "clock": "localTime", "examples": 3 } }
+{ "events": [ { "at": "2026-10-05T09:00:00Z", "request": { …a request, § 4… }, "outcome": "happened" }, … ],
+  "options": { "examples": 3 } }
 ```
 
 | Field | Req | Meaning |
 |---|---|---|
-| `events[].at` | yes | When it was asked. Any non-empty string; "YYYY-MM-DDTHH:MM" is the convention. Reported as given; the implementation MUST process events in the order given and MUST NOT sort them. |
+| `events[].at` | yes | When it was asked: a timestamp (§ 1). Reported as given; the implementation MUST process events in the order given and MUST NOT sort them. It becomes the request's `now` (when the request has none) and each built history entry's `at`. |
 | `events[].request` | yes | Exactly what the participant asked (§ 4). A malformed request is a row refused as missing facts (`request`), never an error. |
 | `events[].outcome` | no | `happened`, `did_not_happen` or `unknown`: what the record says happened next. Used only for `differences` (13.3); it MUST NOT influence any decision. |
-| `options.clock` | no | A declared `time` fact; each built history entry's `at` is the request's value of it. Default: the first declared `time` fact; none if the rulebook declares no time fact. A clock that is not a declared time fact is an error. |
 | `options.examples` | no | How many `at` values each list keeps (the earliest). Default 3. |
 
-An `events` value that is not a list, an event without a non-empty `at` or without `request`, or an `outcome` outside the three values is an error (bad input, like a bad rulebook), not a decision.
+An `events` value that is not a list, an event without a timestamp `at` or without `request`, an `outcome` outside the three values, or the `/2` option `clock` is an error (bad input, like a bad rulebook), not a decision.
 
 ### 13.2 The report
 
 ```
- 0. history = {} (participant ID → (day, entries)); day(at) = the text of `at` before its
-    first "T", or "" when there is none. For each event i, in order:
-      request = event.request; if it is an object, has no `history` member, and names a
-        participant with a string id: request = request ⊕ { history: history[id].entries
-        when history[id] exists and its day == day(at), else [] }
+ 0. history = {} (participant ID → entries). For each event i, in order:
+      request = event.request; if it is an object: request = request ⊕
+        { history: history[id] ?? [] when it has no `history` member and names a
+          participant with a string id } ⊕ { now: event.at when it has no `now` }
       decision = evaluate(rulebook, request)                                      (§ 6)
       missing  = decision.status == BLOCK and some reason has ruleId "required_facts"
       row = { index: i, at, participantId, kind, roleId, action, areaId, status,
@@ -526,12 +602,9 @@ An `events` value that is not a list, an event without a non-empty `at` or witho
          areaId is areaId ?? zoneId)
       matched = matches(rulebook, request)                                         (§ 6 step 4; [] for an incomplete request)
       after deciding, if the request named a participant id and an action:
-        if history[id] is absent or its day != day(at): history[id] = (day(at), [])
-        history[id].entries += { action, areaId, at: request.facts[clock] if clock is set
-                                 and that value is a string }
-    Every earlier event of the same participant on the same day counts, whatever was
-    decided or recorded. History never crosses a day: windows are minute-of-day
-    arithmetic (§ 3.4), so yesterday's actions must not count as today's.
+        history[id] += { action, areaId, at: event.at }
+    Every earlier event of the same participant counts, whatever was decided or
+    recorded; windows are absolute time (§ 3.4), so no day boundary is needed.
 
  1. Counts. A counts object is { events, ALLOW, LIMIT, PAUSE, BLOCK, missingFacts }; an
     event adds to `events` and to `missingFacts` when `missing`, else to its status. So
@@ -560,9 +633,11 @@ An `events` value that is not a list, an event without a non-empty `at` or witho
     request): the entry for that name gains count 1 and an example. The names are, in
     this order: "request" alone when the request's shape is incomplete (§ 6 step 1);
     else each declared fact that is absent while required (by the fact or by the action)
-    or present and invalid, in declaration order; "approvedBy" when the approval is
-    malformed; "history" when a rule in scope (§ 6 step 3) has history conditions and
-    the request's history is absent or invalid. Order: count descending, then name.
+    or present and invalid, in declaration order; "now" when it is present and invalid;
+    "consumedApprovals" when invalid; "approvedBy" when the approval is malformed or
+    needs a `now` that is absent; "history" when a rule in scope (§ 6 step 3) has history
+    conditions and the request's history is absent or invalid; "now" when a window rule
+    is in scope and now is absent. Order: count descending, then name.
 
  7. differences. In event order: { index, at, status, outcome, ruleIds } for each event
     with outcome "happened" and status PAUSE or BLOCK, and for each with outcome
@@ -590,3 +665,26 @@ An `events` value that is not a list, an event without a non-empty `at` or witho
 ```
 
 Consequences: a row's status under a `missing` refusal is BLOCK, so a log that lacks a fact the proposed rulebook newly needs shows up as newly blocked, with `required_facts` in `after` — the honest answer, since the rulebook could not have decided those events. Conformance: [`conformance/backtest.json`](conformance/backtest.json).
+
+## 14. Porting notes
+
+**What a client needs** (a robot controller, a glasses runtime, an agent harness in Unity/C#, Rust, Python): `validate` (§ 2) with `verifyFingerprint` (§ 8), `evaluate` (§ 6), `verifyApproval` (§ 9.3) and the consumed-nonce set (§ 9.5), and `evaluatePlan` (§ 12) if it runs plans. That is the `decision`, `plan`, `error`, `canonical`/`fingerprint`/`sha256`, `requestDigest`, `verify`, `rulebookSignature` and `versions` cases. **Authoring tools** — the conflict check (§ 7: `findings` cases), the backtest (§ 13: `backtest`/`comparison` cases), text drafting — live wherever rulebooks are written and need not ship on the device; a client may trust the findings in a rulebook it was handed.
+
+**Numbers.** Canonical JSON needs ECMAScript `Number::toString` (RFC 8785 § 3.2.2.3): shortest round-trip, `1e+21` and `1e-7` thresholds, `-0` → `0`. In C# use `double.ToString("R")`-equivalent shortest round-trip and reformat exponents; Rust's `ryu`/`{}` for `f64` is shortest round-trip but writes `1e21`, so adjust the exponent form; Python's `repr(float)` is shortest round-trip with the same exponent thresholds as ECMAScript except for the `e+`/`e-` form and `1e16`-range integers — cover the `fp-numbers` case. Rulebook numbers are plain JSON numbers; an implementation MUST parse them as IEEE 754 doubles.
+
+**Strings and hashing.** Sort object keys by UTF-16 code units (not by Unicode scalar, not by UTF-8 bytes: they differ above U+FFFF). Hash the **UTF-8 bytes** of the canonical text (`fp-strings`, `sha256-utf8`). Escape only what § 8.1 says.
+
+**Ed25519.** Pure Ed25519 (RFC 8032), no pre-hash, no context; raw 32-byte public keys; 64-byte signatures; the message is the UTF-8 canonical JSON of the object without `signature`/`verified`. Any mainstream library works (libsodium, `ed25519-dalek`, `cryptography`, .NET's NSec/BouncyCastle); the vectors in `conformance/approvals.json` carry their TEST ONLY seeds so you can reproduce every signature byte for byte.
+
+**Timestamps.** Parse § 1's grammar yourself; read no offset as UTC; compare instants. Do not use a platform parser that assumes local time.
+
+**Comparison.** Conformance is judged by deep semantic equality (`conformance/README.md`): object key order never matters; arrays are ordered.
+
+## 15. What throws, what never does
+
+- `evaluate`, `evaluatePlan`, `matchingRules`, `missingFacts`: never throw for any request or plan value, given a valid rulebook; malformed input is a BLOCK decision (§ 4, § 12 step 0).
+- `compileDomain`, `validateRule`, `validatePlanRule`, `checkRulebook(input)` (when given an input rather than a compiled rulebook): throw `DomainRulesError` on configuration that cannot make a valid rulebook. `validateRulebook` returns problems instead of throwing.
+- `backtest`, `compareBacktests`: throw `DomainRulesError` on bad input (§ 13.1, § 13.3); a malformed *request inside an event* is a row, not a throw.
+- `signApproval`: throws when a required field is missing; `verifyApproval`, `verifyRulebookSignature`: return `{ ok: false }` / `false`, never throw on bad data.
+- `canonicalJson`/`fingerprint`: throw on `undefined` at the top level or a non-finite number.
+- `glassesZoneRules`: throws on an undeclared area or role (configuration).

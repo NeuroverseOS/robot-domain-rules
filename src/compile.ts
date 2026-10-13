@@ -62,6 +62,7 @@ export const BUILTIN_CHECKS: BuiltinCheck[] = [
   { id: 'role_declared', text: 'Only declared roles may act; unknown roles are blocked.' },
   { id: 'role_permits_action', text: 'A participant may only take actions its role lists.' },
   { id: 'unknown_action', text: 'An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise).' },
+  { id: 'plan_area_continuity', text: 'A plan step happens where the earlier steps left the participant unless its action moves it there.' },
 ];
 
 export function compileDomain(input: CompileDomainInput | LegacyCompileInput, options: CompileOptions = {}): Rulebook {
@@ -72,8 +73,8 @@ export function compileDomain(input: CompileDomainInput | LegacyCompileInput, op
     const conflicts = findings.filter(f => f.severity === 'conflict');
     if (conflicts.length) throw new DomainRulesError(`Rules at odds (${conflicts.length}):\n${conflicts.map(f => `- ${f.message}`).join('\n')}`);
   }
-  const withFindings = { ...body, findings: clone(findings) };
-  return deepFreeze({ ...withFindings, fingerprint: fingerprint(withFindings) });
+  // The fingerprint covers the rules and the vocabulary, never the findings: two conforming compilers may word a finding differently.
+  return deepFreeze({ ...body, findings: clone(findings), fingerprint: fingerprint(body) });
 }
 
 type RulebookBody = Omit<Rulebook, 'fingerprint' | 'findings'>;
@@ -121,7 +122,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
   const trustedKeys = input.trustedKeys === undefined ? undefined : validateTrustedKeys(input.trustedKeys, authorities, roles);
 
   const partial: RulebookBody = {
-    format: 'neuroverse-domain-rules/2',
+    format: 'neuroverse-domain-rules/3',
     site,
     ...(template ? { template: template.id } : {}),
     kinds: [...kinds],
@@ -152,7 +153,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
   for (const area of areas) rules.push(...areaRoleLimitRules(area, roles, authorities));
   for (const r of input.rules ?? []) {
     if (!r || typeof r !== 'object') throw new DomainRulesError('Each rule must be an object { id, text, who, does, where, then, setBy }.');
-    rules.push({ ...clone(r), source: r.source ?? { kind: 'manual', ref: r.id } });
+    rules.push({ ...clone(r), source: r.source ? clone(r.source) : { kind: 'manual', ref: r.id } });
   }
 
   const seen = new Set<string>();
@@ -167,7 +168,7 @@ export function assemble(input: CompileDomainInput): RulebookBody {
     const planRules: PlanRule[] = [];
     for (const r of input.planRules) {
       if (!r || typeof r !== 'object') throw new DomainRulesError('Each plan rule must be an object { id, text, who, check, setBy }.');
-      const pr = { ...clone(r), source: r.source ?? { kind: 'manual' as const, ref: r.id } };
+      const pr = { ...clone(r), source: r.source ? clone(r.source) : { kind: 'manual' as const, ref: r.id } };
       validatePlanRule(pr, vocab);
       if (seen.has(pr.id)) throw new DomainRulesError(`Rule "${pr.id}" is declared twice.`);
       seen.add(pr.id);
@@ -283,7 +284,13 @@ export function validateRule(r: Rule, vocab: Vocabulary): void {
 export function validateRulebook(rulebook: unknown): string[] {
   const rb = rulebook as Rulebook;
   if (!rb || typeof rb !== 'object') return ['the rulebook is not an object'];
-  if (rb.format !== 'neuroverse-domain-rules/2') return [`format must be "neuroverse-domain-rules/2", got ${JSON.stringify(rb.format)}`];
+  const format = rb.format as string;
+  if (format !== 'neuroverse-domain-rules/3') {
+    if (format === 'neuroverse-domain-rules/2' || format === 'neuroverse-domain-rules/1') {
+      return [`this rulebook declares format "${format}" (spec robot-domain-rules/${format.slice(-1)}); this implementation is robot-domain-rules/3 and does not reinterpret older rulebooks. Migration: recompile the rulebook from its input with a /3 compiler (its FNV-1a fingerprint becomes a SHA-256 one, history conditions lose "clock"), then re-issue approvals under the /3 approval contract. See SPEC.md § 11.`];
+    }
+    return [`format must be "neuroverse-domain-rules/3", got ${JSON.stringify(format)}`];
+  }
   const problems: string[] = [];
   try {
     const body = assemble({
@@ -325,7 +332,7 @@ export function validateRulebook(rulebook: unknown): string[] {
  */
 export function verifyFingerprint(rulebook: Rulebook): boolean {
   if (!rulebook || typeof rulebook !== 'object') return false;
-  const { fingerprint: claimed, ...body } = rulebook;
+  const { fingerprint: claimed, findings: _findings, ...body } = rulebook;
   return typeof claimed === 'string' && fingerprint(body) === claimed;
 }
 

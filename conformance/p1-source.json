@@ -6,7 +6,7 @@
     ],
     "description": "With no rules at all, a declared role doing a listed action is ALLOW on the role check alone: the engine adds no rule of its own.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -143,10 +143,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "5ea861d027da0859"
+      "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
     },
     "request": {
       "participant": {
@@ -179,7 +183,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "5ea861d027da0859"
+        "fingerprint": "36258a54cc99e1cd16c69fc10f52fcb2dda832dca468fc16edac851b0715c995"
       }
     }
   },
@@ -190,7 +194,7 @@
     ],
     "description": "A rule with no source is not a rule: the rulebook is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -339,10 +343,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "063570df4234b6bd"
+      "fingerprint": "122233b22b540fedfd6a258c97379a2168c66fd8868113782c2d4842531d47c0"
     },
     "expect": {
       "error": true,
@@ -357,7 +365,7 @@
     ],
     "description": "A rule that does not say who set it is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -509,10 +517,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "a31228d30e9fa6b4"
+      "fingerprint": "1a13663f75eb9980b608a926f49fcd86ebe4a3887ecd64e2b13d8e076a6d393f"
     },
     "expect": {
       "error": true,
@@ -527,7 +539,7 @@
     ],
     "description": "Every reason names a rule in the rulebook (or a builtin check) and the authority that set it; here the site's tighter limit, set by the lower authority.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -701,6 +713,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -729,7 +745,7 @@
           "message": "`site_cap` set by low tightens `cap` set by high: `cap` (set by high) says limit speed 1; `site_cap` (set by low) says limit speed 0.5. Both apply to every role · every action · Yard, always. A lower authority may tighten, so this is fine; `cap` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "bf2c7601d84e2a64"
+      "fingerprint": "15ab4096f3e621f9c8f851b930831ef43ddffbdbe054a38f5ed793211e19c72f"
     },
     "request": {
       "participant": {
@@ -775,7 +791,7 @@
         "limits": {
           "speed": 0.5
         },
-        "fingerprint": "bf2c7601d84e2a64"
+        "fingerprint": "15ab4096f3e621f9c8f851b930831ef43ddffbdbe054a38f5ed793211e19c72f"
       }
     }
   },
@@ -786,7 +802,7 @@
     ],
     "description": "A rule written from plain words (source.kind \"text\") decides exactly like any other rule.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -939,10 +955,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "8871027641492709"
+      "fingerprint": "a7b8c660ad2c20421fdcfe0b439d012c236c27d8a6bf6c5190e91a02888ae753"
     },
     "request": {
       "participant": {
@@ -980,7 +1000,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "8871027641492709"
+        "fingerprint": "a7b8c660ad2c20421fdcfe0b439d012c236c27d8a6bf6c5190e91a02888ae753"
       }
     }
   }

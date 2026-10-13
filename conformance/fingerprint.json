@@ -8,7 +8,7 @@
     "value": {},
     "expect": {
       "canonical": "{}",
-      "fingerprint": "08f44b07b5901a25"
+      "fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
     }
   },
   {
@@ -20,7 +20,7 @@
     "value": [],
     "expect": {
       "canonical": "[]",
-      "fingerprint": "09612b07b5ecb5a5"
+      "fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     }
   },
   {
@@ -37,7 +37,7 @@
     },
     "expect": {
       "canonical": "{\"B\":3,\"_\":4,\"a\":2,\"b\":1}",
-      "fingerprint": "2177c951e712e40b"
+      "fingerprint": "f31bf910f7cd3c3712ac9fce564535874c70451a95f0e886c40b144e668eb232"
     }
   },
   {
@@ -65,7 +65,7 @@
     },
     "expect": {
       "canonical": "{\"a\":{\"b\":true,\"c\":null},\"z\":[{\"x\":[3,2,1],\"y\":1},\"a\"]}",
-      "fingerprint": "e642cf5ccaa0b09d"
+      "fingerprint": "e475035d66a8826d3243c346e5275bad4661975c3b56d5f7c3c9a3496157c343"
     }
   },
   {
@@ -85,7 +85,7 @@
     },
     "expect": {
       "canonical": "{\"a\":1,\"b\":0.5,\"c\":1e+21,\"d\":0,\"e\":123456789012345680000,\"f\":0.000001,\"g\":1e-7}",
-      "fingerprint": "4c4411132b57635c"
+      "fingerprint": "ecad2189a2c552dc60ea3c26d7967d14244ab3469e6b189ebbfcf7de650c0079"
     }
   },
   {
@@ -93,13 +93,13 @@
     "principle": [
       5
     ],
-    "description": "Strings as JSON.stringify writes them: only \", \\, control characters escaped; non-ASCII kept literal; the hash runs over UTF-16 code units (an emoji is two).",
+    "description": "Strings as JSON.stringify writes them (RFC 8785): only \", \\, control characters escaped; non-ASCII kept literal; the hash runs over the UTF-8 bytes (é is two, ∑ three, the emoji four).",
     "value": {
       "s": "a\"b\\c\n\t\u0001 é ∑ 🤖"
     },
     "expect": {
       "canonical": "{\"s\":\"a\\\"b\\\\c\\n\\t\\u0001 é ∑ 🤖\"}",
-      "fingerprint": "18cc7c1c20f8f0bc"
+      "fingerprint": "c0f14893b0ed45b4a9c8b7b72728000961f83b5fc5457eaceef45cde81bf2f72"
     }
   },
   {
@@ -115,7 +115,51 @@
     ],
     "expect": {
       "canonical": "[null,true,false]",
-      "fingerprint": "4e4bb39428884f05"
+      "fingerprint": "37257214f22b92121c5ff4d7e29ed2d31b3f1129ee698e96e581ec05cb2e3cf7"
+    }
+  },
+  {
+    "id": "sha256-empty",
+    "principle": [
+      5
+    ],
+    "description": "FIPS 180-4 SHA-256 of the empty string.",
+    "text": "",
+    "expect": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "id": "sha256-abc",
+    "principle": [
+      5
+    ],
+    "description": "FIPS 180-4 example: \"abc\".",
+    "text": "abc",
+    "expect": {
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    }
+  },
+  {
+    "id": "sha256-two-blocks",
+    "principle": [
+      5
+    ],
+    "description": "FIPS 180-4 example: the 56-byte message that pads into two blocks.",
+    "text": "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+    "expect": {
+      "sha256": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+    }
+  },
+  {
+    "id": "sha256-utf8",
+    "principle": [
+      5
+    ],
+    "description": "The hash is over UTF-8 bytes: \"é∑🤖\" is 2 + 3 + 4 bytes.",
+    "text": "é∑🤖",
+    "expect": {
+      "sha256": "113c3c31f95223dbd6c7afe0051a3c0f24adc84e4908066df41165ee799fe078"
     }
   },
   {
@@ -123,9 +167,9 @@
     "principle": [
       5
     ],
-    "description": "The shipped grocery example rulebook (everything but its fingerprint) hashes to its fingerprint.",
+    "description": "The shipped grocery example rulebook (everything but its fingerprint and its findings) hashes to its fingerprint: findings carry free text and are left out, so two conforming compilers agree.",
     "value": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "example-grocery-01",
         "name": "Example Grocery",
@@ -1017,6 +1061,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -1052,85 +1100,11 @@
             "ref": "end_at_dock"
           }
         }
-      ],
-      "findings": [
-        {
-          "kind": "tightening",
-          "severity": "info",
-          "ruleIds": [
-            "robot_speed",
-            "checkout_speed"
-          ],
-          "certainty": "certain",
-          "witness": {
-            "participant": {
-              "id": "inventory_robot-1",
-              "kind": "robot",
-              "roleId": "inventory_robot"
-            },
-            "action": "enter_zone",
-            "areaId": "checkout",
-            "facts": {
-              "peopleInZone": 0,
-              "localTime": "00:00",
-              "day": "mon"
-            }
-          },
-          "message": "`checkout_speed` set by Site manager tightens `robot_speed` set by Law and safety: `robot_speed` (set by Law and safety) says limit maxSpeedMps 1; `checkout_speed` (set by Site manager) says limit maxSpeedMps 0.3. Both apply to Inventory robot, Restock robot, Cleaning robot · enter an area, move, dock · Checkout, always. A lower authority may tighten, so this is fine; `robot_speed` never takes effect there. For example: inventory_robot does enter_zone in checkout with peopleInZone=0, localTime=\"00:00\", day=\"mon\"."
-        },
-        {
-          "kind": "authority-override",
-          "severity": "conflict",
-          "ruleIds": [
-            "shopper_photos_entrance",
-            "glasses_capture"
-          ],
-          "certainty": "certain",
-          "witness": {
-            "participant": {
-              "id": "shopper-1",
-              "kind": "person",
-              "roleId": "shopper"
-            },
-            "action": "camera_capture",
-            "areaId": "entrance",
-            "facts": {
-              "peopleInZone": 0,
-              "localTime": "00:00",
-              "day": "mon"
-            }
-          },
-          "message": "`shopper_photos_entrance` set by Site manager tries to loosen what `glasses_capture` set by Company sets: `shopper_photos_entrance` (set by Site manager) says allow; `glasses_capture` (set by Company) says deny. Both apply to Shopper · take photos or video · Entrance, always. A lower authority can only tighten, so `shopper_photos_entrance` never takes effect at all. For example: shopper does camera_capture in entrance with peopleInZone=0, localTime=\"00:00\", day=\"mon\"."
-        },
-        {
-          "kind": "contradiction",
-          "severity": "conflict",
-          "ruleIds": [
-            "staff_audio_back_room",
-            "no_audio_back_room_lunch"
-          ],
-          "certainty": "certain",
-          "witness": {
-            "participant": {
-              "id": "staff-1",
-              "kind": "person",
-              "roleId": "staff"
-            },
-            "action": "record_audio",
-            "areaId": "back-room",
-            "facts": {
-              "peopleInZone": 0,
-              "day": "mon",
-              "localTime": "12:00"
-            }
-          },
-          "message": "`staff_audio_back_room` (set by Site manager) says allow; `no_audio_back_room_lunch` (set by Site manager) says deny. Both apply to Staff · record audio · Back room, when localTime in 12:00–13:00. The strictest answer wins, so `staff_audio_back_room` never takes effect there. For example: staff does record_audio in back-room with peopleInZone=0, day=\"mon\", localTime=\"12:00\"."
-        }
       ]
     },
     "expect": {
-      "canonical": "{\"actions\":[{\"effects\":[{\"op\":\"move\"}],\"id\":\"enter_zone\",\"kinds\":[\"robot\"],\"name\":\"enter an area\",\"synonyms\":[\"enter\",\"go into\",\"go in\",\"drive into\"],\"tags\":[\"movement\"]},{\"id\":\"move\",\"kinds\":[\"robot\"],\"name\":\"move\",\"synonyms\":[\"drive\",\"navigate\",\"travel\"],\"tags\":[\"movement\"]},{\"effects\":[{\"fact\":\"carrying\",\"op\":\"set\",\"value\":true}],\"id\":\"manipulate\",\"kinds\":[\"robot\"],\"name\":\"pick up or handle things\",\"synonyms\":[\"pick up\",\"handle\",\"restock\",\"touch\",\"manipulate\"],\"tags\":[\"handling\"]},{\"effects\":[{\"fact\":\"carrying\",\"op\":\"set\",\"value\":false}],\"id\":\"place\",\"kinds\":[\"robot\"],\"name\":\"put things down\",\"synonyms\":[\"put down\",\"place\",\"drop\",\"shelve\"],\"tags\":[\"handling\"]},{\"id\":\"scan\",\"kinds\":[\"robot\"],\"name\":\"scan\",\"synonyms\":[\"scan\",\"take images\",\"lidar\"],\"tags\":[\"sensing\"]},{\"effects\":[{\"op\":\"move\"}],\"id\":\"dock\",\"kinds\":[\"robot\"],\"name\":\"dock\",\"synonyms\":[\"dock\",\"charge\",\"return to dock\"],\"tags\":[\"movement\"]},{\"id\":\"camera_capture\",\"kinds\":[\"person\"],\"name\":\"take photos or video\",\"synonyms\":[\"take photos\",\"take pictures\",\"photograph\",\"film\",\"record video\",\"take a photo\",\"take photo\"],\"tags\":[\"capture\"]},{\"id\":\"record_audio\",\"kinds\":[\"person\"],\"name\":\"record audio\",\"synonyms\":[\"record audio\",\"record sound\",\"record\",\"transcribe\"],\"tags\":[\"capture\"]},{\"id\":\"ai_overlay\",\"kinds\":[\"person\"],\"name\":\"show AI overlays\",\"synonyms\":[\"overlay\",\"show overlays\",\"ai overlay\"]},{\"id\":\"share_location\",\"kinds\":[\"person\"],\"name\":\"share location\",\"synonyms\":[\"share location\",\"share position\"]},{\"id\":\"command_robot\",\"kinds\":[\"person\"],\"name\":\"command robots\",\"requires\":[\"targetRobotId\"],\"synonyms\":[\"command robots\",\"command a robot\",\"give robots commands\",\"control robots\"]}],\"answers\":{\"emergency\":\"stop_then_dock\",\"glasses_capture\":\"staff_only\",\"robot_commands\":\"staff_only\",\"robot_scan_near_people\":\"pause\",\"robot_speed\":\"walking\",\"robots_after_hours\":\"listed_roles\",\"robots_near_people\":\"slow\",\"robots_restricted_zones\":\"with_approval\",\"robots_staff_zones\":\"when_staff_present\",\"unknown_actions\":\"block\"},\"areas\":[{\"id\":\"entrance\",\"name\":\"Entrance\",\"tags\":[\"public\"]},{\"id\":\"aisle-3\",\"name\":\"Aisle 3\",\"tags\":[\"public\"]},{\"id\":\"checkout\",\"name\":\"Checkout\",\"tags\":[\"public\"]},{\"allowRoles\":[\"cleaning_robot\",\"staff\",\"shopper\"],\"id\":\"restroom\",\"name\":\"Restroom\",\"tags\":[\"public\"]},{\"id\":\"back-room\",\"name\":\"Back room\",\"tags\":[\"staff-only\"]},{\"id\":\"electrical\",\"name\":\"Electrical room\",\"tags\":[\"restricted\"]},{\"id\":\"dock-a\",\"name\":\"Charging dock A\",\"tags\":[\"dock\"]}],\"authorities\":[{\"id\":\"law-and-safety\",\"name\":\"Law and safety\"},{\"id\":\"company\",\"name\":\"Company\"},{\"id\":\"site-manager\",\"name\":\"Site manager\"},{\"id\":\"staff\",\"name\":\"Staff\"},{\"id\":\"agent\",\"name\":\"AI agent\"}],\"builtin\":[{\"id\":\"required_facts\",\"text\":\"Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission.\"},{\"id\":\"area_declared\",\"text\":\"Only declared areas are governed; anything in an undeclared area is blocked.\"},{\"id\":\"role_declared\",\"text\":\"Only declared roles may act; unknown roles are blocked.\"},{\"id\":\"role_permits_action\",\"text\":\"A participant may only take actions its role lists.\"},{\"id\":\"unknown_action\",\"text\":\"An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise).\"}],\"facts\":[{\"description\":\"People (not robots) in the area, as the spatial system reports.\",\"id\":\"peopleInZone\",\"integer\":true,\"min\":0,\"required\":true,\"synonyms\":[\"people\",\"people present\",\"people in the area\",\"people in the zone\",\"shoppers present\"],\"type\":\"number\"},{\"default\":0,\"description\":\"Staff in the area. Absent means 0.\",\"id\":\"staffInZone\",\"integer\":true,\"min\":0,\"synonyms\":[\"staff present\",\"staff in the area\",\"staff in the zone\"],\"type\":\"number\"},{\"description\":\"Local time \\\"HH:MM\\\". The rulebook has no clock.\",\"id\":\"localTime\",\"required\":true,\"synonyms\":[\"time\"],\"type\":\"time\"},{\"description\":\"Requested speed in m/s for movement. Absent means \\\"cap me\\\".\",\"id\":\"requestedSpeedMps\",\"min\":0,\"type\":\"number\"},{\"default\":false,\"description\":\"True while a site emergency is active. The one fact with a default, because an emergency is an explicit event your system raises.\",\"id\":\"emergency\",\"synonyms\":[\"emergency\",\"alarm\",\"fire alarm\"],\"type\":\"boolean\"},{\"description\":\"For command_robot: the robot being commanded.\",\"id\":\"targetRobotId\",\"type\":\"string\"},{\"default\":false,\"description\":\"True while a robot is carrying stock. In a plan, manipulate sets it and place clears it.\",\"id\":\"carrying\",\"synonyms\":[\"carrying\",\"loaded\",\"carrying stock\"],\"type\":\"boolean\"},{\"description\":\"Day of the week.\",\"id\":\"day\",\"required\":true,\"type\":\"day\"}],\"findings\":[{\"certainty\":\"certain\",\"kind\":\"tightening\",\"message\":\"`checkout_speed` set by Site manager tightens `robot_speed` set by Law and safety: `robot_speed` (set by Law and safety) says limit maxSpeedMps 1; `checkout_speed` (set by Site manager) says limit maxSpeedMps 0.3. Both apply to Inventory robot, Restock robot, Cleaning robot · enter an area, move, dock · Checkout, always. A lower authority may tighten, so this is fine; `robot_speed` never takes effect there. For example: inventory_robot does enter_zone in checkout with peopleInZone=0, localTime=\\\"00:00\\\", day=\\\"mon\\\".\",\"ruleIds\":[\"robot_speed\",\"checkout_speed\"],\"severity\":\"info\",\"witness\":{\"action\":\"enter_zone\",\"areaId\":\"checkout\",\"facts\":{\"day\":\"mon\",\"localTime\":\"00:00\",\"peopleInZone\":0},\"participant\":{\"id\":\"inventory_robot-1\",\"kind\":\"robot\",\"roleId\":\"inventory_robot\"}}},{\"certainty\":\"certain\",\"kind\":\"authority-override\",\"message\":\"`shopper_photos_entrance` set by Site manager tries to loosen what `glasses_capture` set by Company sets: `shopper_photos_entrance` (set by Site manager) says allow; `glasses_capture` (set by Company) says deny. Both apply to Shopper · take photos or video · Entrance, always. A lower authority can only tighten, so `shopper_photos_entrance` never takes effect at all. For example: shopper does camera_capture in entrance with peopleInZone=0, localTime=\\\"00:00\\\", day=\\\"mon\\\".\",\"ruleIds\":[\"shopper_photos_entrance\",\"glasses_capture\"],\"severity\":\"conflict\",\"witness\":{\"action\":\"camera_capture\",\"areaId\":\"entrance\",\"facts\":{\"day\":\"mon\",\"localTime\":\"00:00\",\"peopleInZone\":0},\"participant\":{\"id\":\"shopper-1\",\"kind\":\"person\",\"roleId\":\"shopper\"}}},{\"certainty\":\"certain\",\"kind\":\"contradiction\",\"message\":\"`staff_audio_back_room` (set by Site manager) says allow; `no_audio_back_room_lunch` (set by Site manager) says deny. Both apply to Staff · record audio · Back room, when localTime in 12:00–13:00. The strictest answer wins, so `staff_audio_back_room` never takes effect there. For example: staff does record_audio in back-room with peopleInZone=0, day=\\\"mon\\\", localTime=\\\"12:00\\\".\",\"ruleIds\":[\"staff_audio_back_room\",\"no_audio_back_room_lunch\"],\"severity\":\"conflict\",\"witness\":{\"action\":\"record_audio\",\"areaId\":\"back-room\",\"facts\":{\"day\":\"mon\",\"localTime\":\"12:00\",\"peopleInZone\":0},\"participant\":{\"id\":\"staff-1\",\"kind\":\"person\",\"roleId\":\"staff\"}}}],\"format\":\"neuroverse-domain-rules/2\",\"kinds\":[\"robot\",\"person\"],\"limits\":[{\"appliesTo\":\"tag:movement\",\"id\":\"maxSpeedMps\",\"name\":\"top speed\",\"requestedFact\":\"requestedSpeedMps\",\"synonyms\":[\"speed\",\"slow\",\"slow down\",\"top speed\",\"max speed\"],\"unit\":\"m/s\"}],\"otherwise\":\"deny\",\"planRules\":[{\"check\":{\"first\":\"scan\",\"kind\":\"before\",\"sameArea\":true,\"then\":\"manipulate\"},\"id\":\"scan_before_restock\",\"reason\":\"Scan the shelf before restocking it, so the plan works from what is actually there.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"scan_before_restock\"},\"text\":\"A robot scans a shelf before it restocks it.\",\"who\":\"kind:robot\"},{\"check\":{\"areas\":\"tag:dock\",\"kind\":\"ends_in\"},\"id\":\"end_at_dock\",\"reason\":\"Every plan ends at a charging dock.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"end_at_dock\"},\"text\":\"Every robot plan ends at a charging dock.\",\"who\":\"kind:robot\"}],\"roles\":[{\"actions\":[\"enter_zone\",\"move\",\"scan\",\"dock\"],\"id\":\"inventory_robot\",\"kind\":\"robot\",\"name\":\"Inventory robot\"},{\"actions\":[\"enter_zone\",\"move\",\"scan\",\"dock\",\"manipulate\",\"place\"],\"id\":\"restock_robot\",\"inherits\":\"inventory_robot\",\"kind\":\"robot\",\"name\":\"Restock robot\"},{\"actions\":[\"enter_zone\",\"move\",\"dock\"],\"id\":\"cleaning_robot\",\"kind\":\"robot\",\"name\":\"Cleaning robot\",\"tags\":[\"after-hours\"]},{\"actions\":[\"ai_overlay\",\"camera_capture\",\"record_audio\"],\"id\":\"shopper\",\"kind\":\"person\",\"name\":\"Shopper\"},{\"actions\":[\"ai_overlay\",\"camera_capture\",\"record_audio\",\"share_location\",\"command_robot\"],\"id\":\"staff\",\"inherits\":\"shopper\",\"kind\":\"person\",\"name\":\"Staff\",\"tags\":[\"staff\"]}],\"rules\":[{\"does\":\"tag:movement\",\"id\":\"robots_near_people\",\"reason\":\"People are in the area; robots slow down.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_near_people:slow\"},\"text\":\"Robots slow to 0.3 m/s while people are in their area.\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":0.3}},\"when\":[{\"fact\":\"peopleInZone\",\"op\":\">\",\"value\":0}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"tag:movement\",\"id\":\"robot_speed\",\"reason\":\"Robots move at most 1 m/s.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_speed:walking\"},\"text\":\"Robots move at most 1 m/s.\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":1}},\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_staff_zones\",\"reason\":\"This area is staff-only; wait until staff are there.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_staff_zones:when_staff_present\"},\"text\":\"Robots act in staff-only areas only while staff are in them.\",\"then\":{\"answer\":\"wait\",\"for\":\"condition\"},\"when\":[{\"fact\":\"staffInZone\",\"op\":\"==\",\"value\":0}],\"where\":\"tag:staff-only\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_restricted_zones\",\"reason\":\"This area is restricted.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_restricted_zones:with_approval\"},\"text\":\"Robots act in restricted areas only with a person's approval each time.\",\"then\":{\"answer\":\"wait\",\"for\":\"approval\"},\"where\":\"tag:restricted\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_after_hours\",\"reason\":\"Example Grocery is closed and this robot is not tagged for after-hours work.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_after_hours:listed_roles\"},\"text\":\"Outside opening hours, only robot roles tagged \\\"after-hours\\\" may work.\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"22:00\",\"op\":\"between\",\"to\":\"07:00\"}],\"where\":\"*\",\"who\":[\"kind:robot\",\"!tag:after-hours\"]},{\"does\":\"scan\",\"id\":\"robot_scan_near_people\",\"reason\":\"People are in the area; wait until it is clear to scan.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_scan_near_people:pause\"},\"text\":\"Robot scans wait until the area is clear of people.\",\"then\":{\"answer\":\"wait\",\"for\":\"condition\"},\"when\":[{\"fact\":\"peopleInZone\",\"op\":\">\",\"value\":0}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"tag:capture\",\"id\":\"glasses_capture\",\"reason\":\"Glasses may not capture photos, video or audio here (staff only).\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"glasses_capture:staff_only\"},\"text\":\"Only staff glasses may capture photos, video or audio here.\",\"then\":{\"answer\":\"deny\"},\"where\":\"*\",\"who\":[\"kind:person\",\"!tag:staff\"]},{\"does\":\"command_robot\",\"id\":\"robot_commands\",\"reason\":\"Only staff may command robots.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_commands:staff_only\"},\"text\":\"Only staff may command robots from glasses.\",\"then\":{\"answer\":\"deny\"},\"where\":\"*\",\"who\":[\"kind:person\",\"!tag:staff\"]},{\"does\":[\"*\",\"!dock\"],\"id\":\"emergency_stop\",\"never\":true,\"reason\":\"Emergency: robots stop.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"emergency:stop_then_dock\"},\"text\":\"In an emergency, all robots stop; the only thing they may do is return to dock.\",\"then\":{\"answer\":\"deny\",\"instead\":\"dock\"},\"when\":[{\"fact\":\"emergency\",\"op\":\"==\",\"value\":true}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"command_robot\",\"id\":\"emergency_stop_commands\",\"never\":true,\"reason\":\"Emergency: nobody commands robots from glasses.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"emergency:stop_then_dock\"},\"text\":\"In an emergency, nobody commands robots from glasses.\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"emergency\",\"op\":\"==\",\"value\":true}],\"where\":\"*\",\"who\":\"kind:person\"},{\"does\":\"*\",\"id\":\"area_role_limits:restroom\",\"never\":true,\"reason\":\"Restroom is limited to: cleaning_robot, staff, shopper.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"declaration\",\"ref\":\"area:restroom.allowRoles\"},\"text\":\"Restroom is limited to: cleaning_robot, staff, shopper.\",\"then\":{\"answer\":\"deny\"},\"where\":\"restroom\",\"who\":[\"inventory_robot\",\"restock_robot\"]},{\"does\":\"tag:movement\",\"id\":\"checkout_speed\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"robots slow to 0.3 m/s in checkout\"},\"text\":\"robots slow to 0.3 m/s in checkout\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":0.3}},\"where\":[\"checkout\"],\"who\":[\"kind:robot\"]},{\"does\":\"*\",\"id\":\"no_restock_saturday_pm\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"no restock robots in aisle 3 on Saturdays between 14:00 and 16:00\"},\"text\":\"no restock robots in aisle 3 on Saturdays between 14:00 and 16:00\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"14:00\",\"op\":\"between\",\"to\":\"16:00\"},{\"days\":[\"sat\"],\"fact\":\"day\",\"op\":\"days\"}],\"where\":[\"aisle-3\"],\"who\":[\"restock_robot\"]},{\"does\":[\"camera_capture\"],\"id\":\"shopper_photos_entrance\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"shoppers may take photos in the entrance\"},\"text\":\"shoppers may take photos in the entrance\",\"then\":{\"answer\":\"allow\"},\"where\":[\"entrance\"],\"who\":[\"shopper\"]},{\"does\":[\"record_audio\"],\"id\":\"no_audio_back_room_lunch\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"people may not record audio in the back room between 12:00 and 13:00\"},\"text\":\"people may not record audio in the back room between 12:00 and 13:00\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"12:00\",\"op\":\"between\",\"to\":\"13:00\"}],\"where\":[\"back-room\"],\"who\":[\"kind:person\"]},{\"does\":\"record_audio\",\"id\":\"staff_audio_back_room\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"staff_audio_back_room\"},\"text\":\"Staff may record audio in the back room.\",\"then\":{\"answer\":\"allow\"},\"where\":\"back-room\",\"who\":\"staff\"},{\"does\":\"enter_zone\",\"id\":\"no_carrying_through_checkout\",\"reason\":\"Robots carrying stock do not enter the checkout; put it down first.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"no_carrying_through_checkout\"},\"text\":\"Robots carrying stock do not enter the checkout.\",\"then\":{\"answer\":\"deny\",\"instead\":\"place\"},\"when\":[{\"fact\":\"carrying\",\"op\":\"==\",\"value\":true}],\"where\":\"checkout\",\"who\":\"kind:robot\"}],\"site\":{\"hours\":{\"close\":\"22:00\",\"open\":\"07:00\"},\"id\":\"example-grocery-01\",\"name\":\"Example Grocery\",\"spatialDomainId\":\"posemesh-domain-id-goes-here\"},\"tags\":{\"actions\":[\"movement\",\"handling\",\"sensing\",\"capture\"],\"areas\":[\"public\",\"staff-only\",\"restricted\",\"dock\"],\"roles\":[\"staff\",\"after-hours\"]},\"template\":\"grocery-store\"}",
-      "fingerprint": "81aec41ac2e1e01d"
+      "canonical": "{\"actions\":[{\"effects\":[{\"op\":\"move\"}],\"id\":\"enter_zone\",\"kinds\":[\"robot\"],\"name\":\"enter an area\",\"synonyms\":[\"enter\",\"go into\",\"go in\",\"drive into\"],\"tags\":[\"movement\"]},{\"id\":\"move\",\"kinds\":[\"robot\"],\"name\":\"move\",\"synonyms\":[\"drive\",\"navigate\",\"travel\"],\"tags\":[\"movement\"]},{\"effects\":[{\"fact\":\"carrying\",\"op\":\"set\",\"value\":true}],\"id\":\"manipulate\",\"kinds\":[\"robot\"],\"name\":\"pick up or handle things\",\"synonyms\":[\"pick up\",\"handle\",\"restock\",\"touch\",\"manipulate\"],\"tags\":[\"handling\"]},{\"effects\":[{\"fact\":\"carrying\",\"op\":\"set\",\"value\":false}],\"id\":\"place\",\"kinds\":[\"robot\"],\"name\":\"put things down\",\"synonyms\":[\"put down\",\"place\",\"drop\",\"shelve\"],\"tags\":[\"handling\"]},{\"id\":\"scan\",\"kinds\":[\"robot\"],\"name\":\"scan\",\"synonyms\":[\"scan\",\"take images\",\"lidar\"],\"tags\":[\"sensing\"]},{\"effects\":[{\"op\":\"move\"}],\"id\":\"dock\",\"kinds\":[\"robot\"],\"name\":\"dock\",\"synonyms\":[\"dock\",\"charge\",\"return to dock\"],\"tags\":[\"movement\"]},{\"id\":\"camera_capture\",\"kinds\":[\"person\"],\"name\":\"take photos or video\",\"synonyms\":[\"take photos\",\"take pictures\",\"photograph\",\"film\",\"record video\",\"take a photo\",\"take photo\"],\"tags\":[\"capture\"]},{\"id\":\"record_audio\",\"kinds\":[\"person\"],\"name\":\"record audio\",\"synonyms\":[\"record audio\",\"record sound\",\"record\",\"transcribe\"],\"tags\":[\"capture\"]},{\"id\":\"ai_overlay\",\"kinds\":[\"person\"],\"name\":\"show AI overlays\",\"synonyms\":[\"overlay\",\"show overlays\",\"ai overlay\"]},{\"id\":\"share_location\",\"kinds\":[\"person\"],\"name\":\"share location\",\"synonyms\":[\"share location\",\"share position\"]},{\"id\":\"command_robot\",\"kinds\":[\"person\"],\"name\":\"command robots\",\"requires\":[\"targetRobotId\"],\"synonyms\":[\"command robots\",\"command a robot\",\"give robots commands\",\"control robots\"]}],\"answers\":{\"emergency\":\"stop_then_dock\",\"glasses_capture\":\"staff_only\",\"robot_commands\":\"staff_only\",\"robot_scan_near_people\":\"pause\",\"robot_speed\":\"walking\",\"robots_after_hours\":\"listed_roles\",\"robots_near_people\":\"slow\",\"robots_restricted_zones\":\"with_approval\",\"robots_staff_zones\":\"when_staff_present\",\"unknown_actions\":\"block\"},\"areas\":[{\"id\":\"entrance\",\"name\":\"Entrance\",\"tags\":[\"public\"]},{\"id\":\"aisle-3\",\"name\":\"Aisle 3\",\"tags\":[\"public\"]},{\"id\":\"checkout\",\"name\":\"Checkout\",\"tags\":[\"public\"]},{\"allowRoles\":[\"cleaning_robot\",\"staff\",\"shopper\"],\"id\":\"restroom\",\"name\":\"Restroom\",\"tags\":[\"public\"]},{\"id\":\"back-room\",\"name\":\"Back room\",\"tags\":[\"staff-only\"]},{\"id\":\"electrical\",\"name\":\"Electrical room\",\"tags\":[\"restricted\"]},{\"id\":\"dock-a\",\"name\":\"Charging dock A\",\"tags\":[\"dock\"]}],\"authorities\":[{\"id\":\"law-and-safety\",\"name\":\"Law and safety\"},{\"id\":\"company\",\"name\":\"Company\"},{\"id\":\"site-manager\",\"name\":\"Site manager\"},{\"id\":\"staff\",\"name\":\"Staff\"},{\"id\":\"agent\",\"name\":\"AI agent\"}],\"builtin\":[{\"id\":\"required_facts\",\"text\":\"Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission.\"},{\"id\":\"area_declared\",\"text\":\"Only declared areas are governed; anything in an undeclared area is blocked.\"},{\"id\":\"role_declared\",\"text\":\"Only declared roles may act; unknown roles are blocked.\"},{\"id\":\"role_permits_action\",\"text\":\"A participant may only take actions its role lists.\"},{\"id\":\"unknown_action\",\"text\":\"An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise).\"},{\"id\":\"plan_area_continuity\",\"text\":\"A plan step happens where the earlier steps left the participant unless its action moves it there.\"}],\"facts\":[{\"description\":\"People (not robots) in the area, as the spatial system reports.\",\"id\":\"peopleInZone\",\"integer\":true,\"min\":0,\"required\":true,\"synonyms\":[\"people\",\"people present\",\"people in the area\",\"people in the zone\",\"shoppers present\"],\"type\":\"number\"},{\"default\":0,\"description\":\"Staff in the area. Absent means 0.\",\"id\":\"staffInZone\",\"integer\":true,\"min\":0,\"synonyms\":[\"staff present\",\"staff in the area\",\"staff in the zone\"],\"type\":\"number\"},{\"description\":\"Local time \\\"HH:MM\\\". The rulebook has no clock.\",\"id\":\"localTime\",\"required\":true,\"synonyms\":[\"time\"],\"type\":\"time\"},{\"description\":\"Requested speed in m/s for movement. Absent means \\\"cap me\\\".\",\"id\":\"requestedSpeedMps\",\"min\":0,\"type\":\"number\"},{\"default\":false,\"description\":\"True while a site emergency is active. The one fact with a default, because an emergency is an explicit event your system raises.\",\"id\":\"emergency\",\"synonyms\":[\"emergency\",\"alarm\",\"fire alarm\"],\"type\":\"boolean\"},{\"description\":\"For command_robot: the robot being commanded.\",\"id\":\"targetRobotId\",\"type\":\"string\"},{\"default\":false,\"description\":\"True while a robot is carrying stock. In a plan, manipulate sets it and place clears it.\",\"id\":\"carrying\",\"synonyms\":[\"carrying\",\"loaded\",\"carrying stock\"],\"type\":\"boolean\"},{\"description\":\"Day of the week.\",\"id\":\"day\",\"required\":true,\"type\":\"day\"}],\"format\":\"neuroverse-domain-rules/3\",\"kinds\":[\"robot\",\"person\"],\"limits\":[{\"appliesTo\":\"tag:movement\",\"id\":\"maxSpeedMps\",\"name\":\"top speed\",\"requestedFact\":\"requestedSpeedMps\",\"synonyms\":[\"speed\",\"slow\",\"slow down\",\"top speed\",\"max speed\"],\"unit\":\"m/s\"}],\"otherwise\":\"deny\",\"planRules\":[{\"check\":{\"first\":\"scan\",\"kind\":\"before\",\"sameArea\":true,\"then\":\"manipulate\"},\"id\":\"scan_before_restock\",\"reason\":\"Scan the shelf before restocking it, so the plan works from what is actually there.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"scan_before_restock\"},\"text\":\"A robot scans a shelf before it restocks it.\",\"who\":\"kind:robot\"},{\"check\":{\"areas\":\"tag:dock\",\"kind\":\"ends_in\"},\"id\":\"end_at_dock\",\"reason\":\"Every plan ends at a charging dock.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"end_at_dock\"},\"text\":\"Every robot plan ends at a charging dock.\",\"who\":\"kind:robot\"}],\"roles\":[{\"actions\":[\"enter_zone\",\"move\",\"scan\",\"dock\"],\"id\":\"inventory_robot\",\"kind\":\"robot\",\"name\":\"Inventory robot\"},{\"actions\":[\"enter_zone\",\"move\",\"scan\",\"dock\",\"manipulate\",\"place\"],\"id\":\"restock_robot\",\"inherits\":\"inventory_robot\",\"kind\":\"robot\",\"name\":\"Restock robot\"},{\"actions\":[\"enter_zone\",\"move\",\"dock\"],\"id\":\"cleaning_robot\",\"kind\":\"robot\",\"name\":\"Cleaning robot\",\"tags\":[\"after-hours\"]},{\"actions\":[\"ai_overlay\",\"camera_capture\",\"record_audio\"],\"id\":\"shopper\",\"kind\":\"person\",\"name\":\"Shopper\"},{\"actions\":[\"ai_overlay\",\"camera_capture\",\"record_audio\",\"share_location\",\"command_robot\"],\"id\":\"staff\",\"inherits\":\"shopper\",\"kind\":\"person\",\"name\":\"Staff\",\"tags\":[\"staff\"]}],\"rules\":[{\"does\":\"tag:movement\",\"id\":\"robots_near_people\",\"reason\":\"People are in the area; robots slow down.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_near_people:slow\"},\"text\":\"Robots slow to 0.3 m/s while people are in their area.\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":0.3}},\"when\":[{\"fact\":\"peopleInZone\",\"op\":\">\",\"value\":0}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"tag:movement\",\"id\":\"robot_speed\",\"reason\":\"Robots move at most 1 m/s.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_speed:walking\"},\"text\":\"Robots move at most 1 m/s.\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":1}},\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_staff_zones\",\"reason\":\"This area is staff-only; wait until staff are there.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_staff_zones:when_staff_present\"},\"text\":\"Robots act in staff-only areas only while staff are in them.\",\"then\":{\"answer\":\"wait\",\"for\":\"condition\"},\"when\":[{\"fact\":\"staffInZone\",\"op\":\"==\",\"value\":0}],\"where\":\"tag:staff-only\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_restricted_zones\",\"reason\":\"This area is restricted.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_restricted_zones:with_approval\"},\"text\":\"Robots act in restricted areas only with a person's approval each time.\",\"then\":{\"answer\":\"wait\",\"for\":\"approval\"},\"where\":\"tag:restricted\",\"who\":\"kind:robot\"},{\"does\":\"*\",\"id\":\"robots_after_hours\",\"reason\":\"Example Grocery is closed and this robot is not tagged for after-hours work.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robots_after_hours:listed_roles\"},\"text\":\"Outside opening hours, only robot roles tagged \\\"after-hours\\\" may work.\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"22:00\",\"op\":\"between\",\"to\":\"07:00\"}],\"where\":\"*\",\"who\":[\"kind:robot\",\"!tag:after-hours\"]},{\"does\":\"scan\",\"id\":\"robot_scan_near_people\",\"reason\":\"People are in the area; wait until it is clear to scan.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_scan_near_people:pause\"},\"text\":\"Robot scans wait until the area is clear of people.\",\"then\":{\"answer\":\"wait\",\"for\":\"condition\"},\"when\":[{\"fact\":\"peopleInZone\",\"op\":\">\",\"value\":0}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"tag:capture\",\"id\":\"glasses_capture\",\"reason\":\"Glasses may not capture photos, video or audio here (staff only).\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"glasses_capture:staff_only\"},\"text\":\"Only staff glasses may capture photos, video or audio here.\",\"then\":{\"answer\":\"deny\"},\"where\":\"*\",\"who\":[\"kind:person\",\"!tag:staff\"]},{\"does\":\"command_robot\",\"id\":\"robot_commands\",\"reason\":\"Only staff may command robots.\",\"setBy\":\"company\",\"source\":{\"kind\":\"question\",\"ref\":\"robot_commands:staff_only\"},\"text\":\"Only staff may command robots from glasses.\",\"then\":{\"answer\":\"deny\"},\"where\":\"*\",\"who\":[\"kind:person\",\"!tag:staff\"]},{\"does\":[\"*\",\"!dock\"],\"id\":\"emergency_stop\",\"never\":true,\"reason\":\"Emergency: robots stop.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"emergency:stop_then_dock\"},\"text\":\"In an emergency, all robots stop; the only thing they may do is return to dock.\",\"then\":{\"answer\":\"deny\",\"instead\":\"dock\"},\"when\":[{\"fact\":\"emergency\",\"op\":\"==\",\"value\":true}],\"where\":\"*\",\"who\":\"kind:robot\"},{\"does\":\"command_robot\",\"id\":\"emergency_stop_commands\",\"never\":true,\"reason\":\"Emergency: nobody commands robots from glasses.\",\"setBy\":\"law-and-safety\",\"source\":{\"kind\":\"question\",\"ref\":\"emergency:stop_then_dock\"},\"text\":\"In an emergency, nobody commands robots from glasses.\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"emergency\",\"op\":\"==\",\"value\":true}],\"where\":\"*\",\"who\":\"kind:person\"},{\"does\":\"*\",\"id\":\"area_role_limits:restroom\",\"never\":true,\"reason\":\"Restroom is limited to: cleaning_robot, staff, shopper.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"declaration\",\"ref\":\"area:restroom.allowRoles\"},\"text\":\"Restroom is limited to: cleaning_robot, staff, shopper.\",\"then\":{\"answer\":\"deny\"},\"where\":\"restroom\",\"who\":[\"inventory_robot\",\"restock_robot\"]},{\"does\":\"tag:movement\",\"id\":\"checkout_speed\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"robots slow to 0.3 m/s in checkout\"},\"text\":\"robots slow to 0.3 m/s in checkout\",\"then\":{\"answer\":\"limit\",\"limits\":{\"maxSpeedMps\":0.3}},\"where\":[\"checkout\"],\"who\":[\"kind:robot\"]},{\"does\":\"*\",\"id\":\"no_restock_saturday_pm\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"no restock robots in aisle 3 on Saturdays between 14:00 and 16:00\"},\"text\":\"no restock robots in aisle 3 on Saturdays between 14:00 and 16:00\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"14:00\",\"op\":\"between\",\"to\":\"16:00\"},{\"days\":[\"sat\"],\"fact\":\"day\",\"op\":\"days\"}],\"where\":[\"aisle-3\"],\"who\":[\"restock_robot\"]},{\"does\":[\"camera_capture\"],\"id\":\"shopper_photos_entrance\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"shoppers may take photos in the entrance\"},\"text\":\"shoppers may take photos in the entrance\",\"then\":{\"answer\":\"allow\"},\"where\":[\"entrance\"],\"who\":[\"shopper\"]},{\"does\":[\"record_audio\"],\"id\":\"no_audio_back_room_lunch\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"text\",\"ref\":\"people may not record audio in the back room between 12:00 and 13:00\"},\"text\":\"people may not record audio in the back room between 12:00 and 13:00\",\"then\":{\"answer\":\"deny\"},\"when\":[{\"fact\":\"localTime\",\"from\":\"12:00\",\"op\":\"between\",\"to\":\"13:00\"}],\"where\":[\"back-room\"],\"who\":[\"kind:person\"]},{\"does\":\"record_audio\",\"id\":\"staff_audio_back_room\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"staff_audio_back_room\"},\"text\":\"Staff may record audio in the back room.\",\"then\":{\"answer\":\"allow\"},\"where\":\"back-room\",\"who\":\"staff\"},{\"does\":\"enter_zone\",\"id\":\"no_carrying_through_checkout\",\"reason\":\"Robots carrying stock do not enter the checkout; put it down first.\",\"setBy\":\"site-manager\",\"source\":{\"kind\":\"manual\",\"ref\":\"no_carrying_through_checkout\"},\"text\":\"Robots carrying stock do not enter the checkout.\",\"then\":{\"answer\":\"deny\",\"instead\":\"place\"},\"when\":[{\"fact\":\"carrying\",\"op\":\"==\",\"value\":true}],\"where\":\"checkout\",\"who\":\"kind:robot\"}],\"site\":{\"hours\":{\"close\":\"22:00\",\"open\":\"07:00\"},\"id\":\"example-grocery-01\",\"name\":\"Example Grocery\",\"spatialDomainId\":\"posemesh-domain-id-goes-here\"},\"tags\":{\"actions\":[\"movement\",\"handling\",\"sensing\",\"capture\"],\"areas\":[\"public\",\"staff-only\",\"restricted\",\"dock\"],\"roles\":[\"staff\",\"after-hours\"]},\"template\":\"grocery-store\"}",
+      "fingerprint": "539d72fe658134fc57c9b6c71927b01ad40e6109ead702fbb3363cd97c5458a1"
     }
   },
   {
@@ -1139,7 +1113,7 @@
       5,
       6
     ],
-    "description": "requestDigest is the fingerprint of { participant: { id, kind, roleId }, action, areaId } — never the facts.",
+    "description": "requestDigest is the fingerprint of { participantId, action, areaId } — never the facts.",
     "request": {
       "participant": {
         "id": "b-1",
@@ -1155,7 +1129,7 @@
       }
     },
     "expect": {
-      "requestDigest": "a972a032bcabeaaf"
+      "requestDigest": "ef4f8465ea84c3752e0f1c30e969d3aa14d40000c3382e5418c0ed30f563e3bb"
     }
   }
 ]

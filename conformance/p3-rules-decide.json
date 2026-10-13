@@ -6,7 +6,7 @@
     ],
     "description": "The engine applies the rule's structured `then`, never its prose: a rule whose text says \"allowed\" but whose answer is deny, denies.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -160,10 +160,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "03c2de307a5bbab5"
+      "fingerprint": "55f937f48bee610b127febc88aae5e2499855a126ef4927e6feb6a96f88bd153"
     },
     "request": {
       "participant": {
@@ -201,7 +205,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "03c2de307a5bbab5"
+        "fingerprint": "55f937f48bee610b127febc88aae5e2499855a126ef4927e6feb6a96f88bd153"
       }
     }
   },
@@ -213,7 +217,7 @@
     ],
     "description": "Two requests that differ only in facts the rules do not mention get the same decision: nothing outside the rulebook and the request is consulted.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -374,10 +378,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "d2729f532554cf48"
+      "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
     },
     "request": {
       "participant": {
@@ -418,7 +426,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "d2729f532554cf48"
+        "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
       }
     }
   },
@@ -430,7 +438,7 @@
     ],
     "description": "The counterpart of the previous case: outside the window, with the same irrelevant facts, ALLOW.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -591,10 +599,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "d2729f532554cf48"
+      "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
     },
     "request": {
       "participant": {
@@ -630,7 +642,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "d2729f532554cf48"
+        "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
       }
     }
   }

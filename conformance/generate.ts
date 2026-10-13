@@ -17,9 +17,9 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import {
-  compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest,
-  publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, backtest, compareBacktests,
-  type BacktestEvent, type BacktestOptions, type CompileDomainInput, type DomainRequest, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
+  compileDomain, evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, sha256Utf8, requestDigest,
+  publicKeyOf, signApproval, verifyApproval, signRulebook, verifyRulebookSignature, backtest, compareBacktests, planDigestOf,
+  type BacktestEvent, type BacktestOptions, type CompileDomainInput, type DomainRequest, type HistoryCondition, type Plan, type PlanRule, type Rule, type Rulebook, type TrustedKey, type SignedApproval,
 } from '../src/index';
 import { projectDecision, projectFindings, projectPlan } from './compare.mjs';
 import * as grocery from '../examples/grocery-store';
@@ -91,6 +91,8 @@ interface Want {
   then?: string;
   /** Approval requests as "ruleId" or "ruleId@by". */
   asks?: string[];
+  /** Approval instances used, as "ruleId:nonce". */
+  used?: string[];
   /** Findings as "kind:certainty:idA+idB". */
   findings?: string[];
   error?: true;
@@ -133,8 +135,8 @@ function add(file: string, s: Spec) {
   if (s.tamper) {
     const copy = JSON.parse(JSON.stringify(rulebook)) as Rulebook;
     s.tamper(copy);
-    const { fingerprint: _f, ...body } = copy;
-    rulebook = { ...body, fingerprint: fingerprint(body) };
+    const { fingerprint: _f, findings: _findings, ...body } = copy;
+    rulebook = { ...copy, fingerprint: fingerprint(body) };
   }
   const out: Record<string, unknown> = { id: s.id, principle: s.principle, description: s.description };
   if (s.base && !s.tamper) out.rulebookRef = `rulebooks/${s.base}.json`; else out.rulebook = rulebook;
@@ -182,9 +184,9 @@ function add(file: string, s: Spec) {
     const got = { newlyBlocked: c.newlyBlocked.length, newlyAllowed: c.newlyAllowed.length, other: c.otherChanges.length };
     if (JSON.stringify(got) !== JSON.stringify(w.comparison)) fail(s.id, `comparison: want ${JSON.stringify(w.comparison)}, got ${JSON.stringify(got)}`);
     out.expect = { comparison: JSON.parse(JSON.stringify(c)) };
-  } else if (s.plan) {
+  } else if ('plan' in s) {
     out.plan = s.plan;
-    const p = evaluatePlan(rulebook as Rulebook, s.plan);
+    const p = evaluatePlan(rulebook as Rulebook, s.plan as Plan);
     if (p.status !== w.status) fail(s.id, `plan status: want ${w.status}, got ${p.status}`);
     const steps = p.steps.map(x => x.decision.status);
     if (JSON.stringify(steps) !== JSON.stringify(w.steps ?? [])) fail(s.id, `plan steps: want ${JSON.stringify(w.steps)}, got ${JSON.stringify(steps)}`);
@@ -207,6 +209,8 @@ function add(file: string, s: Spec) {
     if (d.then !== w.then) fail(s.id, `then: want ${w.then}, got ${d.then}`);
     const asks = (d.approvalRequests ?? []).map(a => (a.by ? `${a.ruleId}@${a.by}` : a.ruleId));
     if (JSON.stringify(asks) !== JSON.stringify(w.asks ?? [])) fail(s.id, `approvalRequests: want ${JSON.stringify(w.asks ?? [])}, got ${JSON.stringify(asks)}`);
+    const used = (d.approvalsUsed ?? []).map(a => `${a.ruleId}:${a.nonce}`);
+    if (JSON.stringify(used) !== JSON.stringify(w.used ?? [])) fail(s.id, `approvalsUsed: want ${JSON.stringify(w.used ?? [])}, got ${JSON.stringify(used)}`);
     out.expect = { decision: projectDecision(d) };
   }
   (files[file] ??= []).push(out);
@@ -477,6 +481,16 @@ function p7() {
   for (const [id, description, a, b] of disjoint) pair(id, description, [rule('a', { answer: 'allow' }, { when: a }), rule('b', { answer: 'deny' }, { when: b })], []);
   pair('p7-disjoint-selectors', 'Rules on different areas never meet: no finding, whatever their answers.',
     [rule('a', { answer: 'allow' }, { where: 'floor' }), rule('b', { answer: 'deny' }, { where: 'yard' })], []);
+  pair('p7-limits-compared-on-every-name', 'Two limit rules are compared on EVERY limit name they share, not just the first: equal on speed, looser on load at the lower authority is an authority-override for load.',
+    [rule('company_caps', { answer: 'limit', limits: { speed: 1, load: 3 } }, { setBy: 'high' }), rule('site_caps', { answer: 'limit', limits: { speed: 1, load: 5 } }, { setBy: 'low' })], ['authority-override:certain:site_caps+company_caps'], { limits: [{ id: 'speed', unit: 'm/s', requestedFact: 'speedAsked' }, { id: 'load', unit: 'kg' }] });
+  pair('p7-mixed-limits-are-a-disagreement', 'Each rule tighter on a different shared limit: neither loosens the other outright; reported as a limit_disagreement, and the lower value of each limit applies.',
+    [rule('a', { answer: 'limit', limits: { speed: 2, load: 3 } }), rule('b', { answer: 'limit', limits: { speed: 1, load: 5 } })], ['limit_disagreement:certain:a+b'], { limits: [{ id: 'speed', unit: 'm/s', requestedFact: 'speedAsked' }, { id: 'load', unit: 'kg' }] });
+  pair('p7-range-inside-finite-set-is-covered', 'Subset is exact for every pair of shapes: an integer range (1 <= people <= 2) lies inside the finite set {1, 2}, so the looser wait is fully covered by the deny: shadowed.',
+    [rule('ask', { answer: 'wait', for: 'approval' }, { when: [{ fact: 'people', op: '>=', value: 1 }, { fact: 'people', op: '<=', value: 2 }] }), rule('no', { answer: 'deny' }, { when: [{ fact: 'people', op: 'in', values: [1, 2] }] })], ['shadowed:certain:ask+no']);
+  pair('p7-unreachable-by-role-not-reported', 'Only requests a lawful request can reach count: the bot does not list "look", so two rules that clash on look only never meet (role_permits_action refuses first).',
+    [rule('yes', { answer: 'allow' }, { does: 'look' }), rule('no', { answer: 'deny' }, { does: 'look' })], [], { roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['go'] }] });
+  pair('p7-unreachable-behind-never-rule-not-reported', 'A clash entirely inside the scope of an unconditional never rule is unreachable: the never rule refuses every such request first, so no finding; the never rule itself is still compared with the allow.',
+    [rule('inv', { answer: 'deny' }, { never: true, where: 'yard' }), rule('yes', { answer: 'allow' }, { where: 'yard' }), rule('no', { answer: 'deny' }, { where: 'yard' })], ['never_vs_rule:certain:yes+inv']);
   add(f, { id: 'p7-impossible-condition-rejected', principle: [7, 4], description: 'A rule whose own conditions can never all hold (people > 5 and people < 3) is rejected.',
     input: tiny([rule('r', { answer: 'deny' })]), tamper: rb => { rb.rules[0].when = [{ fact: 'people', op: '>', value: 5 }, { fact: 'people', op: '<', value: 3 }]; }, want: { error: true } });
   add(f, { id: 'p7-grocery-example-findings', principle: [7, 2], description: 'The shipped grocery example reports the manager\'s deliberate conflicts: a tightening, an authority-override and a same-authority contradiction.',
@@ -568,15 +582,15 @@ function plans() {
   add(f, { id: 'plan-accepted-with-final-facts', principle: [3, 5], description: 'A plan every step of which passes is ALLOW, with the projected facts and the area it ends in.',
     input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'yard' }, { action: 'go', area: 'floor' }]),
     want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
-  add(f, { id: 'plan-area-defaults-to-where-the-last-move-left-it', principle: [3], description: 'A step without an area happens where the previous move left the participant; a step without a move effect does not move it.',
+  add(f, { id: 'plan-area-defaults-to-where-the-last-move-left-it', principle: [3, 4], description: 'A step without an area happens where the previous move left the participant; a step that names another area without an action that moves there is refused (plan_area_continuity) — in /2 this plan was accepted with the robot "looking in the floor" while projected in the yard.',
     input: site(), plan: plan([{ action: 'go', area: 'yard' }, { action: 'drop' }, { action: 'look', area: 'floor', facts: ok }, { action: 'drop' }]),
-    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'BLOCK'], firstViolation: 'plan_area_continuity@builtin#2:step' } });
   add(f, { id: 'plan-pause-collects-approvals', principle: [6, 3], description: 'A step that waits for approval is PAUSE; the plan result lists every approval request so a planner can collect them up front, and later steps are still checked.',
     input: site(), plan: plan([{ action: 'look', area: 'floor' }, { action: 'pick' }, { action: 'drop' }]),
     want: { status: 'PAUSE', steps: ['PAUSE', 'ALLOW', 'ALLOW'], asks: ['ask_before_look@high'] } });
   add(f, { id: 'plan-rules-judge-the-whole-plan', principle: [3, 5], description: 'Plan rules: ends_in, before (same area), at_most and ends_with each name the step where the plan breaks them, with the authority that set each; the first violation is the earliest by step.',
-    input: shaped, plan: plan([{ action: 'pick', area: 'floor' }, { action: 'drop' }, { action: 'look', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'look', area: 'yard', facts: ok }]),
-    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'], planChecks: ['end_in_floor:ALLOW', 'look_before_pick:BLOCK', 'one_pick:BLOCK', 'end_with_drop_or_go:BLOCK'], firstViolation: 'look_before_pick@low#0:plan' } });
+    input: shaped, plan: plan([{ action: 'pick', area: 'floor' }, { action: 'drop' }, { action: 'look', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'yard' }, { action: 'look', facts: ok }]),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'], planChecks: ['end_in_floor:BLOCK', 'look_before_pick:BLOCK', 'one_pick:BLOCK', 'end_with_drop_or_go:BLOCK'], firstViolation: 'look_before_pick@low#0:plan' } });
   add(f, { id: 'plan-rules-pass', principle: [3], description: 'The same plan rules, satisfied: a look before the only pick in the same area, ending with a move onto the floor.',
     input: shaped, plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'yard' }, { action: 'go', area: 'floor' }]),
     want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'], planChecks: ['end_in_floor:ALLOW', 'look_before_pick:ALLOW', 'one_pick:ALLOW', 'end_with_drop_or_go:ALLOW'] } });
@@ -610,6 +624,14 @@ function plans() {
     input: shaped, tamper: rb => { delete (rb.planRules![0] as Partial<PlanRule>).setBy; }, want: { error: true } });
   add(f, { id: 'plan-rule-unknown-area-rejected', principle: [4], description: 'A plan rule naming an undeclared area is rejected.',
     input: shaped, tamper: rb => { rb.planRules![0].check = { kind: 'ends_in', areas: 'roof' }; }, want: { error: true } });
+  add(f, { id: 'plan-step-area-without-move-is-refused', principle: [3, 4], description: 'A step may name another area only when its action moves the participant there: "look in the floor, look in the yard" with no move is BLOCK plan_area_continuity at the second step, by the evaluator, and nothing is projected past it.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'look', area: 'yard', facts: ok }, { action: 'drop' }]),
+    want: { status: 'BLOCK', steps: ['ALLOW', 'BLOCK'], firstViolation: 'plan_area_continuity@builtin#1:step' } });
+  add(f, { id: 'plan-step-area-restated-is-fine', principle: [3], description: 'A step may restate the area it is already in; a moving action may name a new one.',
+    input: site(), plan: plan([{ action: 'look', area: 'floor', facts: ok }, { action: 'drop', area: 'floor' }, { action: 'go', area: 'yard' }, { action: 'drop', area: 'yard' }]),
+    want: { status: 'ALLOW', steps: ['ALLOW', 'ALLOW', 'ALLOW', 'ALLOW'] } });
+  add(f, { id: 'plan-null-is-block', principle: [4], description: 'A plan that is not an object (null) is BLOCK required_facts, never a throw; its digest is the digest of null.',
+    input: site(), plan: null as unknown as Plan, want: { status: 'BLOCK', firstViolation: 'required_facts@builtin#0:plan' } });
   add(f, { id: 'plan-rule-duplicate-finding', principle: [7], description: 'Two plan rules that make the same check for roles in common are a duplicate finding (plan rules only reject, so they never disagree).',
     input: site([planRule('one_pick', { kind: 'at_most', actions: 'pick', count: 1 }), planRule('one_pick_again', { kind: 'at_most', actions: 'pick', count: 1 }, { setBy: 'low' })]), want: { findings: ['duplicate:certain:one_pick+one_pick_again'] } });
 }
@@ -619,29 +641,38 @@ function plans() {
 function history() {
   const f = 'history.json';
   const site = tiny([
-    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 'time', op: '>=', value: 5 }] }),
-    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 10, clock: 'time', op: '>=', value: 1 }] }),
+    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, op: '>=', value: 5 }] }),
+    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 15, op: '>=', value: 1 }] }),
     rule('three_yard_visits', { answer: 'wait', for: 'approval' }, { does: 'go', where: 'yard', history: [{ actions: 'go', areas: 'yard', op: '>=', value: 3 }] }),
   ]);
-  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'floor', at: `${String(Math.floor((from + i) / 60)).padStart(2, '0')}:${String((from + i) % 60).padStart(2, '0')}` }));
+  const day = '2026-10-13';
+  const stamp = (minuteOfDay: number, d = day) => `${d}T${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}:00Z`;
+  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'floor', at: stamp(from + i) }));
+  const at = (minuteOfDay: number, request: DomainRequest): DomainRequest => ({ ...request, now: stamp(minuteOfDay) });
   const h = (id: string, principle: number[], description: string, request: DomainRequest, want: Want) => add(f, { id, principle, description, input: site, request, want });
-  h('history-under-the-count-allows', [4, 9], 'Four looks in the hour: the rule needs five, so ALLOW.', { ...req('look'), history: looks(4) }, { status: 'ALLOW', reasons: ['role_permits_action'] });
-  h('history-at-the-count-denies', [4, 9], 'Five looks in the hour before the time fact: the rule matches and denies.', { ...req('look'), history: looks(5) }, { status: 'BLOCK', reasons: ['five_looks_an_hour@high'] });
-  h('history-outside-the-window-does-not-count', [9], 'Only entries within the window before the clock fact count: at 10:05 the 09:00 look is out, four remain, ALLOW.', { ...req('look', 'floor', { time: '10:05' }), history: looks(5) }, { status: 'ALLOW', reasons: ['role_permits_action'] });
-  h('history-window-wraps-midnight', [9], 'The window is minute-of-day arithmetic that wraps: a go at 23:55 is eight minutes before 00:03.', { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'floor', at: '23:55' }] }, { status: 'PAUSE', reasons: ['not_right_after_go@high'] });
-  h('history-same-area-only', [9], 'sameArea counts only entries in the request\'s own area: the go was in the yard, so no wait.', { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'yard', at: '23:55' }] }, { status: 'ALLOW', reasons: ['role_permits_action'] });
-  h('history-areas-selector-without-window', [9], 'A history condition without a window needs no times: three earlier goes into the yard make the next one wait for approval.', { ...req('go', 'yard'), history: [{ action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'floor' }, { action: 'go', areaId: 'yard' }] }, { status: 'PAUSE', reasons: ['three_yard_visits@high'], asks: ['three_yard_visits'] });
-  h('history-missing-is-required-facts', [4], 'A rule in scope that counts history, with no history supplied, is BLOCK required_facts: the engine keeps no history and never guesses.', req('look'), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
-  h('history-entry-without-time-is-required-facts', [4], 'When a rule in scope uses a window, an entry without "at" is incomplete: BLOCK required_facts.', { ...req('look'), history: [{ action: 'look', areaId: 'floor' }] }, { status: 'BLOCK', reasons: ['required_facts@builtin'] });
-  h('history-malformed-entry-is-required-facts', [4], 'An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.', { ...req('look'), history: [{ action: 'look' } as unknown as { action: string; areaId: string }] }, { status: 'BLOCK', reasons: ['required_facts@builtin'] });
-  h('history-not-needed-out-of-scope', [4], 'A request no history rule reaches (go on the floor) needs no history at all.', req('go'), { status: 'ALLOW', reasons: ['role_permits_action'] });
-  h('history-empty-list-is-history', [4], 'An empty list is a history (nothing happened): the count is zero.', { ...req('look'), history: [] }, { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-under-the-count-allows', [4, 9], 'Four looks in the hour before now: the rule needs five, so ALLOW.', at(10 * 60, { ...req('look'), history: looks(4) }), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-at-the-count-denies', [4, 9], 'Five looks in the hour before now: the rule matches and denies.', at(10 * 60, { ...req('look'), history: looks(5) }), { status: 'BLOCK', reasons: ['five_looks_an_hour@high'] });
+  h('history-outside-the-window-does-not-count', [9], 'Only entries within the window before now count: at 10:05 the 09:00 look is out, four remain, ALLOW.', at(10 * 60 + 5, { ...req('look', 'floor', { time: '10:05' }), history: looks(5) }), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-window-crosses-midnight', [9], 'Windows are absolute time: a go at 23:55 yesterday is eight minutes before 00:03 today, so it counts.', at(3, { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'floor', at: stamp(23 * 60 + 55, '2026-10-12') }] }), { status: 'PAUSE', reasons: ['not_right_after_go@high'] });
+  h('history-yesterday-is-not-today', [9], 'The midnight case: a go at 09:50 YESTERDAY is not within 15 minutes of 10:00 today (minute-of-day arithmetic would have said it was); ALLOW.', at(10 * 60, { ...req('look', 'floor', { time: '10:00' }), history: [{ action: 'go', areaId: 'floor', at: stamp(9 * 60 + 50, '2026-10-12') }] }), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-today-counts', [9], 'The counterpart: the same go at 09:50 TODAY is ten minutes before 10:00 and counts.', at(10 * 60, { ...req('look', 'floor', { time: '10:00' }), history: [{ action: 'go', areaId: 'floor', at: stamp(9 * 60 + 50) }] }), { status: 'PAUSE', reasons: ['not_right_after_go@high'] });
+  h('history-future-entry-does-not-count', [9], 'An entry later than now is not "recent": it does not count.', at(10 * 60, { ...req('look', 'floor', { time: '10:00' }), history: [{ action: 'go', areaId: 'floor', at: stamp(10 * 60 + 5) }] }), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-offset-is-applied', [9], 'A timestamp with an offset is the instant it names: 11:50+02:00 is 09:50Z, ten minutes before 10:00Z.', at(10 * 60, { ...req('look', 'floor', { time: '10:00' }), history: [{ action: 'go', areaId: 'floor', at: '2026-10-13T11:50:00+02:00' }] }), { status: 'PAUSE', reasons: ['not_right_after_go@high'] });
+  h('history-same-area-only', [9], 'sameArea counts only entries in the request\'s own area: the go was in the yard, so no wait.', at(3, { ...req('look', 'floor', { time: '00:03' }), history: [{ action: 'go', areaId: 'yard', at: stamp(23 * 60 + 55, '2026-10-12') }] }), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-areas-selector-without-window', [9], 'A history condition without a window needs no times and no now: three earlier goes into the yard make the next one wait for approval.', { ...req('go', 'yard'), history: [{ action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'yard' }, { action: 'go', areaId: 'floor' }, { action: 'go', areaId: 'yard' }] }, { status: 'PAUSE', reasons: ['three_yard_visits@high'], asks: ['three_yard_visits'] });
+  h('history-missing-is-required-facts', [4], 'A rule in scope that counts history, with no history supplied, is BLOCK required_facts: the engine keeps no history and never guesses.', at(10 * 60, req('look')), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-now-missing-is-required-facts', [4, 9], 'A rule in scope with a window needs now: without it the request is BLOCK required_facts (the engine has no clock).', { ...req('look'), history: looks(4) }, { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-entry-without-time-is-required-facts', [4], 'When a rule in scope uses a window, an entry without "at" is incomplete: BLOCK required_facts.', at(10 * 60, { ...req('look'), history: [{ action: 'look', areaId: 'floor' }] }), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-entry-without-date-is-required-facts', [4], 'An "at" without a date ("09:45", the /2 form) is not a timestamp: BLOCK required_facts, never a guess at which day.', at(10 * 60, { ...req('look'), history: [{ action: 'look', areaId: 'floor', at: '09:45' }] }), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-malformed-entry-is-required-facts', [4], 'An entry that is not { action, areaId, at? } is invalid: BLOCK required_facts.', at(10 * 60, { ...req('look'), history: [{ action: 'look' } as unknown as { action: string; areaId: string }] }), { status: 'BLOCK', reasons: ['required_facts@builtin'] });
+  h('history-not-needed-out-of-scope', [4], 'A request no history rule reaches (go on the floor) needs no history and no now at all.', req('go'), { status: 'ALLOW', reasons: ['role_permits_action'] });
+  h('history-empty-list-is-history', [4], 'An empty list is a history (nothing happened): the count is zero.', at(10 * 60, { ...req('look'), history: [] }), { status: 'ALLOW', reasons: ['role_permits_action'] });
   add(f, { id: 'history-unknown-action-rejected', principle: [4], description: 'A history condition naming an undeclared action makes the rulebook invalid.',
     input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'fly', op: '>=', value: 1 }]; }, want: { error: true } });
-  add(f, { id: 'history-window-without-clock-rejected', principle: [4, 9], description: 'A window without a clock fact is rejected: the engine has no clock of its own.',
-    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, op: '>=', value: 5 }]; }, want: { error: true } });
-  add(f, { id: 'history-clock-must-be-time-fact', principle: [4], description: 'A clock that is not a declared time fact is rejected.',
-    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, clock: 'people', op: '>=', value: 5 }]; }, want: { error: true } });
+  add(f, { id: 'history-clock-rejected', principle: [4, 9], description: 'The /2 "clock" member on a history condition is rejected with a message naming the change: windows are measured back from request.now.',
+    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 60, clock: 'time', op: '>=', value: 5 } as unknown as HistoryCondition]; }, want: { error: true } });
+  add(f, { id: 'history-window-out-of-range-rejected', principle: [4], description: 'A window outside 1–1440 minutes is rejected.',
+    input: site, tamper: rb => { rb.rules[0].history = [{ actions: 'look', withinMinutes: 0, op: '>=', value: 5 }]; }, want: { error: true } });
 }
 
 // ─── Backtest: what the rulebook would have decided for recorded activity ────
@@ -658,7 +689,7 @@ function backtestCases() {
     rule('crowd_wait', { answer: 'wait', for: 'condition' }, { does: 'go', when: [{ fact: 'people', op: '>=', value: 3 }] }),
     rule('yard_closed_at_night', { answer: 'deny' }, { where: 'yard', when: [{ fact: 'time', op: 'between', from: '20:00', to: '06:00' }] }),
     rule('slow_in_yard', { answer: 'limit', limits: { speed: 0.5 } }, { does: 'go', where: 'yard' }),
-    rule('four_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 'time', op: '>=', value: 3 }] }),
+    rule('four_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, op: '>=', value: 3 }] }),
     rule('alarm_allows_look', { answer: 'allow' }, { does: 'look', when: [{ fact: 'alarm', op: '==', value: true }], setBy: 'low' }),
     rule('no_look_in_alarm', { answer: 'deny' }, { does: 'look', when: [{ fact: 'alarm', op: '==', value: true }] }),
     rule('never_used', { answer: 'deny' }, { does: 'go', when: [{ fact: 'mode', op: '==', value: 'c' }] }),
@@ -669,14 +700,14 @@ function backtestCases() {
   b('backtest-totals-and-rows', [5, 3], 'A log replayed through a rulebook gives one row per event with the decision\'s status and reasons, totals by status, and counts by area, by role and by rule; the fingerprint names the rulebook that decided.',
     [ev(at(9, 0), ask(9, 0)), ev(at(9, 5), ask(9, 5, 'go', 'yard', { speedAsked: 1 })), ev(at(9, 10), ask(9, 10, 'go', 'floor', { people: 3 })), ev(at(21, 0), ask(21, 0, 'go', 'yard'))],
     { totals: '1/1/1/1/0', neverFired: ['four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['crowd_wait:PAUSE:1', 'yard_closed_at_night:BLOCK:1'] });
-  b('backtest-history-is-built-from-earlier-events', [4, 9], 'A rule that counts history sees, for each event, the earlier events of the same participant in this log, timed by the clock fact: the fourth look within the hour is refused, another participant\'s looks do not count, and nothing is kept between runs.',
+  b('backtest-history-is-built-from-earlier-events', [4, 9], 'A rule that counts history sees, for each event, the earlier events of the same participant in this log, timed by each event\'s at (which is also each request\'s now): the fourth look within the hour is refused, another participant\'s looks do not count, and nothing is kept between runs.',
     [ev(at(10, 0), ask(10, 0, 'look')), ev(at(10, 10), ask(10, 10, 'look')), ev(at(10, 20), ask(10, 20, 'look', 'floor', {}, bot('b-2'))), ev(at(10, 30), ask(10, 30, 'look')), ev(at(10, 40), ask(10, 40, 'look')), ev(at(11, 50), ask(11, 50, 'look'))],
     { totals: '5/0/0/1/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['four_looks_an_hour:BLOCK:1'] });
-  b('backtest-history-does-not-cross-days', [4, 9], 'Built history never crosses a day (the text of `at` before its first "T"): three looks on Monday do not count toward Tuesday\'s first look, whose history is empty.',
+  b('backtest-history-is-absolute-time', [4, 9], 'Built history is all of the participant\'s earlier events, and windows are absolute time: three looks on Monday are a day before Tuesday\'s looks and do not count, with no day boundary needed.',
     [ev(at(10, 0), ask(10, 0, 'look')), ev(at(10, 10), ask(10, 10, 'look')), ev(at(10, 20), ask(10, 20, 'look')), ev(`2026-10-06T10:30`, ask(10, 30, 'look')), ev(`2026-10-06T10:40`, ask(10, 40, 'look'))],
     { totals: '5/0/0/0/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'four_looks_an_hour', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'] });
   b('backtest-history-on-the-request-is-used-as-given', [4, 9], 'An event whose request carries its own history is decided on that history, not on the log: the first look is refused because the request says three happened already.',
-    [ev(at(10, 0), { ...ask(10, 0, 'look'), history: [{ action: 'look', areaId: 'floor', at: '09:30' }, { action: 'look', areaId: 'floor', at: '09:40' }, { action: 'look', areaId: 'floor', at: '09:50' }] }), ev(at(10, 5), ask(10, 5, 'look'))],
+    [ev(at(10, 0), { ...ask(10, 0, 'look'), history: [{ action: 'look', areaId: 'floor', at: at(9, 30) }, { action: 'look', areaId: 'floor', at: at(9, 40) }, { action: 'look', areaId: 'floor', at: at(9, 50) }] }), ev(at(10, 5), ask(10, 5, 'look'))],
     { totals: '1/0/0/1/0', neverFired: ['crowd_wait', 'yard_closed_at_night', 'slow_in_yard', 'alarm_allows_look', 'no_look_in_alarm', 'never_used'], stalls: ['four_looks_an_hour:BLOCK:1'] });
   b('backtest-missing-facts-are-named', [4], 'An event the log did not carry enough facts for is counted as missing facts, not as a refusal by a rule, and the report names each fact and how often it was missing or invalid.',
     [ev(at(9, 0), { ...ask(9, 0), facts: { time: '09:00', day: 'mon' } }), ev(at(9, 5), { ...ask(9, 5), facts: { time: '09:05', day: 'mon', people: -1 } }), ev(at(9, 10), { ...ask(9, 10), facts: { day: 'mon' } }), ev(at(9, 15), ask(9, 15))],
@@ -728,15 +759,26 @@ function fingerprintCases() {
   vec('fp-keys-sorted', 'Object keys are sorted by UTF-16 code unit; no whitespace.', { b: 1, a: 2, B: 3, _: 4 }, '{"B":3,"_":4,"a":2,"b":1}');
   vec('fp-nested', 'Sorting applies at every depth; arrays keep their order.', { z: [{ y: 1, x: [3, 2, 1] }, 'a'], a: { c: null, b: true } }, '{"a":{"b":true,"c":null},"z":[{"x":[3,2,1],"y":1},"a"]}');
   vec('fp-numbers', 'Numbers as JavaScript JSON.stringify writes them: no trailing zeros, exponent form past 1e21, -0 as 0.', { a: 1.0, b: 0.5, c: 1e21, d: -0, e: 123456789012345680000, f: 0.000001, g: 1e-7 }, '{"a":1,"b":0.5,"c":1e+21,"d":0,"e":123456789012345680000,"f":0.000001,"g":1e-7}');
-  vec('fp-strings', 'Strings as JSON.stringify writes them: only ", \\, control characters escaped; non-ASCII kept literal; the hash runs over UTF-16 code units (an emoji is two).', { s: 'a"b\\c\n\t\u0001 é ∑ 🤖' }, '{"s":"a\\"b\\\\c\\n\\t\\u0001 é ∑ 🤖"}');
+  vec('fp-strings', 'Strings as JSON.stringify writes them (RFC 8785): only ", \\, control characters escaped; non-ASCII kept literal; the hash runs over the UTF-8 bytes (é is two, ∑ three, the emoji four).', { s: 'a"b\\c\n\t\u0001 é ∑ 🤖' }, '{"s":"a\\"b\\\\c\\n\\t\\u0001 é ∑ 🤖"}');
   vec('fp-null-and-booleans', 'null, true, false.', [null, true, false], '[null,true,false]');
+  const sha = (id: string, description: string, text: string, want: string) => {
+    const got = sha256Utf8(text);
+    if (got !== want) fail(id, `sha256: want ${want}, got ${got}`);
+    (files[f] ??= []).push({ id, principle: [5], description, text, expect: { sha256: want } });
+    count++;
+  };
+  sha('sha256-empty', 'FIPS 180-4 SHA-256 of the empty string.', '', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  sha('sha256-abc', 'FIPS 180-4 example: "abc".', 'abc', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  sha('sha256-two-blocks', 'FIPS 180-4 example: the 56-byte message that pads into two blocks.', 'abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq', '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+  sha('sha256-utf8', 'The hash is over UTF-8 bytes: "é∑🤖" is 2 + 3 + 4 bytes.', 'é∑🤖', sha256Utf8('é∑🤖'));
   const g = bases.grocery;
-  const { fingerprint: claimed, ...body } = g;
-  vec('fp-grocery-rulebook', 'The shipped grocery example rulebook (everything but its fingerprint) hashes to its fingerprint.', body, canonicalJson(body));
+  const { fingerprint: claimed, findings: _findings, ...body } = g;
+  vec('fp-grocery-rulebook', 'The shipped grocery example rulebook (everything but its fingerprint and its findings) hashes to its fingerprint: findings carry free text and are left out, so two conforming compilers agree.', body, canonicalJson(body));
   if (fingerprint(body) !== claimed) fail('fp-grocery-rulebook', 'fingerprint mismatch');
+  if (fingerprint({ ...body, findings: g.findings }) === claimed) fail('fp-grocery-rulebook', 'findings must not be in the fingerprint');
   const r = req('go', 'yard', { people: 9 });
-  (files[f] ??= []).push({ id: 'fp-request-digest', principle: [5, 6], description: 'requestDigest is the fingerprint of { participant: { id, kind, roleId }, action, areaId } — never the facts.', request: r, expect: { requestDigest: requestDigest(r) } });
-  if (requestDigest(r) !== fingerprint({ participant: r.participant, action: 'go', areaId: 'yard' })) fail('fp-request-digest', 'digest definition');
+  (files[f] ??= []).push({ id: 'fp-request-digest', principle: [5, 6], description: 'requestDigest is the fingerprint of { participantId, action, areaId } — never the facts.', request: r, expect: { requestDigest: requestDigest(r) } });
+  if (requestDigest(r) !== fingerprint({ participantId: r.participant.id, action: 'go', areaId: 'yard' })) fail('fp-request-digest', 'digest definition');
   count++;
 }
 
@@ -749,21 +791,32 @@ async function approvals() {
   const signedInput = shared([
     rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'yard' }),
     rule('ask_lead', { answer: 'wait', for: 'approval', by: 'tag:lead' }, { does: 'look', who: 'bot' }),
+    rule('crowd_wait', { answer: 'wait', for: 'condition' }, { does: 'go', where: 'yard', when: [{ fact: 'people', op: '>=', value: 3 }] }),
+    rule('alarm_stop', { answer: 'deny' }, { never: true, when: [{ fact: 'alarm', op: '==', value: true }] }),
+    rule('no_yard_at_night', { answer: 'deny' }, { does: 'go', where: 'yard', when: [{ fact: 'time', op: 'between', from: '22:00', to: '06:00' }] }),
   ], { trustedKeys: keys });
   const rb = compileDomain(signedInput);
   bases.signed = rb;
   writeFileSync(join(OUT, 'rulebooks', 'signed.json'), JSON.stringify(rb, null, 2) + '\n');
   const unsignedInput = shared([rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'yard' })]);
-  const request = req('go', 'yard');
-  const digest = requestDigest(request);
-  const issuedAt = '2026-10-12T09:00:00Z';
-  const highApproval = await signApproval({ id: 'ann', authority: 'high', requestDigest: digest, rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-high', privateKey: SEED_HIGH });
-  const leadApproval = await signApproval({ id: 'lee', roleId: 'lead', requestDigest: requestDigest(req('look', 'floor')), rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-lead', privateKey: SEED_LEAD });
-  const forged = await signApproval({ id: 'mallory', authority: 'high', requestDigest: digest, rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-high', privateKey: SEED_STRANGER });
-  const strangerKey = await signApproval({ id: 'mallory', authority: 'high', requestDigest: digest, rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-stranger', privateKey: SEED_STRANGER });
-  const overclaim = await signApproval({ id: 'lee', authority: 'high', requestDigest: digest, rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-lead', privateKey: SEED_LEAD });
-  const otherRequest = await signApproval({ id: 'ann', authority: 'high', requestDigest: requestDigest(req('go', 'floor')), rulebookFingerprint: rb.fingerprint, issuedAt }, { keyId: 'test-high', privateKey: SEED_HIGH });
-  const otherRulebook = await signApproval({ id: 'ann', authority: 'high', requestDigest: digest, rulebookFingerprint: '0000000000000000', issuedAt }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const NOW = '2026-10-12T09:05:00Z';
+  const request: DomainRequest = { ...req('go', 'yard'), now: NOW };
+  const issuedAt = '2026-10-12T09:00:00Z', expiresAt = '2026-10-12T09:30:00Z';
+  const bind = { ruleId: 'ask_high', rulebookFingerprint: rb.fingerprint, participantId: 'b-1', action: 'go', areaId: 'yard', nonce: 'n-1', issuedAt, expiresAt };
+  const highApproval = await signApproval({ id: 'ann', authority: 'high', ...bind }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const leadApproval = await signApproval({ id: 'lee', roleId: 'lead', ...bind, ruleId: 'ask_lead', action: 'look', areaId: 'floor', nonce: 'n-2' }, { keyId: 'test-lead', privateKey: SEED_LEAD });
+  const forged = await signApproval({ id: 'mallory', authority: 'high', ...bind }, { keyId: 'test-high', privateKey: SEED_STRANGER });
+  const strangerKey = await signApproval({ id: 'mallory', authority: 'high', ...bind }, { keyId: 'test-stranger', privateKey: SEED_STRANGER });
+  const overclaim = await signApproval({ id: 'lee', authority: 'high', ...bind }, { keyId: 'test-lead', privateKey: SEED_LEAD });
+  const otherArea = await signApproval({ id: 'ann', authority: 'high', ...bind, areaId: 'floor', nonce: 'n-3' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const otherAction = await signApproval({ id: 'ann', authority: 'high', ...bind, action: 'look', nonce: 'n-4' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const otherParticipant = await signApproval({ id: 'ann', authority: 'high', ...bind, participantId: 'b-2', nonce: 'n-5' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const otherRule = await signApproval({ id: 'ann', authority: 'high', ...bind, ruleId: 'crowd_wait', nonce: 'n-6' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const otherRulebook = await signApproval({ id: 'ann', authority: 'high', ...bind, rulebookFingerprint: '0'.repeat(64), nonce: 'n-7' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const expired = await signApproval({ id: 'ann', authority: 'high', ...bind, issuedAt: '2026-10-12T08:00:00Z', expiresAt: '2026-10-12T09:00:00Z', nonce: 'n-8' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  const notYet = await signApproval({ id: 'ann', authority: 'high', ...bind, issuedAt: '2026-10-12T09:10:00Z', expiresAt: '2026-10-12T09:30:00Z', nonce: 'n-9' }, { keyId: 'test-high', privateKey: SEED_HIGH });
+  /** A /2 approval, exactly as 0.5.1 signed it (requestDigest binding, no spec, nonce or expiry; 16-hex fingerprint), under the same key. */
+  const v2Approval = { id: 'ann', authority: 'high', requestDigest: 'a972a032bcabeaaf', rulebookFingerprint: '96be85f891da7c40', issuedAt, keyId: 'test-high', signature: 'ab'.repeat(64) };
 
   const vec = async (id: string, description: string, approval: unknown, ok: boolean, principle = [2, 6]) => {
     const r = await verifyApproval(approval, keys);
@@ -780,27 +833,46 @@ async function approvals() {
     ],
     expect: { canonical: canonicalJson({ b: 1, a: 'x' }), fingerprint: fingerprint({ b: 1, a: 'x' }) }, value: { b: 1, a: 'x' } });
   count++;
-  await vec('approvals-verify-ok', 'A well-formed approval signed by a trusted key, claiming the authority that key is trusted for, verifies.', highApproval, true);
+  await vec('approvals-verify-ok', 'A well-formed /3 approval signed by a trusted key, claiming the authority that key is trusted for, verifies.', highApproval, true);
   await vec('approvals-verify-role-ok', 'An approval signed by a key trusted for a role, claiming that role, verifies.', leadApproval, true);
   await vec('approvals-verify-forged', 'A signature made with a different private key under a trusted keyId does not verify.', forged, false);
   await vec('approvals-verify-untrusted-key', 'A keyId the rulebook does not trust does not verify.', strangerKey, false);
   await vec('approvals-verify-overclaim', 'A key trusted for a role cannot sign an approval that claims an authority.', overclaim, false);
   await vec('approvals-verify-tampered-field', 'Changing any signed field (here the approver id) breaks the signature.', { ...highApproval, id: 'bob' }, false);
-  await vec('approvals-verify-missing-field', 'An approval with no issuedAt is malformed.', (() => { const { issuedAt: _i, ...rest } = highApproval; return rest; })(), false);
+  await vec('approvals-verify-missing-field', 'An approval with no expiresAt is malformed: every /3 approval expires.', (() => { const { expiresAt: _e, ...rest } = highApproval; return rest; })(), false);
+  await vec('approvals-verify-missing-nonce', 'An approval with no nonce is malformed: every /3 approval is one instance.', (() => { const { nonce: _n, ...rest } = highApproval; return rest; })(), false);
   await vec('approvals-verify-bad-signature-encoding', 'A signature that is not 64 bytes of hex does not verify.', { ...highApproval, signature: 'zz' }, false);
+  await vec('approvals-verify-v2-approval-refused', 'VERSION HANDLING: a robot-domain-rules/2 approval (requestDigest binding, no spec, no nonce, no expiry) is refused with a message naming the migration (re-issue under robot-domain-rules-approval/3); it is never reinterpreted.', v2Approval, false);
+  await vec('approvals-verify-wrong-spec-refused', 'An approval declaring another spec string is refused.', { ...highApproval, spec: 'robot-domain-rules-approval/4' }, false);
 
   const dec = (id: string, description: string, approvedBy: unknown, want: Want, r: DomainRequest = request) =>
     add(f, { id, principle: [2, 6], description, base: 'signed', request: { ...r, facts: { ...r.facts, ...(approvedBy === undefined ? {} : { approvedBy }) } }, want });
-  dec('approvals-pause-asks-with-digest', 'With trusted keys declared, an approval wait returns an approval request carrying the request digest and the rulebook fingerprint to sign.', undefined, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-verified-clears', 'A verified signed approval bound to this request and this rulebook clears the wait.', { ...highApproval, verified: true }, { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'] });
-  dec('approvals-unverified-does-not-clear', 'The same signed approval without `verified: true` (the caller never verified it) does not clear the wait.', highApproval, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-plain-does-not-clear-when-keys-declared', 'With trusted keys declared, a plain { id, authority } approval no longer clears anything.', { id: 'ann', authority: 'high' }, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-other-request-does-not-clear', 'A verified approval for a different request (digest mismatch) does not clear this one.', { ...otherRequest, verified: true }, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-other-rulebook-does-not-clear', 'A verified approval given under another rulebook (fingerprint mismatch) does not clear the wait.', { ...otherRulebook, verified: true }, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-verified-but-insufficient', 'A verified approval still has to hold what the rule names: a lead\'s approval does not clear a wait by "high".', { ...leadApproval, verified: true, requestDigest: digest }, { status: 'PAUSE', reasons: ['ask_high@high'], asks: ['ask_high@high'] });
-  dec('approvals-verified-role-clears', 'A verified approval by role tag clears a wait that names that tag.', { ...leadApproval, verified: true }, { status: 'ALLOW', reasons: ['role_permits_action', 'ask_lead'] }, req('look', 'floor'));
-  add(f, { id: 'approvals-plain-ok-without-keys', principle: [2, 6], description: 'Back-compat, development only: with no trusted keys declared, a plain { id, authority } approval clears the wait.',
+  const verified = (a: SignedApproval) => ({ ...a, verified: true });
+  const ASK = { status: 'PAUSE' as const, reasons: ['ask_high@high'], asks: ['ask_high@high'] };
+  dec('approvals-pause-asks-with-binding', 'With trusted keys declared, an approval wait returns an approval request naming the rule, the rulebook fingerprint, the participant, the action and the area to sign for.', undefined, ASK);
+  dec('approvals-verified-clears', 'A verified signed approval bound to this rule, rulebook, participant, action and area, valid at now and not yet used, clears the wait; the decision reports the instance used so the caller can record it.', verified(highApproval), { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'], used: ['ask_high:n-1'] });
+  dec('approvals-unverified-does-not-clear', 'The same signed approval without `verified: true` (the caller never verified it) does not clear the wait.', highApproval, ASK);
+  dec('approvals-plain-does-not-clear-when-keys-declared', 'With trusted keys declared, a plain { id, authority } approval no longer clears anything.', { id: 'ann', authority: 'high' }, ASK);
+  dec('approvals-other-area-does-not-clear', 'SCOPE: a verified approval for another area does not clear this one.', verified(otherArea), ASK);
+  dec('approvals-other-action-does-not-clear', 'SCOPE: a verified approval for another action does not clear this one.', verified(otherAction), ASK);
+  dec('approvals-other-participant-does-not-clear', 'SCOPE: a verified approval for another participant does not clear this one.', verified(otherParticipant), ASK);
+  dec('approvals-other-rule-does-not-clear', 'An approval names the rule it clears: one for crowd_wait does not clear ask_high.', verified(otherRule), ASK);
+  dec('approvals-other-rulebook-does-not-clear', 'RULEBOOK: a verified approval given under another rulebook (fingerprint differs) does not clear the wait.', verified(otherRulebook), ASK);
+  dec('approvals-expired-is-refused', 'EXPIRY: an approval whose expiresAt is at or before now does not clear the wait.', verified(expired), ASK);
+  dec('approvals-not-yet-valid-is-refused', 'An approval whose issuedAt is after now does not clear the wait.', verified(notYet), ASK);
+  dec('approvals-replayed-is-refused', 'REPLAY: the same approval instance, after the caller recorded its nonce as consumed, does not clear the wait a second time.', verified(highApproval), ASK, { ...request, consumedApprovals: ['n-1'] });
+  dec('approvals-now-missing-is-required-facts', 'A signed approval cannot be judged without now: BLOCK required_facts (the engine has no clock; the caller supplies now).', verified(highApproval), { status: 'BLOCK', reasons: ['required_facts@builtin'] }, req('go', 'yard'));
+  dec('approvals-verified-but-insufficient', 'A verified approval still has to hold what the rule names: a lead\'s approval does not clear a wait by "high".', verified({ ...await signApproval({ id: 'lee', roleId: 'lead', ...bind, nonce: 'n-10' }, { keyId: 'test-lead', privateKey: SEED_LEAD }) }), ASK);
+  dec('approvals-verified-role-clears', 'A verified approval by role tag clears a wait that names that tag.', verified(leadApproval), { status: 'ALLOW', reasons: ['role_permits_action', 'ask_lead'], used: ['ask_lead:n-2'] }, { ...req('look', 'floor'), now: NOW });
+  dec('approvals-v2-approval-does-not-clear', 'VERSION HANDLING: a /2 approval passed to the evaluator (even marked verified) does not clear the wait; the reason names the migration.', { ...v2Approval, verified: true }, ASK);
+  // Authorisation is separate from the operational facts: an approval clears its wait and nothing else.
+  dec('approvals-facts-changed-condition-wait-still-holds', 'FACTS CHANGE AFTER APPROVAL: the same valid approval, but now three people are in the yard: the approval clears ask_high and the condition wait crowd_wait still holds. PAUSE on the facts current now, with no new approval request.', verified(highApproval), { status: 'PAUSE', reasons: ['crowd_wait@high'] }, { ...request, facts: { ...request.facts, people: 3 } });
+  dec('approvals-current-never-rule-still-blocks', 'CURRENT BLOCK: with the alarm on, the never rule blocks whatever approval is presented; the approval is not even weighed.', verified(highApproval), { status: 'BLOCK', reasons: ['alarm_stop@high'] }, { ...request, facts: { ...request.facts, alarm: true } });
+  dec('approvals-current-deny-still-blocks', 'CURRENT BLOCK: at night the deny rule matches; the valid approval clears ask_high, but the strictest answer is the current BLOCK.', verified(highApproval), { status: 'BLOCK', reasons: ['no_yard_at_night@high'] }, { ...request, facts: { ...request.facts, time: '23:00' } });
+  add(f, { id: 'approvals-plain-ok-without-keys', principle: [2, 6], description: 'Back-compat, development only: with no trusted keys declared, a plain { id, authority } approval clears the wait (no nonce is recorded: there is none).',
     input: unsignedInput, request: { ...request, facts: { ...request.facts, approvedBy: { id: 'ann', authority: 'high' } } }, want: { status: 'ALLOW', reasons: ['role_permits_action', 'ask_high'] } });
+  add(f, { id: 'approvals-participant-id-required', principle: [2, 6, 4], description: 'A request that needs an approval must name the participant (an approval binds to it): an empty participant.id is BLOCK required_facts.',
+    input: unsignedInput, request: { ...request, participant: { ...request.participant, id: '' } }, want: { status: 'BLOCK', reasons: ['required_facts@builtin'] } });
   add(f, { id: 'approvals-bad-trusted-key-rejected', principle: [2], description: 'A trusted key whose publicKey is not 32 bytes of hex makes the rulebook invalid.',
     base: 'signed', tamper: rb => { rb.trustedKeys![0].publicKey = 'abc'; }, want: { error: true } });
   add(f, { id: 'approvals-trusted-key-unknown-authority-rejected', principle: [2], description: 'A trusted key naming an authority the rulebook does not declare makes the rulebook invalid.',
@@ -808,13 +880,33 @@ async function approvals() {
 
   const sig = await signRulebook(rb, { keyId: 'test-site', privateKey: SEED_SITE });
   if (!(await verifyRulebookSignature(rb, sig, pubSite))) fail('approvals-rulebook-signature', 'does not verify');
-  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-ok', principle: [5], description: 'A rulebook signature (Ed25519 over the canonical JSON of the whole rulebook, fingerprint included) verifies with the pinned public key.', rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: true } } });
+  (files[f] ??= []).push({ id: 'approvals-rulebook-signature-ok', principle: [5], description: 'A rulebook signature (Ed25519 over the canonical JSON of the whole rulebook, fingerprint and findings included) verifies with the pinned public key.', rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: true } } });
   const tampered = JSON.parse(JSON.stringify(rb)) as Rulebook;
   (tampered as { otherwise: string }).otherwise = 'wait-for-approval';
   if (await verifyRulebookSignature(tampered, sig, pubSite)) fail('approvals-rulebook-signature-tampered', 'verified a tampered rulebook');
   (files[f] ??= []).push({ id: 'approvals-rulebook-signature-tampered', principle: [5], description: 'A rulebook changed after signing (here `otherwise`) fails the signature, whatever its fingerprint says.', rulebook: tampered, signature: sig, publicKey: pubSite, expect: { rulebookSignature: { ok: false } } });
   (files[f] ??= []).push({ id: 'approvals-rulebook-signature-wrong-key', principle: [5], description: 'The right rulebook and signature under the wrong public key fail.', rulebookRef: 'rulebooks/signed.json', signature: sig, publicKey: pubStranger, expect: { rulebookSignature: { ok: false } } });
   count += 3;
+}
+
+// ─── Versions: a /2 rulebook is refused, never reinterpreted ──────────────────
+
+function versions() {
+  const f = 'versions.json';
+  const v3 = compileDomain(tiny([rule('no_yard', { answer: 'deny' }, { where: 'yard' })]));
+  const body = JSON.parse(JSON.stringify(v3)) as Record<string, unknown>;
+  // What 0.5.1 would have written: format /2 and a 16-hex FNV-1a fingerprint (its value does not matter; the format decides).
+  const v2 = { ...body, format: 'neuroverse-domain-rules/2', fingerprint: '5f8c2e1a9b3d4c70' };
+  const problems = validateRulebook(v2);
+  if (!problems.length || !/robot-domain-rules\/2/.test(problems[0]) || !/recompile/i.test(problems[0])) fail('versions-v2-rulebook-refused', `expected a versioned refusal naming the migration, got ${JSON.stringify(problems)}`);
+  (files[f] ??= []).push({ id: 'versions-v2-rulebook-refused', principle: [4, 5], description: 'VERSION HANDLING: a rulebook declaring format neuroverse-domain-rules/2 (spec /2, FNV-1a fingerprint) is refused by validation with a message that names its version and the migration (recompile under /3); its contents are never reinterpreted under /3 rules.', rulebook: v2, expect: { error: true, note: problems[0] } });
+  const v1 = { ...body, format: 'neuroverse-domain-rules/1', fingerprint: '5f8c2e1a9b3d4c70' };
+  (files[f] ??= []).push({ id: 'versions-v1-rulebook-refused', principle: [4, 5], description: 'The same for a /1 rulebook.', rulebook: v1, expect: { error: true, note: validateRulebook(v1)[0] } });
+  const unknown = { ...body, format: 'neuroverse-domain-rules/9' };
+  (files[f] ??= []).push({ id: 'versions-unknown-format-refused', principle: [4], description: 'An unknown format string is refused.', rulebook: unknown, expect: { error: true, note: validateRulebook(unknown)[0] } });
+  const fnvOnV3 = { ...body, fingerprint: '5f8c2e1a9b3d4c70' };
+  (files[f] ??= []).push({ id: 'versions-v2-fingerprint-on-v3-rulebook-refused', principle: [5], description: 'A /3 rulebook carrying a 16-hex (/2-shaped) fingerprint fails validation: the fingerprint does not match its contents.', rulebook: fnvOnV3, expect: { error: true, note: validateRulebook(fnvOnV3)[0] } });
+  count += 4;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -834,6 +926,7 @@ async function main() {
   plans(); history(); backtestCases();
   fingerprintCases();
   await approvals();
+  versions();
 
   for (const [file, cases] of Object.entries(files)) writeFileSync(join(OUT, file), JSON.stringify(cases, null, 2) + '\n');
   console.log(`wrote ${count} cases in ${Object.keys(files).length} files`);

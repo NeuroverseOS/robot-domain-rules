@@ -5,11 +5,15 @@
  * Node 20+, modern browsers). No dependencies. Signatures are deterministic,
  * so another implementation can reproduce every test vector exactly.
  *
- * Evaluation stays pure and synchronous: the caller verifies a signed
- * approval here (async) BEFORE evaluating, and passes the verified approval
- * in as `facts.approvedBy`. When the rulebook declares `trustedKeys`, the
- * evaluator clears an approval wait only for an approval marked
- * `verified: true` whose `requestDigest` and `rulebookFingerprint` match.
+ * Evaluation stays pure and synchronous: the caller's trusted layer verifies
+ * a signed approval here (async) BEFORE evaluating, and passes the verified
+ * approval in as `facts.approvedBy` (`verifyAndEvaluate` does both). When
+ * the rulebook declares `trustedKeys`, the evaluator clears an approval wait
+ * only for an approval marked `verified: true` that is bound to that rule,
+ * this rulebook's fingerprint, this participant, action and area, is within
+ * [issuedAt, expiresAt) at `request.now`, and whose nonce is not in
+ * `request.consumedApprovals`. The `verified` flag is trusted as given:
+ * only set it from this module, in the layer that holds the trusted keys.
  *
  * Encodings (SPEC.md § Approvals):
  *   public key   raw Ed25519, 32 bytes, lowercase hex
@@ -18,8 +22,11 @@
  *   signed text  UTF-8 of the canonical JSON of the object without `signature` (and without `verified`)
  */
 
-import type { Approval, Rulebook, SignedApproval, TrustedKey } from './types';
-import { canonicalJson } from './canonical';
+import type { Approval, DomainDecision, DomainRequest, Plan, PlanEvaluation, Rulebook, SignedApproval, TrustedKey } from './types';
+import { APPROVAL_SPEC } from './types';
+import { canonicalJson, fingerprintVersion } from './canonical';
+import { evaluateDomainAction } from './evaluate';
+import { evaluatePlan } from './plan';
 
 export interface SigningKeys {
   keyId: string;
@@ -100,9 +107,18 @@ async function verify(text: string, signature: string, publicKey: string): Promi
   return subtle().verify('Ed25519', await importPublic(publicKey), fromHex(signature), new TextEncoder().encode(text));
 }
 
-/** Sign an approval. `issuedAt` is whatever clock the approver's tool has; the core never reads one. */
-export async function signApproval(approval: Omit<SignedApproval, 'signature' | 'keyId'>, keys: Pick<SigningKeys, 'keyId' | 'privateKey'>): Promise<SignedApproval> {
-  const body: Omit<SignedApproval, 'signature'> = { ...approval, keyId: keys.keyId };
+/**
+ * Sign an approval under the /3 contract: it names the rule, the rulebook,
+ * the participant, the action, the area, a unique nonce and its validity
+ * window. `issuedAt`/`expiresAt` are whatever clock the approver's tool has;
+ * the core never reads one. The nonce is the signer's: a UUID, or a counter
+ * under the key; it must never repeat under that key.
+ */
+export async function signApproval(approval: Omit<SignedApproval, 'signature' | 'keyId' | 'spec'>, keys: Pick<SigningKeys, 'keyId' | 'privateKey'>): Promise<SignedApproval> {
+  for (const field of ['id', 'ruleId', 'rulebookFingerprint', 'participantId', 'action', 'areaId', 'nonce', 'issuedAt', 'expiresAt'] as const) {
+    if (typeof approval[field] !== 'string' || !approval[field]) throw new Error(`signApproval: ${field} is required (a non-empty string).`);
+  }
+  const body: Omit<SignedApproval, 'signature'> = { spec: APPROVAL_SPEC, ...approval, keyId: keys.keyId };
   return { ...body, signature: await sign(signedText(body as unknown as Record<string, unknown>), keys.privateKey) };
 }
 
@@ -116,18 +132,51 @@ export async function signApproval(approval: Omit<SignedApproval, 'signature' | 
  */
 export async function verifyApproval(approval: unknown, trusted: Rulebook | TrustedKey[]): Promise<VerifyResult> {
   const keys = Array.isArray(trusted) ? trusted : trusted.trustedKeys ?? [];
-  const a = approval as SignedApproval;
+  const a = approval as SignedApproval & { requestDigest?: unknown };
   if (!a || typeof a !== 'object') return { ok: false, reason: 'the approval is not an object' };
-  for (const field of ['id', 'requestDigest', 'rulebookFingerprint', 'issuedAt', 'keyId', 'signature'] as const) {
+  if (a.spec !== APPROVAL_SPEC) {
+    if (a.requestDigest !== undefined || fingerprintVersion(a.rulebookFingerprint) === 2) return { ok: false, reason: `this is a robot-domain-rules/2 approval (bound by requestDigest, no nonce or expiry); this implementation is /3 and does not reinterpret it. Have it re-issued as ${APPROVAL_SPEC} (SPEC.md § 11).` };
+    return { ok: false, reason: `the approval does not declare spec ${APPROVAL_SPEC}` };
+  }
+  for (const field of ['id', 'ruleId', 'rulebookFingerprint', 'participantId', 'action', 'areaId', 'nonce', 'issuedAt', 'expiresAt', 'keyId', 'signature'] as const) {
     if (typeof a[field] !== 'string' || a[field].length === 0) return { ok: false, reason: `the approval has no ${field}` };
   }
+  if (fingerprintVersion(a.rulebookFingerprint) !== 3) return { ok: false, reason: 'rulebookFingerprint is not a /3 (SHA-256, 64 hex) fingerprint' };
   const key = keys.find(k => k.keyId === a.keyId);
   if (!key) return { ok: false, reason: `key "${a.keyId}" is not a trusted key` };
   if (a.authority !== undefined && key.authority !== a.authority) return { ok: false, reason: `key "${a.keyId}" is not trusted to approve as authority "${a.authority}"` };
   if (a.roleId !== undefined && key.roleId !== a.roleId) return { ok: false, reason: `key "${a.keyId}" is not trusted to approve as role "${a.roleId}"` };
   if (!(await verify(signedText(a as unknown as Record<string, unknown>), a.signature, key.publicKey))) return { ok: false, reason: 'the signature does not verify' };
-  const { signature: _s, verified: _v, ...rest } = a as SignedApproval & { verified?: boolean };
+  const { signature: _s, verified: _v, requestDigest: _r, ...rest } = a as SignedApproval & { verified?: boolean; requestDigest?: unknown };
   return { ok: true, approval: { ...rest, signature: a.signature, verified: true } };
+}
+
+/**
+ * The recommended entry for a caller's trusted layer: verify whatever signed
+ * approval the request carries (`facts.approvedBy`) against the rulebook's
+ * trusted keys, then evaluate. The evaluator itself stays pure and never
+ * verifies a signature; an approval that does not verify is passed through
+ * unverified, so the decision says why it did not count. The caller still
+ * supplies `now` and `consumedApprovals`, and records `decision.approvalsUsed`.
+ */
+export async function verifyAndEvaluate(rulebook: Rulebook, request: DomainRequest): Promise<DomainDecision> {
+  return evaluateDomainAction(rulebook, { ...request, facts: await withVerified(rulebook, request.facts) });
+}
+
+/** The same for a plan: every step's `facts.approvedBy` (and `initialFacts.approvedBy`) is verified first. */
+export async function verifyAndEvaluatePlan(rulebook: Rulebook, plan: Plan): Promise<PlanEvaluation> {
+  if (!plan || typeof plan !== 'object' || !Array.isArray(plan.steps)) return evaluatePlan(rulebook, plan);
+  const steps = await Promise.all(plan.steps.map(async s => (s && typeof s === 'object' && s.facts ? { ...s, facts: await withVerified(rulebook, s.facts) } : s)));
+  return evaluatePlan(rulebook, { ...plan, steps, ...(plan.initialFacts && typeof plan.initialFacts === 'object' ? { initialFacts: await withVerified(rulebook, plan.initialFacts) } : {}) });
+}
+
+async function withVerified(rulebook: Rulebook, facts: Record<string, unknown> | undefined): Promise<Record<string, unknown>> {
+  if (!facts || typeof facts !== 'object') return facts as unknown as Record<string, unknown>;
+  const a = facts.approvedBy;
+  if (!a || typeof a !== 'object' || typeof (a as SignedApproval).signature !== 'string' || !rulebook.trustedKeys?.length) return facts;
+  const r = await verifyApproval(a, rulebook);
+  const { verified: _v, ...unverified } = a as Record<string, unknown>;
+  return { ...facts, approvedBy: r.ok ? r.approval : unverified };
 }
 
 export interface RulebookSignature {

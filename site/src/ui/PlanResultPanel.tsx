@@ -120,7 +120,7 @@ export function PlanResultPanel({ rulebook, plan, result, selected, onSelect, on
 
           {r.approvalRequests.length > 0 && (
             <div class="notice">
-              <div class="small"><b>Approvals this plan needs before it can run.</b> One per step that waits for a person; each is bound to that step's request digest and this rulebook's fingerprint. A planner collects these up front, then re-sends the plan with the signed approvals on those steps.</div>
+              <div class="small"><b>Approvals this plan needs before it can run.</b> One per step that waits for a person; each names the rule, this rulebook's fingerprint, the participant, the action and the area to sign for, and the signed approval carries a nonce and an expiry. A planner collects these up front, then re-sends the plan with the signed approvals on those steps; each step is asked again on the live facts when it comes up.</div>
               <pre class="code" style="margin-top:6px">{JSON.stringify(r.approvalRequests, null, 2)}</pre>
             </div>
           )}

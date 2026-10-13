@@ -1,5 +1,5 @@
 {
-  "format": "neuroverse-domain-rules/2",
+  "format": "neuroverse-domain-rules/3",
   "site": {
     "id": "example-grocery-01",
     "name": "Example Grocery",
@@ -891,6 +891,10 @@
     {
       "id": "unknown_action",
       "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+    },
+    {
+      "id": "plan_area_continuity",
+      "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
     }
   ],
   "planRules": [
@@ -1001,5 +1005,5 @@
       "message": "`staff_audio_back_room` (set by Site manager) says allow; `no_audio_back_room_lunch` (set by Site manager) says deny. Both apply to Staff · record audio · Back room, when localTime in 12:00–13:00. The strictest answer wins, so `staff_audio_back_room` never takes effect there. For example: staff does record_audio in back-room with peopleInZone=0, day=\"mon\", localTime=\"12:00\"."
     }
   ],
-  "fingerprint": "81aec41ac2e1e01d"
+  "fingerprint": "539d72fe658134fc57c9b6c71927b01ad40e6109ead702fbb3363cd97c5458a1"
 }

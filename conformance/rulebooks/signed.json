@@ -1,5 +1,5 @@
 {
-  "format": "neuroverse-domain-rules/2",
+  "format": "neuroverse-domain-rules/3",
   "site": {
     "id": "tiny",
     "name": "Tiny site"
@@ -269,6 +269,75 @@
         "kind": "manual",
         "ref": "ask_lead"
       }
+    },
+    {
+      "setBy": "high",
+      "id": "crowd_wait",
+      "text": "crowd_wait",
+      "who": "*",
+      "does": "go",
+      "where": "yard",
+      "then": {
+        "answer": "wait",
+        "for": "condition"
+      },
+      "when": [
+        {
+          "fact": "people",
+          "op": ">=",
+          "value": 3
+        }
+      ],
+      "source": {
+        "kind": "manual",
+        "ref": "crowd_wait"
+      }
+    },
+    {
+      "setBy": "high",
+      "id": "alarm_stop",
+      "text": "alarm_stop",
+      "who": "*",
+      "does": "*",
+      "where": "*",
+      "then": {
+        "answer": "deny"
+      },
+      "never": true,
+      "when": [
+        {
+          "fact": "alarm",
+          "op": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "kind": "manual",
+        "ref": "alarm_stop"
+      }
+    },
+    {
+      "setBy": "high",
+      "id": "no_yard_at_night",
+      "text": "no_yard_at_night",
+      "who": "*",
+      "does": "go",
+      "where": "yard",
+      "then": {
+        "answer": "deny"
+      },
+      "when": [
+        {
+          "fact": "time",
+          "op": "between",
+          "from": "22:00",
+          "to": "06:00"
+        }
+      ],
+      "source": {
+        "kind": "manual",
+        "ref": "no_yard_at_night"
+      }
     }
   ],
   "builtin": [
@@ -291,8 +360,12 @@
     {
       "id": "unknown_action",
       "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+    },
+    {
+      "id": "plan_area_continuity",
+      "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
     }
   ],
   "findings": [],
-  "fingerprint": "96be85f891da7c40"
+  "fingerprint": "ebd588da66ab5b8062c9092984dda9d1b6aa50258c2ba0dfe8a7792166094668"
 }

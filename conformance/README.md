@@ -16,8 +16,9 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | `plans.json` | Whole plans: effects projected step by step, the first BLOCK, plan rules, approvals collected, malformed plans, effect and plan-rule validation |
 | `history.json` | History conditions: counts in a window of a clock fact, same-area, missing history is a refusal, validation |
 | `backtest.json` | A recorded log replayed through a rulebook: totals, history built from earlier events, missing facts named, gaps, stalls, conflicts that occurred, rule-versus-record differences, and a current-versus-proposed comparison |
-| `fingerprint.json` | Canonical JSON and the FNV-1a fingerprint, byte for byte; `requestDigest` |
-| `approvals.json` | Ed25519 test vectors (TEST ONLY keys), verification, binding, rulebook signatures |
+| `fingerprint.json` | RFC 8785 canonical JSON and the SHA-256 fingerprint, byte for byte; SHA-256 vectors; `requestDigest` |
+| `approvals.json` | Ed25519 test vectors (TEST ONLY keys), verification, the `/3` binding (rule, rulebook, participant, action, area, nonce, window), replay, facts-change and current-BLOCK cases, `/2` refusal, rulebook signatures |
+| `versions.json` | A `/1` or `/2` rulebook is refused by name with its migration, never reinterpreted |
 
 ## Case shape
 
@@ -41,6 +42,7 @@ Language-neutral JSON cases that any implementation of [SPEC.md](../SPEC.md) mus
 | `findings` | `rulebook` | `check(rulebook)` and report exactly these findings, in any order, each with a valid witness where the reference has one |
 | `error: true` | `rulebook` | reject the rulebook at validation (any message; `note` shows the reference's) |
 | `canonical`, `fingerprint` | `value` | produce exactly this canonical JSON text and this fingerprint |
+| `sha256` | `text` | produce exactly this SHA-256 of the UTF-8 bytes of `text` |
 | `requestDigest` | `request` | produce exactly this digest |
 | `verify: { ok }` | `approval`, `trustedKeys` | `verifyApproval` returns this `ok` |
 | `rulebookSignature: { ok }` | `rulebook`, `signature`, `publicKey` | `verifyRulebookSignature` returns this `ok` |
@@ -51,6 +53,8 @@ The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY 
 
 ## Comparison rules
 
+Every comparison is **deep semantic equality**: objects by key set and values in any order, arrays by position, numbers by value. Nothing depends on the order of keys in the JSON.
+
 **Decision.** Compare these and only these:
 
 - `status` — exact.
@@ -58,7 +62,8 @@ The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY 
 - `trace` — same, ordered.
 - `limits` — deep-equal when present; must be absent when the expectation has none.
 - `then` — exact when present; absent otherwise.
-- `approvalRequests` — ordered list compared on `ruleId`, `by` (absent means absent), `requestDigest`, `rulebookFingerprint`, `setBy`. `reason` is free-form.
+- `approvalRequests` — ordered list compared on `ruleId`, `by` (absent means absent), `rulebookFingerprint`, `participantId`, `action`, `areaId`, `setBy`. `reason` is free-form.
+- `approvalsUsed` — deep-equal when present; absent otherwise.
 - `fingerprint` — exact.
 
 **Plan.** `status`, `finalArea`, `finalFacts` (deep), `planDigest`, `fingerprint` — exact. `steps` — ordered, each on `index`, `action`, `areaId` and its `decision` compared as above (the step's `facts` and `note` are not compared). `planChecks` — ordered, on `ruleId`, `status`, `setBy`, `stepIndex`. `firstViolation` — on `stepIndex`, `ruleId`, `setBy`, `from`; absent means absent. `approvalRequests` — as for a decision.
@@ -67,7 +72,7 @@ The first entry of `approvals.json` (`approvals-test-keys`) lists the TEST ONLY 
 
 **Error.** Validation must fail; the reason is yours.
 
-**Canonical JSON and fingerprint.** Byte for byte (SPEC.md § Canonical JSON).
+**Canonical JSON, SHA-256 and fingerprint.** Byte for byte (SPEC.md § 8).
 
 **Backtest and comparison.** Deep-equal on the whole report or comparison: neither carries free text, and every list has a defined order (SPEC.md § 13).
 
@@ -83,6 +88,7 @@ for each file in conformance/*.json (alphabetical):
                                 for each finding with a witness: assert both ruleIds ∈ matches(rulebook, witness)
     elif case.expect.error:     assert validate(rulebook) reports at least one problem
     elif case.expect.canonical: assert canonical(case.value) == expect.canonical and fingerprint(case.value) == expect.fingerprint
+    elif case.expect.sha256:    assert sha256(utf8(case.text)) == expect.sha256
     elif case.expect.requestDigest: assert requestDigest(case.request) == expect.requestDigest
     elif case.expect.verify:    assert verifyApproval(case.approval, case.trustedKeys).ok == expect.verify.ok
     elif case.expect.rulebookSignature: assert verifyRulebookSignature(rulebook, case.signature, case.publicKey) == expect.rulebookSignature.ok
@@ -94,7 +100,10 @@ for each file in conformance/*.json (alphabetical):
 
 ```bash
 npm run build && node conformance/run-node.mjs
+node conformance/validate-schemas.mjs     # every case input and reference output against spec/*.schema.json
 ```
+
+**Which cases a client needs** (evaluate, fingerprint verify, approval verify): `decision`, `plan`, `error`, `canonical`/`fingerprint`/`sha256`, `requestDigest`, `verify`, `rulebookSignature`, and `versions.json`. The `findings`, `backtest` and `comparison` cases are for authoring tools (SPEC.md § 14).
 
 To run the cases against your own implementation from Node, copy `run-node.mjs` and replace `impl`. From another language, port the loop; the comparison rules above are the whole contract.
 

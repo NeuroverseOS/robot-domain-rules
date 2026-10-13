@@ -7,10 +7,20 @@
  * that could apply to this role, this action, this area — as if its
  * conditions held — and takes the most restrictive answer. The result only
  * ever tightens the base passed in (most restrictive wins).
+ *
+ * Waits, read conservatively:
+ *   - a condition wait ("no camera while children are present") → `blocked`.
+ *     The device cannot re-evaluate the condition; a per-use confirmation
+ *     would let the wearer confirm through it.
+ *   - an approval wait → `confirm_each` only when the WEARER is someone the
+ *     rule accepts as approver: the rule names nobody, or the wearer's role
+ *     (or its tag), or an authority the wearer holds (`options.wearerAuthority`,
+ *     that authority or higher). Otherwise `blocked`: the device has no way to
+ *     obtain a third party's approval on its own.
  */
 
 import type { Rulebook } from './types';
-import { DomainRulesError, resolveSelector, vocabularyOf } from './vocabulary';
+import { DomainRulesError, authorityRank, resolveSelector, vocabularyOf } from './vocabulary';
 import { mergeRules, type ZoneRules } from './zone-rules';
 
 /** Least-restrictive spatial ZoneRules: the default base, so the rulebook alone decides. */
@@ -42,6 +52,8 @@ export interface GlassesBridgeOptions {
   kind?: string;
   /** Action → ZoneRules field. Default GLASSES_ACTION_FIELDS. */
   fields?: Record<string, 'camera' | 'microphone' | 'aiOverlay' | 'locationSharing'>;
+  /** The authority the wearer holds, if any. Lets an approval wait "by <authority>" become confirm_each when the wearer may approve it. */
+  wearerAuthority?: string;
 }
 
 /**
@@ -69,7 +81,10 @@ export function glassesZoneRules(rulebook: Rulebook, areaId: string, roleId: str
         if (!resolveSelector(r.does, 'does', vocab).has(action)) continue;
         if (!resolveSelector(r.where, 'where', vocab).has(area.id)) continue;
         if (r.then.answer === 'deny') { level = 'blocked'; break; }
-        if (r.then.answer === 'wait') level = 'confirm_each';
+        if (r.then.answer === 'wait') {
+          if (r.then.for === 'condition' || !wearerMayApprove(r.then.by, role, options.wearerAuthority, vocab)) { level = 'blocked'; break; }
+          level = 'confirm_each';
+        }
       }
     }
     if (field === 'camera' || field === 'microphone') overlay[field] = level;
@@ -77,4 +92,13 @@ export function glassesZoneRules(rulebook: Rulebook, areaId: string, roleId: str
     else overlay.aiOverlay = level === 'allowed' ? base.aiOverlay : 'blocked';
   }
   return mergeRules(base, overlay);
+}
+
+/** Is the wearer someone the rule accepts as approver? Nobody named: yes. A role or role tag: the wearer's role. An authority: the wearer's, that or higher. */
+function wearerMayApprove(by: string | undefined, role: { id: string; tags?: string[] }, wearerAuthority: string | undefined, vocab: ReturnType<typeof vocabularyOf>): boolean {
+  if (!by) return true;
+  if (by.startsWith('tag:')) return role.tags?.includes(by.slice(4)) ?? false;
+  const need = authorityRank(vocab, by);
+  if (need >= 0) { const has = wearerAuthority ? authorityRank(vocab, wearerAuthority) : -1; return has >= 0 && has <= need; }
+  return role.id === by;
 }

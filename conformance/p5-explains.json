@@ -6,7 +6,7 @@
     ],
     "description": "The trace lists every check that ran, in order: builtin role check first, then matching rules in rulebook order, each with its authority.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -226,6 +226,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -254,7 +258,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -301,7 +305,7 @@
         "limits": {
           "speed": 0.3
         },
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -312,7 +316,7 @@
     ],
     "description": "Reasons are exactly the checks at the strictest status; with two limit rules and one at the minimum, only that one is a reason.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -532,6 +536,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -560,7 +568,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -602,7 +610,7 @@
         "limits": {
           "speed": 1
         },
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -614,7 +622,7 @@
     ],
     "description": "A request under every limit is ALLOW and still carries the effective limits, so the controller knows the ceiling.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -834,6 +842,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -862,7 +874,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -909,7 +921,7 @@
         "limits": {
           "speed": 1
         },
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -920,7 +932,7 @@
     ],
     "description": "A deny rule's `instead` hint is returned as `then` when the decision is BLOCK.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1140,6 +1152,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1168,7 +1184,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -1212,7 +1228,7 @@
           }
         ],
         "then": "dock",
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -1223,7 +1239,7 @@
     ],
     "description": "The decision carries the fingerprint of the rulebook that decided it.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1443,6 +1459,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1471,7 +1491,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -1514,7 +1534,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -1525,7 +1545,7 @@
     ],
     "description": "A BLOCK from a builtin shape check ends the trace: nothing after it runs.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1745,6 +1765,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1773,7 +1797,7 @@
           "message": "`ok_look` (set by high) says allow; `no_yard_night` (set by high) says deny. Both apply to every role · look · Yard, when time in 00:00–06:00, 22:00–24:00. The strictest answer wins, so `ok_look` never takes effect there. For example: bot does look in yard with people=0, day=\"mon\", time=\"00:00\"."
         }
       ],
-      "fingerprint": "d2b7bdb807a4ba4b"
+      "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
     },
     "request": {
       "participant": {
@@ -1806,7 +1830,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "d2b7bdb807a4ba4b"
+        "fingerprint": "f50cd561c2bf0034f85414bb2b21a2ea77ca8f4dd166e47a50018b104046468a"
       }
     }
   },
@@ -1818,7 +1842,7 @@
     ],
     "description": "When a never rule matches, the trace holds the never rules that matched and nothing else.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1990,10 +2014,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "66f172611ed59979"
+      "fingerprint": "5df7fa50ec392a1431ee21791f032045ae89b61749538c1de553b9ae8d836972"
     },
     "request": {
       "participant": {
@@ -2026,7 +2054,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "66f172611ed59979"
+        "fingerprint": "5df7fa50ec392a1431ee21791f032045ae89b61749538c1de553b9ae8d836972"
       }
     }
   }

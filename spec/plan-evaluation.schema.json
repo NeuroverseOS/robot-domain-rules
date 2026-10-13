@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/plan-evaluation.schema.json",
-  "title": "Plan evaluation (robot-domain-rules/2)",
-  "description": "The verdict on a plan: every evaluated step with its decision, the plan rules' verdicts, the first violation, the approvals needed, the final facts. SPEC.md \u00a7 12.",
+  "title": "Plan evaluation (robot-domain-rules/3)",
+  "description": "The verdict on a plan: every evaluated step with its decision, the plan rules' verdicts, the first violation, the approvals needed, the final facts. SPEC.md § 12.",
   "type": "object",
   "required": [
     "status",
@@ -130,7 +130,8 @@
       "type": "string"
     },
     "planDigest": {
-      "$ref": "common.schema.json#/$defs/fingerprint"
+      "$ref": "common.schema.json#/$defs/fingerprint",
+      "description": "fingerprint of the plan with every approvedBy and consumedApprovals left out."
     },
     "fingerprint": {
       "$ref": "common.schema.json#/$defs/fingerprint"

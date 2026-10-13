@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, requestDigest, verifyApproval, verifyRulebookSignature,
+  evaluateDomainAction, evaluatePlan, matchingRules, checkRulebook, validateRulebook, canonicalJson, fingerprint, sha256Utf8, requestDigest, verifyApproval, verifyRulebookSignature,
   backtest, compareBacktests,
   type Rulebook,
 } from '../src/index';
@@ -21,6 +21,7 @@ const impl = {
   validate: validateRulebook,
   canonical: canonicalJson,
   fingerprint,
+  sha256: sha256Utf8,
   requestDigest,
   verifyApproval,
   verifyRulebookSignature,

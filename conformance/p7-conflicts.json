@@ -6,7 +6,7 @@
     ],
     "description": "An allow and a deny at the same authority where every request matching one matches the other: a certain contradiction.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -174,6 +174,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -202,7 +206,7 @@
           "message": "`yes` (set by high) says allow; `no` (set by high) says deny. Both apply to every role · every action · Yard, always. The strictest answer wins, so `yes` never takes effect there. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "2c452c728f718f2e"
+      "fingerprint": "e4008c53a2a5011cc231b4a18ae7618040fa8aa1fe62dcfb21beca75e1fe07cd"
     },
     "expect": {
       "findings": [
@@ -239,7 +243,7 @@
     ],
     "description": "Conditions on two independent facts (people == 0, load > 0) can both hold: the analysis is exact, so the contradiction is certain, with a witness request that matches both.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -422,6 +426,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -451,7 +459,7 @@
           "message": "`yes` (set by high) says allow; `wait` (set by high) says wait for the situation to change. Both apply to every role · every action · everywhere, when people in 0 and load > 0. The strictest answer wins, so `yes` never takes effect there. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=0, load=1."
         }
       ],
-      "fingerprint": "a04f0546e35ec419"
+      "fingerprint": "f165c2ba631670e8d883fef5017b1a3a4e9709c82ffc43304d8593b8807773d6"
     },
     "expect": {
       "findings": [
@@ -489,7 +497,7 @@
     ],
     "description": "A looser rule fully covered by a stricter one at the same authority can never change a decision: shadowed.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -665,6 +673,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -693,7 +705,7 @@
           "message": "`small` (set by high) is fully covered by the stricter `big` (set by high): `small` (set by high) says wait for approval; `big` (set by high) says deny. `small` can never change a decision. For example: bot does go in yard with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "2c3c24076bd3bfdb"
+      "fingerprint": "2df5c7ccdff3f2a5c14ef4d291f9d34ae5e9b336f9da1ea55dbe50e94645edda"
     },
     "expect": {
       "findings": [
@@ -730,7 +742,7 @@
     ],
     "description": "Two rules with the same scope and the same answer: duplicate.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -898,6 +910,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -926,7 +942,7 @@
           "message": "`a` (set by high) and `b` (set by high) cover the same ground and say the same thing (deny): every role · look · everywhere, always. One of them can go. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "0bad7135a9255c94"
+      "fingerprint": "40b2196acd5cac20d6516adffc4fe80fe394a65b1cf55890bf4a4c80c9ee28be"
     },
     "expect": {
       "findings": [
@@ -963,7 +979,7 @@
     ],
     "description": "A rule whose scope lies inside another with the same answer adds nothing: duplicate, narrower rule first.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1131,6 +1147,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1159,7 +1179,7 @@
           "message": "`b` (set by high) is already covered by `a` (set by high), which says the same thing (deny) for every role · look · Yard, always. `b` adds nothing. For example: bot does look in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "6b7bcd1c8804ecf0"
+      "fingerprint": "f2c6a3145bd78872243f9774c4faed77a19173b53c91f638e935553341fb1b3f"
     },
     "expect": {
       "findings": [
@@ -1196,7 +1216,7 @@
     ],
     "description": "Two limits on the same name whose scopes partly overlap with different values: limit_disagreement; the lower applies where both match.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1384,6 +1404,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1409,10 +1433,10 @@
               "people": 3
             }
           },
-          "message": "`fast` (set by high) and `slow` (set by high) both limit speed for every role · every action · Floor, when people >= 3 and <= 4: 1 and 0.5. The lower value, 0.5, applies where both match. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=3."
+          "message": "`fast` (set by high) and `slow` (set by high) both limit speed for every role · every action · Floor, when people >= 3 and <= 4: speed 1 and 0.5. The lower value applies where both match. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "1f3c37cd7e200fa0"
+      "fingerprint": "85d7f738d8936b8704bc6c7fdb8c3604600abe2e49b06dc09e281e799324073f"
     },
     "expect": {
       "findings": [
@@ -1449,7 +1473,7 @@
     ],
     "description": "A stricter special case of a looser limit is normal layering: no finding.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1630,10 +1654,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "1a85eb39bcecde65"
+      "fingerprint": "a10505d463ec97974caffe5aedb7948a3d7f1111182a316150f3081993ca9427"
     },
     "expect": {
       "findings": []
@@ -1646,7 +1674,7 @@
     ],
     "description": "A deny and a condition wait that overlap are one restriction on another, not a conflict: no finding.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1822,10 +1850,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "eef015512900b846"
+      "fingerprint": "c4bc4d5448d9adf0244690bbe8bc9bd7a8322f85d5aff972c9da7f21827c628f"
     },
     "expect": {
       "findings": []
@@ -1838,7 +1870,7 @@
     ],
     "description": "A rule that tries to allow what a never rule forbids: never_vs_rule, a conflict; certain, since every request matching the never rule matches the allow.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2014,6 +2046,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2043,7 +2079,7 @@
           "message": "`ok` (set by high) tries to allow what the never rule `inv` (set by high) forbids. Both apply to every role · go · everywhere, when alarm in true. Nothing overrides a never rule, so `ok` never takes effect there. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "d1c700ac1af31dcd"
+      "fingerprint": "e06603f0d25313f3c53afb3fa80e7065eeb838aef1d5a8c15f8494e0344a41cd"
     },
     "expect": {
       "findings": [
@@ -2081,7 +2117,7 @@
     ],
     "description": "A never rule is kept for its own sake: an ordinary deny with the same scope is not reported as a duplicate.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2250,10 +2286,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "328eef151ae9bca3"
+      "fingerprint": "40e0d7077a38160dc989162c4d25953b4201709187588c23acd2ec3245c21879"
     },
     "expect": {
       "findings": []
@@ -2266,7 +2306,7 @@
     ],
     "description": "An approval wait naming nobody is looser than one naming an approver; fully covered, it is shadowed.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2437,6 +2477,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2465,7 +2509,7 @@
           "message": "`ask_any` (set by high) is fully covered by the stricter `ask_high` (set by high): `ask_any` (set by high) says wait for approval; `ask_high` (set by high) says wait for approval by high. `ask_any` can never change a decision. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
         }
       ],
-      "fingerprint": "7fe867a57169ed6b"
+      "fingerprint": "2b49fb3764656cb67b23541e365eec31439b5843b87edf80f99aa45d409d7af9"
     },
     "expect": {
       "findings": [
@@ -2502,7 +2546,7 @@
     ],
     "description": "people <= 3 and people >= 3 share the value 3: the overlap is real, certain, and the witness carries people = 3.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2684,6 +2728,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2712,7 +2760,7 @@
           "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 3. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=3."
         }
       ],
-      "fingerprint": "2fb5da4ea0cdb722"
+      "fingerprint": "a4c2c0caa45f4fcf426262b85284973c853fa60d2678e6d0caab83d55455a41b"
     },
     "expect": {
       "findings": [
@@ -2749,7 +2797,7 @@
     ],
     "description": "A witness is found through every constraint shape at once: an integer range, a real range, a time window, a day set, an enum and a boolean.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2978,6 +3026,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3009,7 +3061,7 @@
           "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when people >= 3 and <= 4 and load >= 1.5 and < 3 and time in 00:00–06:00 and day in sun and mode in b, c and alarm in true. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with people=3, load=1.5, time=\"00:00\", day=\"sun\", mode=\"b\", alarm=true."
         }
       ],
-      "fingerprint": "aad7bebda66762da"
+      "fingerprint": "d6999a3ffbcb4ada75a1fb7589baf001835a3dfead4d1c115d682072706b77ba"
     },
     "expect": {
       "findings": [
@@ -3049,7 +3101,7 @@
     ],
     "description": "A rule that conditions on history is not analysed: the overlap on facts is real, the certainty is \"possible\", and no witness is given.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3224,6 +3276,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3238,7 +3294,7 @@
           "message": "`yes` (set by high) says allow; `too_many` (set by high) says deny. Both apply to every role · look · everywhere, always. The strictest answer wins, so `yes` never takes effect there. (Overlap is possible, not proven: a rule here conditions on history, which the analysis does not model; on the facts alone both would match bot does look in floor with people=0, time=\"00:00\", day=\"mon\".)"
         }
       ],
-      "fingerprint": "845040ba7ee4038d"
+      "fingerprint": "c44338a383cb0f35fb28ad296277e1cea64d15338e56ff53b2ab8556f2e4a322"
     },
     "expect": {
       "findings": [
@@ -3261,7 +3317,7 @@
     ],
     "description": "A real range is never emptied by excluded points: 1 < load < 2 and load != 1.5 still meet, and the witness avoids 1.5.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3448,6 +3504,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3477,7 +3537,7 @@
           "message": "`a` (set by high) says allow; `b` (set by high) says deny. Both apply to every role · every action · everywhere, when load > 1 and < 2 and not 1.5. The strictest answer wins, so `a` never takes effect there. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\", load=1.25."
         }
       ],
-      "fingerprint": "08b036dd0334a08a"
+      "fingerprint": "249ff67666a7da35907e9afe876c2de1a1fa0d5b6b403bac37fec59df58d5107"
     },
     "expect": {
       "findings": [
@@ -3515,7 +3575,7 @@
     ],
     "description": "people < 3 and people >= 3 can never both hold: no finding.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3697,10 +3757,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "2a53a92ca31857c8"
+      "fingerprint": "ec1903c390714a9f11ba7d7f52971ab47deee906bfcf666ad7619b7a8b87194b"
     },
     "expect": {
       "findings": []
@@ -3713,7 +3777,7 @@
     ],
     "description": "For an integer fact, > 2 and < 3 can never both hold: no finding.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3895,10 +3959,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "7a8b113aae5c9b12"
+      "fingerprint": "f6b5dd90182d6064a54890294afd6a27ddd9b3e4e5b7ab73072e2f2a62fefed7"
     },
     "expect": {
       "findings": []
@@ -3911,7 +3979,7 @@
     ],
     "description": "!= 2 and == 2 are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4093,10 +4161,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "b6a8d044f45df8ab"
+      "fingerprint": "d5cfe958dfde580d06e7a73208940e5392a082c2ad66daa62f4eb3314fc89bda"
     },
     "expect": {
       "findings": []
@@ -4109,7 +4181,7 @@
     ],
     "description": "Two disjoint `in` sets are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4297,10 +4369,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "fa4db1e90f4fa3f1"
+      "fingerprint": "9a168e25b03d6aff0edfcde03ecc93130c772bf9f7d9787015692b4115c12ec6"
     },
     "expect": {
       "findings": []
@@ -4313,7 +4389,7 @@
     ],
     "description": "A window and its exact complement (overnight) are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4497,10 +4573,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "a8715e4938046f3d"
+      "fingerprint": "d3000922ec102125940a625dc4c164d162333c0ec25353cd6a331fbbb5bed8d2"
     },
     "expect": {
       "findings": []
@@ -4513,7 +4593,7 @@
     ],
     "description": "An overnight window and the daytime expressed with >= and < are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4701,10 +4781,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "57517197dfb4435b"
+      "fingerprint": "153ec5ba44ba85c3d86aaf93ef47c46e4f31f7b8675ef7501440bcd6669513bd"
     },
     "expect": {
       "findings": []
@@ -4717,7 +4801,7 @@
     ],
     "description": "Disjoint day sets are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4904,10 +4988,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "059b2c91cbb5c3c3"
+      "fingerprint": "3f2462d8e0669b0cb4361bd4daf5f386e9d78fa3a5056cb484d83387805a63b7"
     },
     "expect": {
       "findings": []
@@ -4920,7 +5008,7 @@
     ],
     "description": "true and false are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5102,10 +5190,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "39ea534a78d2f4de"
+      "fingerprint": "3f4b45fdbdf2e3270145f1f5991e82d45d43ca5615c24ccea104318e4b80ec8a"
     },
     "expect": {
       "findings": []
@@ -5118,7 +5210,7 @@
     ],
     "description": "Disjoint enum sets, and != vs ==, are disjoint.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5300,10 +5392,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "eb917a9e17e4ba81"
+      "fingerprint": "876af84b0d57465c72eea0f1ad58a225a3969fc57482b2c6882a3e2e074110fe"
     },
     "expect": {
       "findings": []
@@ -5316,7 +5412,7 @@
     ],
     "description": "Two rules sharing a day but disagreeing on a count are disjoint because of the count.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5512,10 +5608,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "99b625d8a8476112"
+      "fingerprint": "8aeda37219d2cfea3a463fa8d5b1dc892aed9993828e4485de7794d9c3865b7a"
     },
     "expect": {
       "findings": []
@@ -5528,7 +5628,7 @@
     ],
     "description": "An integer range whose every whole number is excluded (1..2 minus 1 and 2) is empty: no finding.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5720,10 +5820,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "b893eb9681207301"
+      "fingerprint": "5f7c23b3d53040a43bad916013c9127846fab76c65be32b3edff22653a99308b"
     },
     "expect": {
       "findings": []
@@ -5736,7 +5840,7 @@
     ],
     "description": "Rules on different areas never meet: no finding, whatever their answers.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5904,13 +6008,1215 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "a940dce449dcf171"
+      "fingerprint": "0afd584d4c9696908ecb872fb38bfb6c006a970a7e57cf14e6485e3121393eb6"
     },
     "expect": {
       "findings": []
+    }
+  },
+  {
+    "id": "p7-limits-compared-on-every-name",
+    "principle": [
+      7
+    ],
+    "description": "Two limit rules are compared on EVERY limit name they share, not just the first: equal on speed, looser on load at the lower authority is an authority-override for load.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        },
+        {
+          "id": "load",
+          "unit": "kg"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "company_caps",
+          "text": "company_caps",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 1,
+              "load": 3
+            }
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "company_caps"
+          }
+        },
+        {
+          "setBy": "low",
+          "id": "site_caps",
+          "text": "site_caps",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 1,
+              "load": 5
+            }
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "site_caps"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "authority-override",
+          "severity": "conflict",
+          "ruleIds": [
+            "site_caps",
+            "company_caps"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`site_caps` set by low tries to loosen what `company_caps` set by high sets: `site_caps` (set by low) says limit load 5; `company_caps` (set by high) says limit load 3. Both apply to every role · every action · everywhere, always. A lower authority can only tighten, so `site_caps` never takes effect at all. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
+        }
+      ],
+      "fingerprint": "3f6b8e84ae6460762dce6d145c839736bfa1a0ada9dda5c1b9c53b3d85be08f7"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "authority-override",
+          "severity": "conflict",
+          "ruleIds": [
+            "site_caps",
+            "company_caps"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-mixed-limits-are-a-disagreement",
+    "principle": [
+      7
+    ],
+    "description": "Each rule tighter on a different shared limit: neither loosens the other outright; reported as a limit_disagreement, and the lower value of each limit applies.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        },
+        {
+          "id": "load",
+          "unit": "kg"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "a",
+          "text": "a",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 2,
+              "load": 3
+            }
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "a"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "b",
+          "text": "b",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "limit",
+            "limits": {
+              "speed": 1,
+              "load": 5
+            }
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "b"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "limit_disagreement",
+          "severity": "info",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`a` (set by high) says limit speed 2, load 3; `b` (set by high) says limit speed 1, load 5. Both apply to every role · every action · everywhere, always. Each is tighter on a different limit, so the lower value of each limit applies where both match. For example: bot does go in floor with people=0, time=\"00:00\", day=\"mon\"."
+        }
+      ],
+      "fingerprint": "299199c5ca98e9efb6e257517d4107e1ceaa21aae83319440771f4c7f36e854e"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "limit_disagreement",
+          "severity": "info",
+          "ruleIds": [
+            "a",
+            "b"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-range-inside-finite-set-is-covered",
+    "principle": [
+      7
+    ],
+    "description": "Subset is exact for every pair of shapes: an integer range (1 <= people <= 2) lies inside the finite set {1, 2}, so the looser wait is fully covered by the deny: shadowed.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "ask",
+          "text": "ask",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": ">=",
+              "value": 1
+            },
+            {
+              "fact": "people",
+              "op": "<=",
+              "value": 2
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "ask"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no",
+          "text": "no",
+          "who": "*",
+          "does": "*",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "when": [
+            {
+              "fact": "people",
+              "op": "in",
+              "values": [
+                1,
+                2
+              ]
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "ask",
+            "no"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 1
+            }
+          },
+          "message": "`ask` (set by high) is fully covered by the stricter `no` (set by high): `ask` (set by high) says wait for approval; `no` (set by high) says deny. `ask` can never change a decision. For example: bot does go in floor with time=\"00:00\", day=\"mon\", people=1."
+        }
+      ],
+      "fingerprint": "db743e10becdb16a3ac60343ce97dd4b33043ce563d9ef8b7187e8d2ea41ad9d"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "shadowed",
+          "severity": "warning",
+          "ruleIds": [
+            "ask",
+            "no"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "floor",
+            "facts": {
+              "time": "00:00",
+              "day": "mon",
+              "people": 1
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "p7-unreachable-by-role-not-reported",
+    "principle": [
+      7
+    ],
+    "description": "Only requests a lawful request can reach count: the bot does not list \"look\", so two rules that clash on look only never meet (role_permits_action refuses first).",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "yes",
+          "text": "yes",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "yes"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no",
+          "text": "no",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "no"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "6aaa842eb9816b36362209e0701e68083d63766f05089a5d54b4bbac75ee8be6"
+    },
+    "expect": {
+      "findings": []
+    }
+  },
+  {
+    "id": "p7-unreachable-behind-never-rule-not-reported",
+    "principle": [
+      7
+    ],
+    "description": "A clash entirely inside the scope of an unconditional never rule is unreachable: the never rule refuses every such request first, so no finding; the never rule itself is still compared with the allow.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "inv",
+          "text": "inv",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "never": true,
+          "source": {
+            "kind": "manual",
+            "ref": "inv"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "yes",
+          "text": "yes",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "allow"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "yes"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "no",
+          "text": "no",
+          "who": "*",
+          "does": "*",
+          "where": "yard",
+          "then": {
+            "answer": "deny"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "no"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [
+        {
+          "kind": "never_vs_rule",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "inv"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          },
+          "message": "`yes` (set by high) tries to allow what the never rule `inv` (set by high) forbids. Both apply to every role · every action · Yard, always. Nothing overrides a never rule, so `yes` never takes effect at all. For example: bot does go in yard with people=0, time=\"00:00\", day=\"mon\"."
+        }
+      ],
+      "fingerprint": "9a3643c6ef72e0121dc1d85c3dfbe632e87b175a6e7896fce76d9303958a58fb"
+    },
+    "expect": {
+      "findings": [
+        {
+          "kind": "never_vs_rule",
+          "severity": "conflict",
+          "ruleIds": [
+            "yes",
+            "inv"
+          ],
+          "certainty": "certain",
+          "witness": {
+            "participant": {
+              "id": "bot-1",
+              "kind": "robot",
+              "roleId": "bot"
+            },
+            "action": "go",
+            "areaId": "yard",
+            "facts": {
+              "people": 0,
+              "time": "00:00",
+              "day": "mon"
+            }
+          }
+        }
+      ]
     }
   },
   {
@@ -5921,7 +7227,7 @@
     ],
     "description": "A rule whose own conditions can never all hold (people > 5 and people < 3) is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6086,10 +7392,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "e95af9bcdddb2571"
+      "fingerprint": "2ba5dfbfa46e1e78fdcf68d94094bf4ea663a511bb729c2f431d93f2f911ed4d"
     },
     "expect": {
       "error": true,

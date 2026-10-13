@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/backtest-report.schema.json",
-  "title": "Backtest report and comparison (robot-domain-rules/2)",
+  "title": "Backtest report and comparison (robot-domain-rules/3)",
   "description": "What a rulebook would have decided for a recorded log (`backtest`), and what a proposed rulebook would change (`compareBacktests`, in $defs/comparison). No free text; every list has a defined order. SPEC.md § 13.",
   "type": "object",
   "required": ["fingerprint", "events", "totals", "byArea", "byRole", "byRule", "neverFired", "wouldStall", "conflictsOccurred", "gaps", "missingFacts", "differences", "rows"],

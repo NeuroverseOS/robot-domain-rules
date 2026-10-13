@@ -9,17 +9,22 @@
  *   { findings }       check(rulebook) must report exactly these findings, any order
  *   { error: true }    the rulebook must be rejected by validation
  *   { canonical, fingerprint }   of `case.value`
+ *   { sha256 }         of the UTF-8 bytes of `case.text`
  *   { requestDigest }  of `case.request`
  *   { verify: { ok } } verifyApproval(case.approval, case.trustedKeys)
  *   { rulebookSignature: { ok } }  verifyRulebookSignature(rulebook, case.signature, case.publicKey)
  *   { backtest }       backtest(rulebook, case.events, case.options) must equal it, deep (the report has no free text)
  *   { comparison }     compareBacktests(backtest(rulebook, …), backtest(case.proposed, …)) must equal it, deep
  *
- * Decision comparison — exact on: status, limits (deep), then, fingerprint;
- * reasons and trace as ordered lists of { ruleId, status, setBy } (the
- * `reason` text is free-form); approvalRequests as an ordered list of
- * { ruleId, by, requestDigest, rulebookFingerprint, setBy } (reason text free).
- * A field absent from the expectation must be absent from the decision.
+ * Decision comparison — exact on: status, limits (deep), then, fingerprint,
+ * approvalsUsed (deep); reasons and trace as ordered lists of { ruleId,
+ * status, setBy } (the `reason` text is free-form); approvalRequests as an
+ * ordered list of { ruleId, by, rulebookFingerprint, participantId, action,
+ * areaId, setBy } (reason text free). A field absent from the expectation
+ * must be absent from the decision.
+ *
+ * Every comparison is DEEP SEMANTIC equality: object key order never
+ * matters, arrays are ordered, numbers compare by value.
  *
  * Findings comparison — as a multiset of { kind, severity, ruleIds, certainty,
  * witness? }; ruleIds keep their order; the message is free-form. A witness
@@ -39,7 +44,7 @@
  */
 
 const check = (c) => ({ ruleId: c.ruleId, status: c.status, setBy: c.setBy });
-const ask = (a) => ({ ruleId: a.ruleId, by: a.by, requestDigest: a.requestDigest, rulebookFingerprint: a.rulebookFingerprint, setBy: a.setBy });
+const ask = (a) => ({ ruleId: a.ruleId, by: a.by, rulebookFingerprint: a.rulebookFingerprint, participantId: a.participantId, action: a.action, areaId: a.areaId, setBy: a.setBy });
 const finding = (f) => ({ kind: f.kind, severity: f.severity, ruleIds: [...f.ruleIds], certainty: f.certainty, witness: f.witness });
 const planCheck = (c) => ({ ruleId: c.ruleId, status: c.status, setBy: c.setBy, stepIndex: c.stepIndex });
 
@@ -56,6 +61,7 @@ export function projectDecision(d) {
     limits: d.limits,
     then: d.then,
     approvalRequests: d.approvalRequests ? d.approvalRequests.map(ask) : undefined,
+    approvalsUsed: d.approvalsUsed,
     fingerprint: d.fingerprint,
   });
 }
@@ -81,17 +87,32 @@ export function projectPlan(p) {
 
 const withoutWitness = (f) => { const { witness, ...rest } = f; return { ...rest, hasWitness: witness !== undefined }; };
 
-const key = (f) => JSON.stringify(f);
+/** A sort key independent of object key order. */
+const key = (f) => JSON.stringify(canon(f));
 
+/** The value with every object's keys sorted, recursively (arrays keep their order). */
+export function canon(v) {
+  if (Array.isArray(v)) return v.map(canon);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])]));
+  return v;
+}
+
+/** Deep semantic equality: objects by key set and values (any order), arrays by position, primitives by value. */
 export function deepEqual(a, b) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => deepEqual(x, b[i]));
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const ka = Object.keys(a).filter(k => a[k] !== undefined).sort(), kb = Object.keys(b).filter(k => b[k] !== undefined).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && deepEqual(a[k], b[k]));
+  }
+  return false;
 }
 
 /**
  * Run one case against an implementation `impl`:
  *   { evaluate(rulebook, request), evaluatePlan(rulebook, plan), check(rulebook), validate(rulebook) → problems[],
  *     matches?(rulebook, request) → ruleIds (optional; see witness rule above),
- *     canonical(value), fingerprint(value), requestDigest(request),
+ *     canonical(value), fingerprint(value), sha256(utf8Text) → hex, requestDigest(request),
  *     verifyApproval(approval, keys) → Promise<{ok}>, verifyRulebookSignature(rulebook, sig, pub) → Promise<boolean>,
  *     backtest(rulebook, events, options?) → report, compareBacktests(reportA, reportB) → comparison }
  * Returns null when the case passes, else a short description of the mismatch.
@@ -132,6 +153,10 @@ export async function runCase(c, impl, rulebook) {
     if (e.canonical !== undefined && canonical !== e.canonical) return `canonical JSON differs\n  want ${e.canonical}\n  got  ${canonical}`;
     if (e.fingerprint !== undefined && fp !== e.fingerprint) return `fingerprint differs: want ${e.fingerprint}, got ${fp}`;
     return null;
+  }
+  if (e.sha256 !== undefined) {
+    const got = impl.sha256(c.text);
+    return got === e.sha256 ? null : `sha256 differs: want ${e.sha256}, got ${got}`;
   }
   if (e.requestDigest !== undefined) {
     const got = impl.requestDigest(c.request);

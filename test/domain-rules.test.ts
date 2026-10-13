@@ -9,7 +9,7 @@ import {
   DomainRulesError,
   draftRuleFromText,
   evaluateDomainAction,
-  glassesZoneRules,
+  glassesZoneRules, parseTimestamp, sha256Utf8, canonicalJson, fingerprint, signApproval, verifyApproval, verifyAndEvaluate, publicKeyOf, planDigestOf,
   isOpen,
   matchingRules,
   evaluatePlan,
@@ -22,6 +22,7 @@ import type { ZoneRules } from '../src/zone-rules';
 import { store } from '../examples/legacy-store-0.2';
 import * as grocery from '../examples/grocery-store';
 import * as clinicExample from '../examples/clinic';
+import { sampleSite } from '../examples/backtest/rulebook';
 
 /** @neuroverseos/governance/spatial ZONE_TEMPLATES.retail, copied so this repo has no dependency on it. */
 const RETAIL_ZONE_RULES: ZoneRules = {
@@ -320,6 +321,26 @@ describe('domain rules: glasses', () => {
     // A manager's conditional "no audio at lunch" rule is applied as if it held: the glasses can only tighten.
     expect(glassesZoneRules(grocery.rulebook, 'back-room', 'staff').microphone).toBe('blocked');
   });
+
+  it('maps waits conservatively: a condition wait is blocked (the device cannot re-evaluate it); an approval wait is confirm_each only when the wearer may approve', () => {
+    const site = (then: Rule['then']): CompileDomainInput => ({
+      site: { id: 'g', name: 'G' }, authorities: [{ id: 'manager' }, { id: 'staff' }],
+      kinds: ['person'], actions: [{ id: 'camera_capture', kinds: ['person'] }], facts: [{ id: 'children', type: 'number', integer: true, min: 0, required: true }],
+      areas: [{ id: 'a', name: 'A' }], roles: [{ id: 'wearer', name: 'Wearer', kind: 'person', actions: ['camera_capture'], tags: ['crew'] }, { id: 'lead', name: 'Lead', kind: 'person', actions: ['camera_capture'] }],
+      rules: [{ id: 'r', text: 'r', who: '*', does: 'camera_capture', where: '*', when: [{ fact: 'children', op: '>', value: 0 }], then, setBy: 'manager', source: { kind: 'manual', ref: 'r' } }],
+    });
+    // "No camera while children are present": the glasses cannot know when that changes, so the camera is blocked, never confirm-each.
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'condition' })), 'a', 'wearer').camera).toBe('blocked');
+    // An approval wait naming nobody: the wearer confirms each time.
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval' })), 'a', 'wearer').camera).toBe('confirm_each');
+    // Naming an authority: confirm_each only when the wearer holds it (or higher); otherwise the device cannot obtain it, so blocked.
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval', by: 'staff' })), 'a', 'wearer').camera).toBe('blocked');
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval', by: 'staff' })), 'a', 'wearer', { wearerAuthority: 'manager' }).camera).toBe('confirm_each');
+    // Naming a role or a role tag: the wearer's own role decides.
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval', by: 'lead' })), 'a', 'wearer').camera).toBe('blocked');
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval', by: 'lead' })), 'a', 'lead').camera).toBe('confirm_each');
+    expect(glassesZoneRules(compileDomain(site({ answer: 'wait', for: 'approval', by: 'tag:crew' })), 'a', 'wearer').camera).toBe('confirm_each');
+  });
 });
 
 // ─── 0.3: generic model ──────────────────────────────────────────────────────
@@ -526,7 +547,7 @@ describe('generic rulebook: rules at odds', () => {
       rule('slow', { answer: 'limit', limits: { speed: 0.5 } }, { when: [{ fact: 'n', op: '>', value: 2 }] }),
     ]);
     expect(kinds(limits)).toEqual(['limit_disagreement:certain:fast+slow']);
-    expect(checkRulebook(limits)[0].message).toContain('The lower value, 0.5, applies');
+    expect(checkRulebook(limits)[0].message).toContain('The lower value applies');
     expect(checkRulebook(limits)[0].witness?.facts.n).toBe(3);
     // A stricter special case of a looser rule is layering, not a finding.
     expect(kinds(tiny([rule('site', { answer: 'limit', limits: { speed: 1 } }), rule('near', { answer: 'limit', limits: { speed: 0.3 } }, { when: [{ fact: 'n', op: '>', value: 0 }] })]))).toEqual([]);
@@ -720,7 +741,7 @@ describe('plans: an AI planner proposes, the rulebook checks every step on proje
     expect(v1.planChecks.map(c => `${c.ruleId}:${c.status}`)).toEqual(['end_in_x:BLOCK', 'look_before_pick:ALLOW', 'one_pick:ALLOW']);
     expect(v1.finalArea).toBe('y');
     expect(v1.fingerprint).toBe(rb.fingerprint);
-    expect(v1.planDigest).toMatch(/^[0-9a-f]{16}$/);
+    expect(v1.planDigest).toMatch(/^[0-9a-f]{64}$/);
     // Same plan, dropped before moving and back to x at the end: every step passes, the count fact went up by the pick.
     const v2 = evaluatePlan(rb, { participant: bot, initialFacts: start, steps: [{ action: 'look', area: 'x', facts: { approvedBy: { id: 'ann', authority: 'high' } } }, { action: 'pick' }, { action: 'drop' }, { action: 'go', area: 'y' }, { action: 'go', area: 'x' }] });
     expect(v2.status).toBe('ALLOW');
@@ -783,37 +804,52 @@ describe('plans: an AI planner proposes, the rulebook checks every step on proje
 
 describe('history conditions: what the participant did recently, as the caller reports it', () => {
   const site = tiny([
-    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, clock: 't', op: '>=', value: 5 }] }),
-    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 10, clock: 't', op: '>=', value: 1 }] }),
+    rule('five_looks_an_hour', { answer: 'deny' }, { does: 'look', history: [{ actions: 'look', withinMinutes: 60, op: '>=', value: 5 }] }),
+    rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', sameArea: true, withinMinutes: 15, op: '>=', value: 1 }] }),
   ]);
   const rb = compileDomain(site);
-  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'x', at: `${String(Math.floor((from + i) / 60)).padStart(2, '0')}:${String((from + i) % 60).padStart(2, '0')}` }));
+  const stamp = (m: number, day = '2026-10-13') => `${day}T${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00Z`;
+  const looks = (n: number, from = 9 * 60) => Array.from({ length: n }, (_, i) => ({ action: 'look', areaId: 'x', at: stamp(from + i) }));
+  const at = (m: number, r: DomainRequest): DomainRequest => ({ ...r, now: stamp(m) });
 
-  it('counts matching entries in the window of the clock fact; missing history is required_facts, never permission', () => {
-    expect(ids(evaluateDomainAction(rb, { ...tinyReq('look'), history: looks(4) }))).toEqual(['role_permits_action']);
-    expect(ids(evaluateDomainAction(rb, { ...tinyReq('look'), history: looks(5) }))).toEqual(['five_looks_an_hour']);
+  it('counts matching entries in the window before now, on absolute time; missing history or now is required_facts, never permission', () => {
+    expect(ids(evaluateDomainAction(rb, at(600, { ...tinyReq('look'), history: looks(4) })))).toEqual(['role_permits_action']);
+    expect(ids(evaluateDomainAction(rb, at(600, { ...tinyReq('look'), history: looks(5) })))).toEqual(['five_looks_an_hour']);
     // Five looks, but the oldest is outside the hour: four count.
-    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '10:05' }), history: looks(5) }).status).toBe('ALLOW');
-    // Overnight: 23:55 then 00:03 is eight minutes later.
-    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'x', at: '23:55' }] }).status).toBe('PAUSE');
-    expect(evaluateDomainAction(rb, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'y', at: '23:55' }] }).status).toBe('ALLOW');
-    const missing = evaluateDomainAction(rb, tinyReq('look'));
+    expect(evaluateDomainAction(rb, at(605, { ...tinyReq('look', 'x', { t: '10:05' }), history: looks(5) })).status).toBe('ALLOW');
+    // Overnight: 23:55 yesterday then 00:03 today is eight minutes later.
+    expect(evaluateDomainAction(rb, at(3, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'x', at: stamp(23 * 60 + 55, '2026-10-12') }] })).status).toBe('PAUSE');
+    expect(evaluateDomainAction(rb, at(3, { ...tinyReq('look', 'x', { t: '00:03' }), history: [{ action: 'go', areaId: 'y', at: stamp(23 * 60 + 55, '2026-10-12') }] })).status).toBe('ALLOW');
+    // The midnight bug of /2: 09:50 YESTERDAY is not ten minutes before 10:00 today.
+    expect(evaluateDomainAction(rb, at(600, { ...tinyReq('look', 'x', { t: '10:00' }), history: [{ action: 'go', areaId: 'x', at: stamp(590, '2026-10-12') }] })).status).toBe('ALLOW');
+    expect(evaluateDomainAction(rb, at(600, { ...tinyReq('look', 'x', { t: '10:00' }), history: [{ action: 'go', areaId: 'x', at: stamp(590) }] })).status).toBe('PAUSE');
+    const missing = evaluateDomainAction(rb, at(600, tinyReq('look')));
     expect(missing.status).toBe('BLOCK');
     expect(missing.reasons[0].ruleId).toBe('required_facts');
     expect(missing.reasons[0].reason).toContain('history is required');
-    // An entry without a time, when a rule uses a window, is incomplete.
-    expect(evaluateDomainAction(rb, { ...tinyReq('look'), history: [{ action: 'look', areaId: 'x' }] }).reasons[0].ruleId).toBe('required_facts');
+    // No now, with a window in scope: incomplete.
+    expect(evaluateDomainAction(rb, { ...tinyReq('look'), history: looks(4) }).reasons[0].reason).toContain('now is required');
+    // An entry without a time, or with a /2 "HH:MM" time (no date), when a rule uses a window, is incomplete.
+    expect(evaluateDomainAction(rb, at(600, { ...tinyReq('look'), history: [{ action: 'look', areaId: 'x' }] })).reasons[0].ruleId).toBe('required_facts');
+    expect(evaluateDomainAction(rb, at(600, { ...tinyReq('look'), history: [{ action: 'look', areaId: 'x', at: '09:45' }] })).reasons[0].reason).toContain('timestamp with a date');
     // A request the history rules do not reach (action go) needs no history at all.
     expect(evaluateDomainAction(rb, tinyReq('go')).status).toBe('ALLOW');
   });
 
-  it('rejects history conditions that are not declared exactly', () => {
+  it('rejects history conditions that are not declared exactly, including the /2 clock', () => {
     const bad = (history: unknown, re: RegExp) => expect(() => compileDomain(tiny([rule('r', { answer: 'deny' }, { history: history as Rule['history'] })]))).toThrow(re);
     bad([{ actions: 'fly', op: '>=', value: 1 }], /unknown action "fly"/);
-    bad([{ actions: 'go', withinMinutes: 10, op: '>=', value: 1 }], /needs clock/);
-    bad([{ actions: 'go', withinMinutes: 10, clock: 'n', op: '>=', value: 1 }], /not a declared time fact/);
+    bad([{ actions: 'go', withinMinutes: 10, clock: 't', op: '>=', value: 1 }], /clock was removed in robot-domain-rules\/3/);
+    bad([{ actions: 'go', withinMinutes: 0, op: '>=', value: 1 }], /between 1 and 1440/);
     bad([{ actions: 'go', op: '>=', value: 1.5 }], /whole number/);
     bad([{ actions: 'go', op: '~', value: 1 }], /history op/);
+  });
+
+  it('parses timestamps deterministically: no offset is UTC, offsets apply, calendar nonsense is refused', () => {
+    expect(parseTimestamp('2026-10-12T10:00')).toBe(Date.UTC(2026, 9, 12, 10, 0));
+    expect(parseTimestamp('2026-10-12T12:00:00+02:00')).toBe(Date.UTC(2026, 9, 12, 10, 0));
+    expect(parseTimestamp('2026-10-12T09:30:15.250Z')).toBe(Date.UTC(2026, 9, 12, 9, 30, 15, 250));
+    for (const bad of ['10:00', '2026-02-30T10:00', '2026-13-01T10:00', '2026-10-12T24:00', '2026-10-12 10:00', 12, null]) expect(parseTimestamp(bad)).toBeNull();
   });
 });
 
@@ -833,19 +869,21 @@ describe('backtest: what a rulebook would have decided for recorded activity', (
     expect(compareBacktests(a, b).changed).toBe(0);
     expect(() => compareBacktests(a, backtest(grocery.rulebook, events.slice(1)))).toThrow(DomainRulesError);
     expect(() => backtest(grocery.rulebook, [{ at: '', request: events[0].request }])).toThrow(DomainRulesError);
-    expect(() => backtest(grocery.rulebook, events, { clock: 'peopleInZone' })).toThrow(DomainRulesError);
+    expect(() => backtest(grocery.rulebook, [{ at: '09:00', request: events[0].request }])).toThrow(/timestamp with a date/);
+    expect(() => backtest(grocery.rulebook, events, { clock: 'peopleInZone' } as unknown as { examples: number })).toThrow(/clock option was removed/);
   });
 
-  it('builds each participant\'s history from the earlier events of the same log, timed by the clock fact, and never from another participant', () => {
+  it('builds each participant\'s history from the earlier events of the same log, timed by each event\'s at, and never from another participant', () => {
     const rb = compileDomain({
       site: { id: 's', name: 'S' }, authorities: [{ id: 'site' }],
       actions: [{ id: 'scan', kinds: ['robot'] }], facts: [{ id: 'time', type: 'time', required: true }],
       areas: [{ id: 'a', name: 'A' }], roles: [{ id: 'bot', name: 'Bot', kind: 'robot', actions: ['scan'] }],
-      rules: [{ id: 'two_scans_an_hour', text: 'two', who: '*', does: 'scan', where: '*', history: [{ actions: 'scan', withinMinutes: 60, clock: 'time', op: '>=', value: 2 }], then: { answer: 'wait', for: 'condition' }, setBy: 'site', source: { kind: 'manual', ref: 'x' } }],
+      rules: [{ id: 'two_scans_an_hour', text: 'two', who: '*', does: 'scan', where: '*', history: [{ actions: 'scan', withinMinutes: 60, op: '>=', value: 2 }], then: { answer: 'wait', for: 'condition' }, setBy: 'site', source: { kind: 'manual', ref: 'x' } }],
     });
-    const scan = (id: string, time: string) => ({ at: `2026-10-05T${time}`, request: { participant: { id, kind: 'robot', roleId: 'bot' }, action: 'scan', areaId: 'a', facts: { time } } });
-    const r = backtest(rb, [scan('r-1', '09:00'), scan('r-2', '09:10'), scan('r-1', '09:20'), scan('r-1', '09:30'), scan('r-1', '10:25')]);
-    expect(r.rows.map(x => x.status)).toEqual(['ALLOW', 'ALLOW', 'ALLOW', 'PAUSE', 'ALLOW']);
+    const scan = (id: string, time: string, day = '2026-10-05') => ({ at: `${day}T${time}`, request: { participant: { id, kind: 'robot', roleId: 'bot' }, action: 'scan', areaId: 'a', facts: { time } } });
+    const r = backtest(rb, [scan('r-1', '09:00'), scan('r-2', '09:10'), scan('r-1', '09:20'), scan('r-1', '09:30'), scan('r-1', '10:25'), scan('r-1', '09:50', '2026-10-06')]);
+    // The last scan is the next day at 09:50: on absolute time nothing of the day before is within the hour.
+    expect(r.rows.map(x => x.status)).toEqual(['ALLOW', 'ALLOW', 'ALLOW', 'PAUSE', 'ALLOW', 'ALLOW']);
     expect(r.wouldStall).toEqual([{ ruleId: 'two_scans_an_hour', setBy: 'site', status: 'PAUSE', count: 1, examples: ['2026-10-05T09:30'] }]);
   });
 });
@@ -882,7 +920,7 @@ describe('conflict check exactness: "disjoint" is never a lie, and every witness
     const randomFacts = () => ({ n: int(0, 7), m: int(0, 9) / 2, t: hhmm(), day: pick(days), mode: pick(modes), flag: pick([true, false]) });
 
     let pairs = 0, disjointPairs = 0, requests = 0, witnesses = 0;
-    for (let round = 0; round < 400; round++) {
+    for (let round = 0; round < 800; round++) {
       let input: CompileDomainInput;
       try { input = tiny([randomRule('a', { answer: 'allow' }), randomRule('b', { answer: 'deny' })]); compileDomain(input); } catch { continue; }   // impossible conditions are refused at compile time; skip them
       const rb = compileDomain(input);
@@ -911,5 +949,192 @@ describe('conflict check exactness: "disjoint" is never a lie, and every witness
     expect(disjointPairs).toBeGreaterThan(20);
     expect(witnesses).toBeGreaterThan(100);
     expect(requests).toBeGreaterThan(5000);
+  });
+});
+
+// ─── 0.5.2: the audit fixes ───────────────────────────────────────────────────
+
+describe('0.5.2: canonical JSON is RFC 8785 and the fingerprint is SHA-256 over UTF-8', () => {
+  it('reproduces the FIPS 180-4 vectors and agrees with the platform hash on long and non-ASCII input', async () => {
+    expect(sha256Utf8('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    expect(sha256Utf8('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Utf8('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe('248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+    expect(sha256Utf8('a'.repeat(1_000_000))).toBe('cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0');
+    for (const text of ['é ∑ 🤖', 'x'.repeat(55), 'y'.repeat(56), 'z'.repeat(64), 'w'.repeat(119)]) {
+      const platform = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(b => b.toString(16).padStart(2, '0')).join('');
+      expect(sha256Utf8(text)).toBe(platform);
+    }
+  });
+
+  it('canonicalises as JCS: sorted keys, ES number form, undefined dropped, non-finite refused; the fingerprint leaves findings out', () => {
+    expect(canonicalJson({ b: 1, a: [1, { d: undefined, c: 2 }], e: -0, f: 1e21, g: 1e-7, h: 'é🤖' })).toBe('{"a":[1,{"c":2}],"b":1,"e":0,"f":1e+21,"g":1e-7,"h":"é🤖"}');
+    expect(() => canonicalJson({ a: Infinity })).toThrow(/not a JSON number/);
+    expect(fingerprint({ a: 1 })).toMatch(/^[0-9a-f]{64}$/);
+    const { fingerprint: fp, findings, ...body } = grocery.rulebook;
+    expect(findings.length).toBeGreaterThan(0);
+    expect(fingerprint(body)).toBe(fp);
+    expect(fingerprint({ ...body, findings })).not.toBe(fp);
+    expect(verifyFingerprint({ ...grocery.rulebook, findings: [] })).toBe(true);   // reworded or dropped findings do not change identity
+  });
+});
+
+describe('0.5.2: a compiled rulebook shares nothing with the caller\'s input', () => {
+  it('does not freeze or alias the caller\'s rule.source (0.5.1 did)', () => {
+    const input = tiny([rule('r', { answer: 'deny' })]);
+    const source = input.rules![0].source;
+    const rb = compileDomain(input);
+    expect(Object.isFrozen(source)).toBe(false);
+    expect(rb.rules.find(r => r.id === 'r')!.source).not.toBe(source);
+    source.ref = 'changed by the caller afterwards';
+    expect(rb.rules.find(r => r.id === 'r')!.source.ref).toBe('r');
+  });
+});
+
+describe('0.5.2: plans', () => {
+  const bot = { id: 'b', kind: 'robot', roleId: 'bot' };
+  it('evaluatePlan(undefined) and other non-objects are BLOCK, never a throw', () => {
+    const rb = compileDomain(tiny([]));
+    for (const bad of [undefined, null, 42, 'plan', []]) {
+      const r = evaluatePlan(rb, bad as unknown as Parameters<typeof evaluatePlan>[1]);
+      expect(r.status).toBe('BLOCK');
+      expect(r.firstViolation?.ruleId).toBe('required_facts');
+    }
+  });
+
+  it('the plan digest ignores approvals, so collecting them does not change the plan\'s identity', () => {
+    const plan = { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, steps: [{ action: 'go', area: 'x' }, { action: 'look' }] };
+    const approved = { ...plan, steps: [plan.steps[0], { ...plan.steps[1], facts: { approvedBy: 'ann' } }], consumedApprovals: ['n-1'] };
+    expect(planDigestOf(approved)).toBe(planDigestOf(plan));
+    expect(planDigestOf({ ...plan, steps: [plan.steps[0]] })).not.toBe(planDigestOf(plan));
+  });
+
+  it('a step that names another area without an action that moves there is refused; now advances per step and times the history it appends', () => {
+    const rb = compileDomain(tiny([rule('not_right_after_go', { answer: 'wait', for: 'condition' }, { does: 'look', history: [{ actions: 'go', withinMinutes: 2, op: '>=', value: 1 }] })], {
+      actions: [{ id: 'go', kinds: ['robot'], tags: ['movement'], effects: [{ op: 'move' }] }, { id: 'look', kinds: ['robot'] }],
+    }));
+    const r = evaluatePlan(rb, { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, now: '2026-10-12T10:00:00Z', steps: [{ action: 'look', area: 'x' }, { action: 'look', area: 'y' }] });
+    expect(r.status).toBe('BLOCK');
+    expect(r.firstViolation).toMatchObject({ stepIndex: 1, ruleId: 'plan_area_continuity', setBy: 'builtin', from: 'step' });
+    expect(r.steps[1].decision.reasons[0].reason).toContain('does not move it');
+    // With `now`, the go at step 0 is one minute before the look at step 1 (within 2 min: PAUSE), and three minutes before step 3 (ALLOW).
+    const timed = evaluatePlan(rb, { participant: bot, initialFacts: { n: 0, t: '10:00', day: 'mon' }, now: '2026-10-12T10:00:00Z', stepDurationSeconds: 60, clock: 't', steps: [{ action: 'go', area: 'x' }, { action: 'look' }, { action: 'look' }, { action: 'look' }] });
+    expect(timed.steps.map(s => s.decision.status)).toEqual(['ALLOW', 'PAUSE', 'PAUSE', 'ALLOW']);
+    expect(timed.steps[3].facts.t).toBe('10:03');   // startTime defaulted from now
+  });
+});
+
+describe('0.5.2: the drafter refuses to guess', () => {
+  it('"max 2 robots in aisle 5" is a count, never a speed: mapped to a declared count fact, or refused', () => {
+    const noCountFact = draftRuleFromText('max 2 robots in aisle 5', grocery.rulebook, { setBy: 'site-manager', id: 'c' });
+    expect(noCountFact.draft).toBeNull();
+    expect(noCountFact.ready).toBe(false);
+    expect(noCountFact.notes.join(' ')).toMatch(/count of robots, not a speed/);
+    const withCountFact = draftRuleFromText('max 2 robots in aisle 5', sampleSite(2).rulebook, { setBy: 'site-manager', id: 'c' });
+    expect(withCountFact.draft).toMatchObject({ who: ['kind:robot'], where: ['aisle-5'], when: [{ fact: 'robotsInZone', op: '>=', value: 2 }], then: { answer: 'wait', for: 'condition' } });
+    expect(withCountFact.draft!.then).not.toMatchObject({ answer: 'limit' });
+    expect(withCountFact.confidence).toBeLessThan(1);
+    expect(withCountFact.notes.join(' ')).toMatch(/read as a count on the fact "robotsInZone"/);
+  });
+
+  it('"Don\'t let robots block the fire exit" is not ready: "block" is a verb the drafter does not model', () => {
+    const d = draftRuleFromText("Don't let robots block the fire exit", grocery.rulebook, { setBy: 'site-manager', id: 'b' });
+    expect(d.ready).toBe(false);
+    expect(d.confidence).toBeLessThan(0.5);
+    expect(d.notes.join(' ')).toMatch(/"block" is a verb the drafter does not model/);
+    expect(d.notes.join(' ')).toMatch(/buildRuleDraftPrompt/);
+    // A bare number with no unit, no speed word and nothing to count is refused too.
+    expect(draftRuleFromText('robots at most 2 in checkout', grocery.rulebook, { setBy: 'site-manager', id: 'n' }).draft).toBeNull();
+  });
+});
+
+describe('0.5.2: approvals are authorisation, separate from the operational facts', () => {
+  const SEED = '0001020304050607080910111213141516171819202122232425262728293031';   // TEST ONLY
+  const NOW = '2026-10-12T09:05:00Z';
+  async function signedSite() {
+    const pub = await publicKeyOf(SEED);
+    return compileDomain(tiny([
+      rule('ask_high', { answer: 'wait', for: 'approval', by: 'high' }, { does: 'go', where: 'y' }),
+      rule('crowd', { answer: 'wait', for: 'condition' }, { does: 'go', when: [{ fact: 'n', op: '>=', value: 3 }] }),
+      rule('night', { answer: 'deny' }, { when: [{ fact: 't', op: 'between', from: '22:00', to: '06:00' }] }),
+    ], { trustedKeys: [{ keyId: 'k', publicKey: pub, authority: 'high' }] }));
+  }
+  const ask = (rb: Rulebook, facts: Record<string, unknown> = {}, extra: Partial<DomainRequest> = {}): DomainRequest => ({ ...tinyReq('go', 'y', facts), now: NOW, ...extra });
+
+  it('verifyAndEvaluate verifies then evaluates; the approval clears only its wait, once, within its window, under its rulebook', async () => {
+    const rb = await signedSite();
+    const bind = { id: 'ann', authority: 'high', ruleId: 'ask_high', rulebookFingerprint: rb.fingerprint, participantId: 'b', action: 'go', areaId: 'y', nonce: 'n-1', issuedAt: '2026-10-12T09:00:00Z', expiresAt: '2026-10-12T09:30:00Z' };
+    const signed = await signApproval(bind, { keyId: 'k', privateKey: SEED });
+    expect(signed.spec).toBe('robot-domain-rules-approval/3');
+    expect((await verifyApproval(signed, rb)).ok).toBe(true);
+    const pause = await verifyAndEvaluate(rb, ask(rb));
+    expect(pause.status).toBe('PAUSE');
+    expect(pause.approvalRequests![0]).toMatchObject({ ruleId: 'ask_high', by: 'high', participantId: 'b', action: 'go', areaId: 'y', rulebookFingerprint: rb.fingerprint });
+    const ok = await verifyAndEvaluate(rb, ask(rb, { approvedBy: signed }));
+    expect(ok.status).toBe('ALLOW');
+    expect(ok.approvalsUsed).toEqual([{ ruleId: 'ask_high', nonce: 'n-1' }]);
+    // (a) occupancy rose after the approval: the condition wait holds on the facts current now; the approval does not override it.
+    const crowded = await verifyAndEvaluate(rb, ask(rb, { approvedBy: signed, n: 3 }));
+    expect(crowded.status).toBe('PAUSE');
+    expect(ids(crowded)).toEqual(['crowd']);
+    expect(crowded.approvalRequests).toBeUndefined();
+    // (f) a current BLOCK stays BLOCK whatever approval is presented.
+    expect(ids(await verifyAndEvaluate(rb, ask(rb, { approvedBy: signed, t: '23:00' })))).toEqual(['night']);
+    // (b) expired, (c) replayed, (d) altered scope, (e) other rulebook: refused, each with its reason.
+    const reasonFor = async (facts: Record<string, unknown>, extra: Partial<DomainRequest> = {}) => { const d = await verifyAndEvaluate(rb, ask(rb, facts, extra)); expect(d.status).toBe('PAUSE'); return d.reasons[0].reason; };
+    expect(await reasonFor({ approvedBy: signed }, { now: '2026-10-12T09:30:00Z' })).toMatch(/expired at 2026-10-12T09:30:00Z/);
+    expect(await reasonFor({ approvedBy: signed }, { consumedApprovals: ['n-1'] })).toMatch(/already used/);
+    expect(await reasonFor({ approvedBy: await signApproval({ ...bind, areaId: 'x', nonce: 'n-2' }, { keyId: 'k', privateKey: SEED }) })).toMatch(/for area "x"/);
+    expect(await reasonFor({ approvedBy: await signApproval({ ...bind, participantId: 'other', nonce: 'n-3' }, { keyId: 'k', privateKey: SEED }) })).toMatch(/for participant "other"/);
+    expect(await reasonFor({ approvedBy: await signApproval({ ...bind, rulebookFingerprint: '1'.repeat(64), nonce: 'n-4' }, { keyId: 'k', privateKey: SEED }) })).toMatch(/another rulebook/);
+    // A tampered signature is passed through unverified and does not count.
+    expect(await reasonFor({ approvedBy: { ...signed, nonce: 'n-5' } })).toMatch(/only signed approvals verified/);
+    // A /2 approval is refused by name, not reinterpreted.
+    const v2 = { id: 'ann', authority: 'high', requestDigest: 'a972a032bcabeaaf', rulebookFingerprint: '96be85f891da7c40', issuedAt: '2026-10-12T09:00:00Z', keyId: 'k', signature: 'ab'.repeat(64) };
+    expect((await verifyApproval(v2, rb)).reason).toMatch(/robot-domain-rules\/2 approval .* re-issued/);
+    expect(await reasonFor({ approvedBy: { ...v2, verified: true } })).toMatch(/robot-domain-rules\/2 approval/);
+    // No now: the window cannot be judged, so required_facts.
+    expect(ids(await verifyAndEvaluate(rb, { ...ask(rb, { approvedBy: signed }), now: undefined }))).toEqual(['required_facts']);
+  });
+});
+
+describe('0.5.2: the conflict check', () => {
+  it('compares limit rules on every shared limit name', () => {
+    const site = tiny([rule('company', { answer: 'limit', limits: { speed: 1, load: 3 } }), rule('site', { answer: 'limit', limits: { speed: 1, load: 5 } }, { setBy: 'low' })], { limits: [{ id: 'speed', unit: 'm/s' }, { id: 'load', unit: 'kg' }] });
+    expect(checkRulebook(site).map(f => [f.kind, f.ruleIds])).toEqual([['authority-override', ['site', 'company']]]);
+    expect(checkRulebook(site)[0].message).toMatch(/load 5.*load 3/);
+  });
+
+  it('subset is exact for every pair of constraint shapes (property test against brute force on a small integer domain)', () => {
+    // Facts: n integer in 0..5. Each rule's constraint on n is a random condition list; subset is checked by enumeration.
+    let seed = 7;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    const int = (lo: number, hi: number) => lo + Math.floor(rnd() * (hi - lo + 1));
+    const cond = (): Condition => {
+      const k = int(0, 3);
+      if (k === 0) return { fact: 'n', op: 'in', values: Array.from({ length: int(1, 3) }, () => int(0, 5)) };
+      if (k === 1) return { fact: 'n', op: '==', value: int(0, 5) };
+      return { fact: 'n', op: (['>', '>=', '<', '<=', '!='] as const)[int(0, 4)], value: int(0, 5) };
+    };
+    const holds = (when: Condition[], v: number) => when.every(c => {
+      if (c.op === 'in') return c.values.includes(v);
+      if (c.op === 'between' || c.op === 'days') return false;
+      const x = c.value as number;
+      return c.op === '==' ? v === x : c.op === '!=' ? v !== x : c.op === '>' ? v > x : c.op === '>=' ? v >= x : c.op === '<' ? v < x : v <= x;
+    });
+    let checked = 0;
+    for (let round = 0; round < 800; round++) {
+      const a = Array.from({ length: int(1, 2) }, cond), b = Array.from({ length: int(1, 2) }, cond);
+      const site = tiny([rule('a', { answer: 'deny' }, { when: a }), rule('b', { answer: 'deny' }, { when: b })], { facts: [{ id: 'n', type: 'number', integer: true, min: 0, max: 5, required: true }, { id: 't', type: 'time', required: true }, { id: 'day', type: 'day', required: true }] });
+      let findings;
+      try { findings = checkRulebook(site); } catch { continue; }   // impossible conditions are refused at compile time
+      const A = [0, 1, 2, 3, 4, 5].filter(v => holds(a, v)), B = [0, 1, 2, 3, 4, 5].filter(v => holds(b, v));
+      const overlap = A.some(v => B.includes(v));
+      const aInB = A.every(v => B.includes(v)), bInA = B.every(v => A.includes(v));
+      // Same answer and authority: a duplicate with [a, b] when a ⊆ b, [b, a] when only b ⊆ a, nothing otherwise.
+      const want = !overlap ? [] : aInB ? [['a', 'b']] : bInA ? [['b', 'a']] : [];
+      expect(findings.map(f => f.ruleIds), JSON.stringify({ a, b, A, B })).toEqual(want);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(300);
   });
 });

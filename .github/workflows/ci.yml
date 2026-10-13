@@ -1,0 +1,73 @@
+# Every check the repo relies on, on every push and pull request to main.
+# The site is also built here (not deployed; pages.yml deploys it).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: typecheck, core tests, conformance, schemas, Z3
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Core tests, every conformance case, and the Z3 cross-check (about a minute)
+        run: npm test
+      - run: npm run build
+      - name: Conformance against dist, no framework
+        run: node conformance/run-node.mjs
+      - name: Every conformance input and reference output against the JSON Schemas
+        run: npm run conformance:schemas
+      - name: Examples run end to end (demo, the harness replays on the real semantic-volume shape, the backtest)
+        run: npm run demo && npm run replay && npm run plan-replay && npm run backtest
+      - name: Published files
+        run: npm pack --dry-run
+
+  cedar:
+    name: Cedar adapter against cedar-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: adapters/cedar/package-lock.json
+      - run: npm ci
+        working-directory: adapters/cedar
+      - run: npm run typecheck && npm test
+        working-directory: adapters/cedar
+
+  site:
+    name: Switchboard typecheck, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+        working-directory: site
+      - run: npm run typecheck && npm test && npm run build
+        working-directory: site

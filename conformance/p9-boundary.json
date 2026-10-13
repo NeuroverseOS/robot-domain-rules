@@ -6,7 +6,7 @@
     ],
     "description": "The rulebook takes the facts as given: alarm true is an emergency whatever else is true.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -185,10 +185,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "795a6514f6b02781"
+      "fingerprint": "1621081715dc4abf90c3f96fbe37fc556ec4345e404536978b42bcfd65e5bea2"
     },
     "request": {
       "participant": {
@@ -222,7 +226,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "795a6514f6b02781"
+        "fingerprint": "1621081715dc4abf90c3f96fbe37fc556ec4345e404536978b42bcfd65e5bea2"
       }
     }
   },
@@ -233,7 +237,7 @@
     ],
     "description": "There is no clock: the only time the rulebook knows is the `time` fact in the request.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -394,10 +398,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "d2729f532554cf48"
+      "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
     },
     "request": {
       "participant": {
@@ -435,7 +443,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "d2729f532554cf48"
+        "fingerprint": "d2ca53dd6b8b83daae361d4be75c69659d0b943d9a903cc4a9f335976cd60034"
       }
     }
   },
@@ -446,7 +454,7 @@
     ],
     "description": "A LIMIT says the ceiling; the controller enforces it. The decision does not say what speed to drive.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -625,10 +633,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "795a6514f6b02781"
+      "fingerprint": "1621081715dc4abf90c3f96fbe37fc556ec4345e404536978b42bcfd65e5bea2"
     },
     "request": {
       "participant": {
@@ -670,7 +682,7 @@
         "limits": {
           "speed": 1
         },
-        "fingerprint": "795a6514f6b02781"
+        "fingerprint": "1621081715dc4abf90c3f96fbe37fc556ec4345e404536978b42bcfd65e5bea2"
       }
     }
   }

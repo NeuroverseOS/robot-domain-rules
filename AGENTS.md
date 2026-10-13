@@ -8,13 +8,13 @@
 2. **Authority is declared, layered, and only tightens.** `authorities` highest first; a lower level can only tighten; `authority-override` is named and has no effect; approvals must hold what `wait.by` names.
 3. **AI writes and proposes; the rulebook decides.** No model and no clock in `evaluate.ts`, `plan.ts`, `check.ts`, `compile.ts`; the structured `then` decides, never prose; a draft's `setBy` comes from the caller, never from the model. A plan is checked step by step on projected facts (declared `effects`) and by `planRules`; it is never written here.
 4. **Unknown means no; a missing fact is never a yes.** `required_facts`, `area_declared`, `role_declared`, `role_permits_action`, `unknown_action`; only declared defaults are filled in; history is the caller's (`request.history`) and a rule that needs it and does not get it refuses; a projected fact out of range refuses, never clamps.
-5. **Every decision explains itself.** `reasons`, `trace`, `setBy`, `limits`, `then`, `fingerprint`; canonical JSON and the FNV-1a fingerprint are reproduced byte for byte.
-6. **Waiting has two meanings.** Approval waits return `approvalRequests` and are cleared by a sufficient approval; condition waits are cleared only by facts; with `trustedKeys` declared, only a `verified` signed approval bound to the request digest and the rulebook fingerprint counts.
+5. **Every decision explains itself.** `reasons`, `trace`, `setBy`, `limits`, `then`, `fingerprint`; RFC 8785 canonical JSON and the SHA-256 fingerprint (over UTF-8, findings excluded) are reproduced byte for byte.
+6. **Waiting has two meanings, and approval is not a fact.** Approval waits return `approvalRequests` and are cleared by a sufficient approval; condition waits are cleared only by facts; with `trustedKeys` declared, only a `verified` `/3` signed approval bound to the rule, the rulebook fingerprint, the participant, the action and the area, valid at `request.now`, with a nonce not in `request.consumedApprovals`, counts — and it clears that wait only; everything else is decided on the current facts. Facts, `now` and `history` come from the harness, never from the requester.
 7. **Conflicts are surfaced, never quietly resolved.** Seven finding kinds; the analysis is exact for the rule language, and every certain finding carries a `witness` request that matches both rules; "possible" only for history conditions; compile never hides findings. The Z3 cross-check (`test/z3-crosscheck.test.ts`) must keep agreeing on every pair.
 8. **One law for everyone.** Robots, people and agents through one `evaluate`; selectors by ID, kind, tag and exclusion; area role limits as never rules.
 9. **Rules say what may happen; evidence says what is true.** Facts are trusted; this is not a safety system ([BOUNDARY.md](BOUNDARY.md)).
 
-Plus the mechanical ones: rulebooks are deep-frozen and detached from their input; bad config throws `DomainRulesError`, a bad request never throws; the glasses bridge only tightens; the 0.2 input shape keeps deciding identically (`legacy.ts`).
+Plus the mechanical ones: rulebooks are deep-frozen and detached from their input (nothing of the caller's objects is aliased); bad config throws `DomainRulesError`, a bad request or plan never throws (SPEC.md § 15); the glasses bridge only tightens, and maps a condition wait to `blocked`; the 0.2 input shape keeps deciding identically (`legacy.ts`); **versions are explicit**: a `/2` rulebook or approval is refused by name, never reinterpreted (SPEC.md § 11).
 
 ## Any behaviour change needs a conformance case
 
@@ -22,17 +22,19 @@ If a change alters what `evaluate`, `evaluatePlan`, `matchingRules`, `check`, `v
 
 ## The contract, briefly
 
-Request: `{ participant: { id, kind, roleId }, action, areaId, facts: { ...declared facts, approvedBy? }, history? }`. `approvedBy` is a string, `{ id, authority?, roleId? }`, or a verified signed approval. `history` is `[{ action, areaId, at? }]`, caller-supplied.
+Request: `{ participant: { id, kind, roleId }, action, areaId, facts: { ...declared facts, approvedBy? }, history?, now?, consumedApprovals? }`. `approvedBy` is a string, `{ id, authority?, roleId? }`, or a verified `/3` signed approval. `history` is `[{ action, areaId, at? }]` with dated timestamps; `now` is a dated timestamp; all caller-supplied.
 
-Decision: `{ status, reasons, limits?, then?, approvalRequests?, trace, fingerprint }`. Strictest wins: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`. The exact algorithm is SPEC.md § 6.
+Decision: `{ status, reasons, limits?, then?, approvalRequests?, approvalsUsed?, trace, fingerprint }`. Strictest wins: `BLOCK` > `PAUSE` > `LIMIT` > `ALLOW`. The exact algorithm is SPEC.md § 6.
 
-Plan: `{ participant, steps: [{ action, area?, facts?, note? }], initialFacts, history?, clock?, startTime?, stepDurationSeconds? }` → `evaluatePlan` → `{ status, steps: [{ index, action, areaId, facts, decision }], planChecks, firstViolation?, approvalRequests, finalFacts, finalArea, planDigest, fingerprint }`. SPEC.md § 12.
+Plan: `{ participant, steps: [{ action, area?, facts?, note? }], initialFacts, history?, clock?, startTime?, stepDurationSeconds?, now?, consumedApprovals? }` → `evaluatePlan` → `{ status, steps: [{ index, action, areaId, facts, decision }], planChecks, firstViolation?, approvalRequests, finalFacts, finalArea, planDigest, fingerprint }`. A step may not change area without a `move` effect (`plan_area_continuity`). SPEC.md § 12.
 
-Rule: `{ id, text, who, does, where, when?, history?, then, reason?, source, setBy, never? }`. `source.kind` ∈ template, question, declaration, manual, text, agent, system, builtin. Plan rule: `{ id, text, who, check: { kind: ends_in | ends_with | before | at_most, … }, reason?, source, setBy }`. Action: `effects?: [{ op: set | add | subtract, fact, value } | { op: move }]`.
+Signed approval (`robot-domain-rules-approval/3`): `{ spec, id, authority?, roleId?, ruleId, rulebookFingerprint, participantId, action, areaId, nonce, issuedAt, expiresAt, keyId, signature }`. SPEC.md § 9.
+
+Rule: `{ id, text, who, does, where, when?, history?, then, reason?, source, setBy, never? }`. History condition: `{ actions, areas?, sameArea?, withinMinutes?, op, value }` (no `clock`; windows run back from `request.now`). `source.kind` ∈ template, question, declaration, manual, text, agent, system, builtin. Plan rule: `{ id, text, who, check: { kind: ends_in | ends_with | before | at_most, … }, reason?, source, setBy }`. Action: `effects?: [{ op: set | add | subtract, fact, value } | { op: move }]`.
 
 Finding: `{ kind, severity, ruleIds, certainty, witness?, message }`.
 
-Backtest: `backtest(rulebook, events: [{ at, request, outcome? }], { clock?, examples? })` → `{ fingerprint, events, totals, byArea, byRole, byRule, neverFired, wouldStall, conflictsOccurred, gaps, missingFacts, differences, rows }`; `compareBacktests(baseline, proposed)` → `{ newlyBlocked, newlyAllowed, otherChanges, byRule, … }`. History for a rule that counts it is built from the earlier events of the same participant on the same day of the log; `outcome` is reported, never decided on. No free text in the report; every list has a defined order. SPEC.md § 13.
+Backtest: `backtest(rulebook, events: [{ at, request, outcome? }], { examples? })` → `{ fingerprint, events, totals, byArea, byRole, byRule, neverFired, wouldStall, conflictsOccurred, gaps, missingFacts, differences, rows }`; `compareBacktests(baseline, proposed)` → `{ newlyBlocked, newlyAllowed, otherChanges, byRule, … }`. `at` is a dated timestamp and becomes each request's `now`; history for a rule that counts it is built from every earlier event of the same participant, on absolute time; `outcome` is reported, never decided on. No free text in the report; every list has a defined order. SPEC.md § 13.
 
 ## Files, in read order
 
@@ -41,17 +43,17 @@ Backtest: `backtest(rulebook, events: [{ at, request, outcome? }], { clock?, exa
 | `src/types.ts` | **First.** Every type. |
 | `src/vocabulary.ts` | Selectors, fact validation, conditions, and the exact constraint sets the conflict check uses. |
 | `src/compile.ts` | Input → rulebook: templates, validation, role inheritance, area never rules, `validateRule`, `validateRulebook`, freezing. |
-| `src/canonical.ts` | Canonical JSON, `fingerprint`, `requestDigest` — what other languages reproduce. |
-| `src/evaluate.ts` | One request → one decision, including approval sufficiency, binding and history conditions; `matchingRules` for witnesses. |
+| `src/canonical.ts` | RFC 8785 canonical JSON, pure SHA-256, `fingerprint`, `requestDigest` — what other languages reproduce. |
+| `src/evaluate.ts` | One request → one decision, including approval binding (rule, rulebook, participant, action, area, nonce, window), sufficiency and history conditions; `matchingRules` for witnesses. |
 | `src/plan.ts` | One plan → one evaluation: effects projected step by step, plan rules, approvals collected. |
-| `src/check.ts` | The conflict check: exact overlap with a witness, classification, plain-English messages; plan-rule duplicates. |
+| `src/check.ts` | The conflict check: exact overlap on reachable requests with a witness, classification (limits compared on every shared name), plain-English messages; plan-rule duplicates. |
 | `src/backtest.ts` | A recorded log replayed through a rulebook: the report and the current-versus-proposed comparison. Uses `evaluate`, `matchingRules`, `missingFacts` and the rulebook's findings; adds no semantics of its own. |
-| `src/approvals.ts` | Ed25519 via WebCrypto: sign/verify approvals and rulebooks. Zero dependencies. |
-| `src/draft.ts` | Deterministic text drafting; model prompt and answer validation. |
+| `src/approvals.ts` | Ed25519 via WebCrypto: sign/verify `/3` approvals and rulebooks; `verifyAndEvaluate`. Zero dependencies. |
+| `src/draft.ts` | Deterministic text drafting for simple forms (refuses to guess: counts are not speeds, unmodelled verbs are not ready); model prompt and answer validation — the path for real editors. |
 | `src/templates/template.ts` | The template contract. `grocery-store.ts`, `warehouse.ts` are the two shipped. |
 | `src/legacy.ts`, `src/render.ts`, `src/glasses.ts`, `src/zone-rules.ts` | 0.2 input shape; rendering; the glasses bridge. |
 | `src/index.ts` | Public exports and `DomainRulesBuilder`. |
-| `conformance/` | The cases, `compare.mjs` (the judging rules), `run-node.mjs`, `generate.ts`. |
+| `conformance/` | The cases, `compare.mjs` (the judging rules, deep semantic equality), `run-node.mjs`, `validate-schemas.mjs` (every case against `spec/`), `generate.ts`. |
 | `test/domain-rules.test.ts` | One test per behaviour, plus the seeded exactness test. `test/conformance.test.ts` runs every case. `test/z3-crosscheck.test.ts` agrees with Z3 on every generated pair (z3-solver is a devDependency only). Do not add test files without being asked. |
 | `examples/` | Sites, `demo.ts`, `harness/` (volumes adapter, the agent replay, the planner replay `plan-replay.ts`), `backtest/` (the sample site, a synthetic sample week, `backtest.ts`), `mcp/` (its own package). |
 | `adapters/cedar/` | The Cedar export, its own package; lossy and says so; tested against cedar-wasm. Never imported by the core. |
@@ -77,6 +79,7 @@ npm run typecheck        # tsc --noEmit (src, examples except mcp, test, conform
 npm test                 # vitest run --dir test — core tests + every conformance case
 npm run build            # tsup → dist/
 node conformance/run-node.mjs      # the cases against dist/, no framework
+npm run conformance:schemas        # every case input and reference output against spec/*.schema.json (needs dist/)
 npm run demo             # tsx examples/demo.ts; add -- --json to write <site>.rules.json
 npx tsx examples/harness/replay.ts
 npx tsx examples/harness/plan-replay.ts
@@ -86,13 +89,13 @@ cd examples/mcp && npm install && npm run typecheck
 cd adapters/cedar && npm install && npm run typecheck && npm test
 ```
 
-Run typecheck, test (which includes the Z3 cross-check), build and the conformance runner before you say a change is done; the site's three if you touched `site/` or anything it imports; the adapter's two if you touched `adapters/cedar/` or `check.ts`.
+Run typecheck, test (which includes the Z3 cross-check), build, the conformance runner and the schema validation before you say a change is done (`.github/workflows/ci.yml` runs all of it); the site's three if you touched `site/` or anything it imports; the adapter's two if you touched `adapters/cedar/` or `check.ts`.
 
 ## Do not build here
 
-- Area geometry, localisation, people counting, identity, sensors, maps. The surrounding system owns that (`examples/harness/volumeAt` is an example helper, not a feature).
-- A clock, scheduler, history store or live feed. Facts and history arrive in the request; a plan's clock is the plan's; a backtest's times come from its log; `issuedAt` is for the caller.
+- Area geometry, localisation, membership (which volume a participant is in), people counting, identity, sensors, maps. The surrounding system owns that; the harness example deliberately has no point-in-box test.
+- A clock, scheduler, history store, consumed-approval store or live feed. Facts, history, `now` and `consumedApprovals` arrive in the request; a plan's clock is the plan's; a backtest's times come from its log.
 - An explanation of why things happened. A backtest applies rules to recorded requests and reports the decisions; reading evidence across sources is for an evidence system, not for this layer.
 - A planner. `evaluatePlan` checks a plan it is handed; it never searches for one.
 - A model call anywhere in the core. `buildRuleDraftPrompt` / `parseRuleDraft` are the whole model surface.
-- A key store, expiry policy, or HTTP service. Key custody and age limits are the deployment's.
+- A key store or HTTP service. Key custody is the deployment's; expiry is in the approval and judged against the caller's `now`.

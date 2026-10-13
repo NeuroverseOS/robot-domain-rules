@@ -47,6 +47,48 @@ export function inWindow(t: number, from: number, to: number): boolean {
   return from < to ? t >= from && t < to : t >= from || t < to;
 }
 
+const TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})?$/;
+
+/**
+ * An ISO 8601 timestamp with a date (`Timestamp`), as milliseconds since the
+ * Unix epoch; null when it is not one. No offset means UTC, so every
+ * implementation reads the same instant. Calendar validity is checked
+ * (2026-02-30 is not a timestamp).
+ */
+export function parseTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const m = TIMESTAMP.exec(value);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s, frac, zone] = m;
+  const Y = Number(y), M = Number(mo), D = Number(d), H = Number(h), MI = Number(mi), S = Number(s ?? 0);
+  if (M < 1 || M > 12 || D < 1 || H > 23 || MI > 59 || S > 59) return null;
+  const ms = Date.UTC(Y, M - 1, D, H, MI, S, frac ? Math.floor(Number(frac.padEnd(3, '0').slice(0, 3))) : 0);
+  if (new Date(ms).getUTCDate() !== D) return null;
+  let offset = 0;
+  if (zone && zone !== 'Z') {
+    const sign = zone[0] === '-' ? -1 : 1;
+    const oh = Number(zone.slice(1, 3)), om = Number(zone.slice(4, 6));
+    if (oh > 23 || om > 59) return null;
+    offset = sign * (oh * 60 + om) * 60_000;
+  }
+  return ms - offset;
+}
+
+export function isTimestamp(value: unknown): value is string {
+  return parseTimestamp(value) !== null;
+}
+
+/** A timestamp `seconds` later, in the same form (`YYYY-MM-DDTHH:MM:SSZ`). */
+export function addSeconds(timestamp: string, seconds: number): string {
+  const ms = parseTimestamp(timestamp)! + seconds * 1000;
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+/** The "HH:MM" of a timestamp, in UTC (its own offset applied). */
+export function timeOfDay(timestamp: string): string {
+  return new Date(parseTimestamp(timestamp)!).toISOString().slice(11, 16);
+}
+
 // ─── Vocabulary ──────────────────────────────────────────────────────────────
 
 export interface Vocabulary {
@@ -303,11 +345,8 @@ export function validateHistoryCondition(h: HistoryCondition, vocab: Vocabulary,
   if (typeof h.value !== 'number' || !Number.isInteger(h.value) || h.value < 0) throw new DomainRulesError(`${where}: history value must be a whole number, 0 or more.`);
   if (h.withinMinutes !== undefined) {
     if (typeof h.withinMinutes !== 'number' || !Number.isFinite(h.withinMinutes) || h.withinMinutes <= 0 || h.withinMinutes > 1440) throw new DomainRulesError(`${where}: history.withinMinutes must be between 1 and 1440.`);
-    if (typeof h.clock !== 'string') throw new DomainRulesError(`${where}: history.withinMinutes needs clock: the time fact that is "now".`);
-    const def = vocab.facts.get(h.clock);
-    if (!def || def.type !== 'time') throw new DomainRulesError(`${where}: history.clock "${h.clock}" is not a declared time fact.`);
-    if (!factAlwaysPresent(def)) throw new DomainRulesError(`${where}: history.clock "${h.clock}" is optional with no default; make it required or give it a default.`);
-  } else if (h.clock !== undefined) throw new DomainRulesError(`${where}: history.clock only applies with withinMinutes.`);
+  }
+  if ((h as { clock?: unknown }).clock !== undefined) throw new DomainRulesError(`${where}: history.clock was removed in robot-domain-rules/3; a window is measured back from request.now (a timestamp with a date). Remove clock and recompile.`);
 }
 
 /** Problems with a supplied history, in plain words (empty when it is usable). `needTimes`: some matching rule uses a window. */
@@ -316,25 +355,24 @@ export function historyProblems(history: unknown, needTimes: boolean): string[] 
   const problems: string[] = [];
   history.forEach((e: HistoryEntry, i) => {
     if (!e || typeof e !== 'object' || typeof e.action !== 'string' || !e.action || typeof e.areaId !== 'string' || !e.areaId) problems.push(`history[${i}] must be { action, areaId, at? }`);
-    else if (e.at !== undefined && !isValidTime(e.at)) problems.push(`history[${i}].at must be "HH:MM", got ${show(e.at)}`);
+    else if (e.at !== undefined && !isTimestamp(e.at)) problems.push(`history[${i}].at must be a timestamp with a date ("YYYY-MM-DDTHH:MM", optional seconds and offset), got ${show(e.at)}`);
     else if (needTimes && e.at === undefined) problems.push(`history[${i}] needs "at" because a rule counts within a time window`);
   });
   return problems;
 }
 
-/** Does the history condition hold for this request? History and facts are validated here. */
-export function historyConditionHolds(h: HistoryCondition, history: HistoryEntry[], areaId: string, facts: Record<string, FactValue>, vocab: Vocabulary): boolean {
+/** Does the history condition hold for this request? History is validated here; `nowMs` is `request.now` parsed (present when any window is in scope). */
+export function historyConditionHolds(h: HistoryCondition, history: HistoryEntry[], areaId: string, nowMs: number | null, vocab: Vocabulary): boolean {
   const actions = resolveSelector(h.actions, 'does', vocab);
   const areas = h.areas !== undefined ? resolveSelector(h.areas, 'where', vocab) : null;
-  const now = h.withinMinutes !== undefined ? minutesOf(facts[h.clock!] as string) : null;
   let count = 0;
   for (const e of history) {
     if (!actions.has(e.action)) continue;
     if (h.sameArea && e.areaId !== areaId) continue;
     if (areas && !areas.has(e.areaId)) continue;
-    if (now !== null) {
-      const ago = (now - minutesOf(e.at!) + 1440) % 1440;
-      if (ago > h.withinMinutes!) continue;
+    if (h.withinMinutes !== undefined) {
+      const ago = (nowMs! - parseTimestamp(e.at)!) / 60_000;
+      if (ago < 0 || ago > h.withinMinutes) continue;
     }
     count++;
   }
@@ -522,6 +560,16 @@ export function isSubset(a: Constraint, b: Constraint): boolean {
     if (a.lo === b.lo && b.loOpen && !a.loOpen) return false;
     if (a.hi === b.hi && b.hiOpen && !a.hiOpen) return false;
     return b.excluded.every(v => !rangeHas(a, v));
+  }
+  if (a.shape === 'range' && b.shape === 'finite') {
+    // A range fits in a finite set only when it holds finitely many values: an integer range, or a single closed point.
+    if (a.integer) {
+      if (a.lo === -Infinity || a.hi === Infinity) return false;
+      if (a.hi - a.lo + 1 - a.excluded.length > b.values.length) return false;   // more whole numbers than b has: bounded loop below
+      for (let v = a.lo; v <= a.hi; v++) if (!a.excluded.includes(v) && !b.values.includes(v)) return false;
+      return true;
+    }
+    return a.lo === a.hi && !a.loOpen && !a.hiOpen && b.values.includes(a.lo);
   }
   if (a.shape === 'values' && b.shape === 'values') {
     if (a.values) return a.values.every(v => b.values ? b.values.includes(v) : !b.excluded.includes(v));

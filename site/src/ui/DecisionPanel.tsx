@@ -89,7 +89,7 @@ export function DecisionPanel({ rulebook, situation, request, decision, findings
 
           {decision.approvalRequests && (
             <div class="notice">
-              <div class="small"><b>What a signed approval must say.</b> A PAUSE for approval returns this object; whoever holds the named authority signs it (Ed25519) and the request is re-sent with it. It is bound to this request's digest and this rulebook's fingerprint, so it cannot be reused for another action or under other rules.</div>
+              <div class="small"><b>What a signed approval must say.</b> A PAUSE for approval returns this object; whoever holds the named authority signs it (Ed25519) and the request is re-sent with it. It names this rule, this rulebook's fingerprint, this participant, this action and this area; the signed approval adds a nonce and an expiry, so it cannot be reused for another action, under other rules, after it lapses, or twice.</div>
               <pre class="code" style="margin-top:6px">{JSON.stringify(decision.approvalRequests, null, 2)}</pre>
             </div>
           )}

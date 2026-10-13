@@ -1,74 +1,102 @@
 /**
  * Example adapter: semantic volumes → rulebook areas.
  *
- * aukilabs/domain-harness stores authored boxes in a collection named
- * `spatial-harness.semantic-volumes/v1` (metres and radians; each volume has
- * a stable id, a required title, an optional description, a centre, a base
- * elevation, width, depth, height and a rotation about Y). This file maps
- * that shape — as described in their README, not fetched from it — onto the
- * areas a rulebook declares:
+ * The input is EXACTLY the collection aukilabs/domain-harness stores, as its
+ * `src/semantic_volumes.rs` (branch `develop`) defines it — the shape, the
+ * default and the validation limits below are transcribed from that file:
  *
- *   area.id   = volume.id          (the ID your spatial system will report)
- *   area.name = volume.title
- *   area.tags = words after '#' in the description — a convention THIS
- *               example suggests so a volume can say "#staff-only"; it is
- *               not part of the harness.
+ *   { schema: "spatial-harness.semantic-volumes/v1",
+ *     frame:  "<scene frame>",
+ *     items:  [ { id, title, description, semantic_type?, center: [x,y,z], size: [x,y,z], yaw }, … ] }
  *
- * `volumeAt(pose, volumes)` is an OPTIONAL helper for the replay: a
- * point-in-oriented-box test so the sample can turn a pose into an area.
- * In production your spatial system decides membership; this core never
- * does (PRINCIPLES.md § 9, BOUNDARY.md). It is here only so the example runs
- * on its own.
+ *   - `deny_unknown_fields` on the collection and on every item: an unknown
+ *     field is an error, never ignored;
+ *   - `semantic_type` defaults to "region" when absent (`default_semantic_type`);
+ *   - `validate(frame)`: schema and frame must match; at most 256 items; the
+ *     serialised collection at most 4 MiB; `id` a UUID, unique; `title`
+ *     non-blank and at most 120 characters; `description` at most 10 000;
+ *     `semantic_type` non-blank, at most 80 characters, no control characters;
+ *     `center` finite with |n| <= 100 000; `size` finite in [0.01, 10 000];
+ *     `yaw` finite with |yaw| <= 2π (radians about the OpenGL Y axis);
+ *     metres throughout, in one explicit scene frame.
+ *
+ * The mapping onto a rulebook's areas:
+ *
+ *   area.id   = item.id             (the UUID your spatial system reports)
+ *   area.name = item.title
+ *   area.tags = [item.semantic_type] (the authored type — "aisle", "dock",
+ *                                     "staff-only", … — "region" by default)
+ *
+ * Membership — which volume a participant is in — is the spatial system's
+ * job and is NOT done here: this example has no point-in-box test. A pose
+ * test on its own has no frame check, no freshness, no dwell and no
+ * hysteresis, and teaches the wrong habit. The replay takes the spatial
+ * system's area reports as events (PRINCIPLES.md § 9, BOUNDARY.md).
  */
 
 import type { AreaDef } from '../../src/index';
 
+export const SEMANTIC_VOLUMES_SCHEMA = 'spatial-harness.semantic-volumes/v1';
+
 export interface SemanticVolume {
+  /** A UUID, unique within the collection. */
   id: string;
   title: string;
-  description?: string;
-  /** Centre of the footprint, metres. `y` is ignored for membership; `baseElevation` and `height` bound it. */
-  center: { x: number; y: number; z: number };
-  baseElevation: number;
-  width: number;
-  depth: number;
-  height: number;
-  /** Rotation about the Y (up) axis, radians. */
-  rotationY: number;
+  description: string;
+  /** Defaults to "region". */
+  semantic_type?: string;
+  /** Box centre, metres, in the collection's frame. */
+  center: [number, number, number];
+  /** Box size, metres. */
+  size: [number, number, number];
+  /** Rotation about the OpenGL Y axis, radians. */
+  yaw: number;
 }
 
-export interface SemanticVolumesCollection {
-  collection: 'spatial-harness.semantic-volumes/v1';
-  volumes: SemanticVolume[];
+export interface SemanticVolumes {
+  schema: typeof SEMANTIC_VOLUMES_SCHEMA;
+  frame: string;
+  items: SemanticVolume[];
 }
 
-/** Tags are the `#words` in the description — a suggested convention, not the harness's. */
-export function tagsOf(volume: SemanticVolume): string[] {
-  return [...(volume.description ?? '').matchAll(/#([\w-]+)/g)].map(m => m[1]);
-}
+const DEFAULT_SEMANTIC_TYPE = 'region';
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const ITEM_FIELDS = new Set(['id', 'title', 'description', 'semantic_type', 'center', 'size', 'yaw']);
+const COLLECTION_FIELDS = new Set(['schema', 'frame', 'items']);
 
-export function volumesToAreas(collection: SemanticVolumesCollection): AreaDef[] {
-  if (collection.collection !== 'spatial-harness.semantic-volumes/v1') throw new Error(`Expected collection spatial-harness.semantic-volumes/v1, got ${collection.collection}`);
-  return collection.volumes.map(v => {
-    if (!v.id || !v.title) throw new Error(`Volume needs an id and a title: ${JSON.stringify(v)}`);
-    const tags = tagsOf(v);
-    return { id: v.id, name: v.title, ...(tags.length ? { tags } : {}) };
-  });
-}
+const vec3 = (v: unknown, ok: (n: number) => boolean): v is [number, number, number] =>
+  Array.isArray(v) && v.length === 3 && v.every(n => typeof n === 'number' && Number.isFinite(n) && ok(n));
 
 /**
- * EXAMPLE ONLY — which volume a point is in, or null. Oriented-box test:
- * translate to the volume's centre, rotate by -rotationY about Y, compare
- * with half-extents; elevation between baseElevation and baseElevation + height.
- * First match wins when volumes overlap. In production the spatial system
- * reports the area; do not ship this.
+ * Parse and validate a semantic-volumes collection the way the harness does,
+ * for the expected scene frame. Throws with the harness's own messages where
+ * it has them. Returns the collection with `semantic_type` defaulted.
  */
-export function volumeAt(pose: { x: number; y: number; z: number }, volumes: SemanticVolume[]): SemanticVolume | null {
-  for (const v of volumes) {
-    const dx = pose.x - v.center.x, dz = pose.z - v.center.z;
-    const c = Math.cos(-v.rotationY), s = Math.sin(-v.rotationY);
-    const lx = dx * c - dz * s, lz = dx * s + dz * c;
-    if (Math.abs(lx) <= v.width / 2 && Math.abs(lz) <= v.depth / 2 && pose.y >= v.baseElevation && pose.y <= v.baseElevation + v.height) return v;
-  }
-  return null;
+export function parseSemanticVolumes(value: unknown, frame: string): SemanticVolumes {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Semantic volumes must be an object { schema, frame, items }');
+  for (const k of Object.keys(value)) if (!COLLECTION_FIELDS.has(k)) throw new Error(`unknown field \`${k}\` (a collection has schema, frame and items only)`);
+  const c = value as Record<string, unknown>;
+  if (typeof c.schema !== 'string' || typeof c.frame !== 'string' || !Array.isArray(c.items)) throw new Error('Semantic volumes must be an object { schema, frame, items }');
+  if (c.schema !== SEMANTIC_VOLUMES_SCHEMA || c.frame !== frame) throw new Error('Semantic volume frame or schema mismatch');
+  if (c.items.length > 256) throw new Error('Scene has too many volumes');
+  if (new TextEncoder().encode(JSON.stringify(value)).length > 4 * 1024 * 1024) throw new Error('Semantic volume collection is too large');
+  const ids = new Set<string>();
+  const items: SemanticVolume[] = c.items.map((raw: unknown) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Each volume must be an object');
+    for (const k of Object.keys(raw)) if (!ITEM_FIELDS.has(k)) throw new Error(`unknown field \`${k}\` on a volume (id, title, description, semantic_type, center, size, yaw only)`);
+    const v = raw as Record<string, unknown>;
+    if (typeof v.id !== 'string' || !UUID.test(v.id) || ids.has(v.id)) throw new Error('Invalid or duplicate volume identity');
+    ids.add(v.id);
+    if (typeof v.title !== 'string' || !v.title.trim() || [...v.title].length > 120 || typeof v.description !== 'string' || [...v.description].length > 10000) throw new Error('Provide a title (up to 120 characters) and a description up to 10000 characters');
+    const semantic_type = v.semantic_type === undefined ? DEFAULT_SEMANTIC_TYPE : v.semantic_type;
+    if (typeof semantic_type !== 'string' || !semantic_type.trim() || [...semantic_type].length > 80 || /\p{Cc}/u.test(semantic_type)) throw new Error('Invalid semantic type');
+    if (!vec3(v.center, n => Math.abs(n) <= 100000) || !vec3(v.size, n => n >= 0.01 && n <= 10000) || typeof v.yaw !== 'number' || !Number.isFinite(v.yaw) || Math.abs(v.yaw) > 2 * Math.PI) throw new Error('Invalid volume position, dimensions or rotation');
+    return { id: v.id, title: v.title, description: v.description, semantic_type, center: v.center, size: v.size, yaw: v.yaw };
+  });
+  return { schema: SEMANTIC_VOLUMES_SCHEMA, frame: c.frame, items };
+}
+
+/** The rulebook areas for a validated collection: id, title as the name, semantic_type as the one tag. */
+export function volumesToAreas(collection: SemanticVolumes): AreaDef[] {
+  return collection.items.map(v => ({ id: v.id, name: v.title, tags: [v.semantic_type ?? DEFAULT_SEMANTIC_TYPE] }));
 }

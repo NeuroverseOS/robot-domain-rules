@@ -1,5 +1,5 @@
 {
-  "format": "neuroverse-domain-rules/2",
+  "format": "neuroverse-domain-rules/3",
   "site": {
     "id": "tiny",
     "name": "Tiny site"
@@ -295,8 +295,12 @@
     {
       "id": "unknown_action",
       "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+    },
+    {
+      "id": "plan_area_continuity",
+      "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
     }
   ],
   "findings": [],
-  "fingerprint": "027c0c11c50dd97c"
+  "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
 }

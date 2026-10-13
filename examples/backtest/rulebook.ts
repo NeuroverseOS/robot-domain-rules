@@ -68,7 +68,7 @@ export function sampleSite(aisle5Limit = 2): { input: CompileDomainInput; rulebo
     id: 'scan_budget',
     text: 'An inventory robot scans the same area at most four times an hour.',
     who: 'inventory_robot', does: 'scan', where: '*',
-    history: [{ actions: 'scan', sameArea: true, withinMinutes: 60, clock: 'localTime', op: '>=', value: 4 }],
+    history: [{ actions: 'scan', sameArea: true, withinMinutes: 60, op: '>=', value: 4 }],
     then: { answer: 'wait', for: 'condition' },
     reason: 'This area has been scanned four times in the last hour; wait before scanning it again.',
   });

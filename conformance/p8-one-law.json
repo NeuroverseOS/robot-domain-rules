@@ -42,7 +42,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -89,7 +89,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -136,7 +136,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -187,12 +187,14 @@
           {
             "ruleId": "agents_plan_with_approval",
             "by": "tag:staff",
-            "requestDigest": "1a445d5d5ce1c1cb",
-            "rulebookFingerprint": "027c0c11c50dd97c",
+            "rulebookFingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93",
+            "participantId": "agent-1",
+            "action": "plan",
+            "areaId": "floor",
             "setBy": "high"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -239,7 +241,7 @@
             "setBy": "high"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -281,7 +283,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -323,7 +325,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -365,7 +367,7 @@
             "setBy": "low"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -408,7 +410,7 @@
             "setBy": "builtin"
           }
         ],
-        "fingerprint": "027c0c11c50dd97c"
+        "fingerprint": "219e26d1da86514320768cbff2604156e00bfa4588b3f19e0a99ea1100c35a93"
       }
     }
   },
@@ -419,7 +421,7 @@
     ],
     "description": "A rulebook where a person role lists a robot-only action is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -716,10 +718,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "950cad062f597fa8"
+      "fingerprint": "bf125bd636b1f036683971ac74966f37f621d427e6b60ddc404b0682749345ed"
     },
     "expect": {
       "error": true,

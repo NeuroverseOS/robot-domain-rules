@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://neuroverseos.github.io/robot-domain-rules/spec/findings.schema.json",
-  "title": "Findings (robot-domain-rules/2)",
+  "title": "Findings (robot-domain-rules/3)",
   "description": "What the conflict check reports. SPEC.md § Conflict analysis.",
   "type": "array",
   "items": { "$ref": "#/$defs/finding" },

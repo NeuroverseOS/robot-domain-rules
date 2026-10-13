@@ -31,8 +31,8 @@ export function importRulebook(text: string): ImportResult {
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { return { ok: false, message: 'That is not JSON.' }; }
   const rb = parsed as Rulebook;
-  if (!rb || typeof rb !== 'object' || rb.format !== 'neuroverse-domain-rules/2' || !rb.site || !Array.isArray(rb.rules) || typeof rb.fingerprint !== 'string') {
-    return { ok: false, message: 'That JSON is not a rulebook (expected format "neuroverse-domain-rules/2" with site, rules and a fingerprint).' };
+  if (!rb || typeof rb !== 'object' || rb.format !== 'neuroverse-domain-rules/3' || !rb.site || !Array.isArray(rb.rules) || typeof rb.fingerprint !== 'string') {
+    return { ok: false, message: 'That JSON is not a rulebook (expected format "neuroverse-domain-rules/3" with site, rules and a fingerprint).' };
   }
   let verified = false;
   try { verified = verifyFingerprint(rb); } catch { verified = false; }

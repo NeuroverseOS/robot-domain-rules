@@ -46,7 +46,7 @@ In code: `reasons`, `trace`, `setBy` on every check, `limits`, `then`, `fingerpr
 
 "Wait" can mean *a person must say yes* or *the situation must change*, and the two are never confused. An approval wait returns exactly what needs signing — the rule, the required authority, a digest of the request, the rulebook's fingerprint — and is cleared by an approval from someone holding what the rule names, for that request, under that rulebook. A condition wait — people in the aisle, no staff in the back room — is cleared only by the facts changing, and no approval, however senior, overrides it. A space can choose that every approval be signed by a key it trusts; then an unsigned or unverified approval clears nothing.
 
-In code: `wait { for: 'approval', by? }` versus `wait { for: 'condition' }`, `approvalRequests` on a PAUSE, `requestDigest`, `trustedKeys` and `verified` — [`p6-waiting.json`](conformance/p6-waiting.json), [`approvals.json`](conformance/approvals.json).
+In code: `wait { for: 'approval', by? }` versus `wait { for: 'condition' }`, `approvalRequests` on a PAUSE (naming the rule, rulebook, participant, action and area to sign for), `trustedKeys`, `verified`, `now` and `consumedApprovals` — [`p6-waiting.json`](conformance/p6-waiting.json), [`approvals.json`](conformance/approvals.json).
 
 ## 7. Conflicts are surfaced, never quietly resolved
 

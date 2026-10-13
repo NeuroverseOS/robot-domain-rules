@@ -23,6 +23,7 @@ const impl = {
   validate: core.validateRulebook,
   canonical: core.canonicalJson,
   fingerprint: core.fingerprint,
+  sha256: core.sha256Utf8,
   requestDigest: core.requestDigest,
   verifyApproval: core.verifyApproval,
   verifyRulebookSignature: core.verifyRulebookSignature,

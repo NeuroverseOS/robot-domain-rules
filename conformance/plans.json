@@ -8,7 +8,7 @@
     ],
     "description": "Each step is decided on facts projected by the earlier steps' declared effects: pick sets loaded, so the move to the yard is refused at step 3 by the rule, its reason, its authority and its instead hint; nothing is projected past it.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -230,10 +230,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -303,7 +307,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -326,7 +330,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -355,7 +359,7 @@
                 }
               ],
               "then": "drop",
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
@@ -378,8 +382,8 @@
           "loaded": true
         },
         "finalArea": "yard",
-        "planDigest": "d0f2a5b0b724e833",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "9c870ca5ca47072e0d6a9a6460e980cc65d1c0f757f8206c02b9a3fee72e6949",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -391,7 +395,7 @@
     ],
     "description": "A plan every step of which passes is ALLOW, with the projected facts and the area it ends in.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -613,10 +617,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -690,7 +698,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -713,7 +721,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -736,7 +744,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -759,7 +767,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -782,7 +790,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
@@ -799,19 +807,20 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "38bee9d301bf890e",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "e3402a6b65d8566f054d5a45d210c9d90aa966126336729c134b2d3b1a99a5b1",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
   {
     "id": "plan-area-defaults-to-where-the-last-move-left-it",
     "principle": [
-      3
+      3,
+      4
     ],
-    "description": "A step without an area happens where the previous move left the participant; a step without a move effect does not move it.",
+    "description": "A step without an area happens where the previous move left the participant; a step that names another area without an action that moves there is refused (plan_area_continuity) — in /2 this plan was accepted with the robot \"looking in the floor\" while projected in the yard.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1033,10 +1042,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -1074,7 +1087,7 @@
     },
     "expect": {
       "plan": {
-        "status": "ALLOW",
+        "status": "BLOCK",
         "steps": [
           {
             "index": 0,
@@ -1096,7 +1109,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -1119,7 +1132,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -1127,59 +1140,32 @@
             "action": "look",
             "areaId": "floor",
             "decision": {
-              "status": "ALLOW",
+              "status": "BLOCK",
               "reasons": [
                 {
-                  "ruleId": "role_permits_action",
-                  "status": "ALLOW",
-                  "setBy": "builtin"
-                },
-                {
-                  "ruleId": "ask_before_look",
-                  "status": "ALLOW",
-                  "setBy": "high"
-                }
-              ],
-              "trace": [
-                {
-                  "ruleId": "role_permits_action",
-                  "status": "ALLOW",
-                  "setBy": "builtin"
-                },
-                {
-                  "ruleId": "ask_before_look",
-                  "status": "ALLOW",
-                  "setBy": "high"
-                }
-              ],
-              "fingerprint": "271a469c3a9e8a48"
-            }
-          },
-          {
-            "index": 3,
-            "action": "drop",
-            "areaId": "yard",
-            "decision": {
-              "status": "ALLOW",
-              "reasons": [
-                {
-                  "ruleId": "role_permits_action",
-                  "status": "ALLOW",
+                  "ruleId": "plan_area_continuity",
+                  "status": "BLOCK",
                   "setBy": "builtin"
                 }
               ],
               "trace": [
                 {
-                  "ruleId": "role_permits_action",
-                  "status": "ALLOW",
+                  "ruleId": "plan_area_continuity",
+                  "status": "BLOCK",
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
         "planChecks": [],
+        "firstViolation": {
+          "stepIndex": 2,
+          "ruleId": "plan_area_continuity",
+          "setBy": "builtin",
+          "from": "step"
+        },
         "approvalRequests": [],
         "finalFacts": {
           "people": 0,
@@ -1191,9 +1177,9 @@
             "authority": "high"
           }
         },
-        "finalArea": "yard",
-        "planDigest": "571c4baea68ef5a7",
-        "fingerprint": "271a469c3a9e8a48"
+        "finalArea": "floor",
+        "planDigest": "b761e5df795416d4f985ec0580d2f8eae38e0742c7760b97ac594240c95d3026",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -1205,7 +1191,7 @@
     ],
     "description": "A step that waits for approval is PAUSE; the plan result lists every approval request so a planner can collect them up front, and later steps are still checked.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1427,10 +1413,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -1489,12 +1479,14 @@
                 {
                   "ruleId": "ask_before_look",
                   "by": "high",
-                  "requestDigest": "06d4dcc6d0f1bebc",
-                  "rulebookFingerprint": "271a469c3a9e8a48",
+                  "rulebookFingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0",
+                  "participantId": "b-1",
+                  "action": "look",
+                  "areaId": "floor",
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -1517,7 +1509,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -1540,7 +1532,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
@@ -1549,8 +1541,10 @@
           {
             "ruleId": "ask_before_look",
             "by": "high",
-            "requestDigest": "06d4dcc6d0f1bebc",
-            "rulebookFingerprint": "271a469c3a9e8a48",
+            "rulebookFingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0",
+            "participantId": "b-1",
+            "action": "look",
+            "areaId": "floor",
             "setBy": "high"
           }
         ],
@@ -1561,8 +1555,8 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "63120400f65aa516",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "3b306a0a8650c1a646e6302bc311a8f162afe0c5d63c8af5b39c8cd139ab6e3e",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -1574,7 +1568,7 @@
     ],
     "description": "Plan rules: ends_in, before (same area), at_most and ends_with each name the step where the plan breaks them, with the authority that set each; the first violation is the earliest by step.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1796,6 +1790,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -1863,7 +1861,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "56929e312e63cc10"
+      "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
     },
     "plan": {
       "participant": {
@@ -1900,8 +1898,11 @@
           "action": "drop"
         },
         {
+          "action": "go",
+          "area": "yard"
+        },
+        {
           "action": "look",
-          "area": "yard",
           "facts": {
             "approvedBy": {
               "id": "ann",
@@ -1935,7 +1936,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -1958,7 +1959,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -1991,7 +1992,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2014,7 +2015,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2037,11 +2038,34 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
             "index": 5,
+            "action": "go",
+            "areaId": "yard",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
+            }
+          },
+          {
+            "index": 6,
             "action": "look",
             "areaId": "yard",
             "decision": {
@@ -2070,15 +2094,16 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           }
         ],
         "planChecks": [
           {
             "ruleId": "end_in_floor",
-            "status": "ALLOW",
-            "setBy": "high"
+            "status": "BLOCK",
+            "setBy": "high",
+            "stepIndex": 6
           },
           {
             "ruleId": "look_before_pick",
@@ -2096,7 +2121,7 @@
             "ruleId": "end_with_drop_or_go",
             "status": "BLOCK",
             "setBy": "high",
-            "stepIndex": 5
+            "stepIndex": 6
           }
         ],
         "firstViolation": {
@@ -2116,9 +2141,9 @@
             "authority": "high"
           }
         },
-        "finalArea": "floor",
-        "planDigest": "4d52deee26034556",
-        "fingerprint": "56929e312e63cc10"
+        "finalArea": "yard",
+        "planDigest": "76f578829cf1e022e90c154bdc4e41f0096f6b3c5ceae0e74a979a8780d70342",
+        "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
       }
     }
   },
@@ -2129,7 +2154,7 @@
     ],
     "description": "The same plan rules, satisfied: a look before the only pick in the same area, ending with a move onto the floor.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2351,6 +2376,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -2418,7 +2447,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "56929e312e63cc10"
+      "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
     },
     "plan": {
       "participant": {
@@ -2492,7 +2521,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2515,7 +2544,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2538,7 +2567,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2561,7 +2590,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2584,7 +2613,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           }
         ],
@@ -2622,8 +2651,8 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "38bee9d301bf890e",
-        "fingerprint": "56929e312e63cc10"
+        "planDigest": "e3402a6b65d8566f054d5a45d210c9d90aa966126336729c134b2d3b1a99a5b1",
+        "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
       }
     }
   },
@@ -2634,7 +2663,7 @@
     ],
     "description": "What the participant did before the plan (plan.history) counts for a \"before\" plan rule.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2856,6 +2885,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -2923,7 +2956,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "56929e312e63cc10"
+      "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
     },
     "plan": {
       "participant": {
@@ -2976,7 +3009,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           },
           {
@@ -2999,7 +3032,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "56929e312e63cc10"
+              "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
             }
           }
         ],
@@ -3033,8 +3066,8 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "d1c90252452d5a7a",
-        "fingerprint": "56929e312e63cc10"
+        "planDigest": "acfec9a9fe9f7120acaf2d3f402c8d573191f9160b4f7cec22a470f5df2de34f",
+        "fingerprint": "8ac71f2a418eea08c6e009d647567afc59846b09ea3b0898d7c14814ea0c54de"
       }
     }
   },
@@ -3045,7 +3078,7 @@
     ],
     "description": "A plan rule binds the roles its who selector names and no others: one on [\"*\", \"!bot\"] does not apply to the bot, so it is not even checked.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3267,6 +3300,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -3290,7 +3327,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "2c5fcd60750b0759"
+      "fingerprint": "102bde475b3565488b4672a8a235974dfc0d71468a2d10746cdc5c714cec7c0b"
     },
     "plan": {
       "participant": {
@@ -3337,7 +3374,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "2c5fcd60750b0759"
+              "fingerprint": "102bde475b3565488b4672a8a235974dfc0d71468a2d10746cdc5c714cec7c0b"
             }
           },
           {
@@ -3360,7 +3397,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "2c5fcd60750b0759"
+              "fingerprint": "102bde475b3565488b4672a8a235974dfc0d71468a2d10746cdc5c714cec7c0b"
             }
           }
         ],
@@ -3373,8 +3410,8 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "dd947b1ab3935a37",
-        "fingerprint": "2c5fcd60750b0759"
+        "planDigest": "f8db8b78d4ff77a7f589d4bc7cd5fb015dbcf6a79521317fe8563621edc73027",
+        "fingerprint": "102bde475b3565488b4672a8a235974dfc0d71468a2d10746cdc5c714cec7c0b"
       }
     }
   },
@@ -3385,7 +3422,7 @@
     ],
     "description": "An effect that pushes a fact outside its declared range (people max 2) is not clamped: the next step is BLOCK required_facts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3607,10 +3644,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -3685,7 +3726,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -3708,7 +3749,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -3731,7 +3772,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -3754,7 +3795,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -3777,7 +3818,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
@@ -3800,8 +3841,8 @@
           "loaded": true
         },
         "finalArea": "floor",
-        "planDigest": "3a181a5619ee0456",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "f212fafe78aec3378156f239cba4b068da480420a6e7084e68b32b22916f544d",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -3813,7 +3854,7 @@
     ],
     "description": "With clock, startTime and stepDurationSeconds, the named time fact advances per step (whole minutes, wrapping at midnight); there is still no clock in the engine.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4058,10 +4099,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "ee6060a06fd72b61"
+      "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
     },
     "plan": {
       "participant": {
@@ -4114,7 +4159,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "ee6060a06fd72b61"
+              "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
             }
           },
           {
@@ -4137,7 +4182,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "ee6060a06fd72b61"
+              "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
             }
           },
           {
@@ -4165,7 +4210,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "ee6060a06fd72b61"
+              "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
             }
           }
         ],
@@ -4184,8 +4229,8 @@
           "loaded": false
         },
         "finalArea": "floor",
-        "planDigest": "41bb9b783c8d1192",
-        "fingerprint": "ee6060a06fd72b61"
+        "planDigest": "76bf3617c9b6448dd2727dda4ec8b460ba78784accd8a889344967b4db0ca44d",
+        "fingerprint": "7b6f1f5de5e511302761de503989582360be5f97917389526fedbe9eaebfcdc8"
       }
     }
   },
@@ -4196,7 +4241,7 @@
     ],
     "description": "A plan with no steps is BLOCK required_facts, never a throw and never permission.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4418,10 +4463,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -4450,8 +4499,8 @@
         "approvalRequests": [],
         "finalFacts": {},
         "finalArea": "",
-        "planDigest": "c3210c2bbbeb3f26",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "39e60d97f6ab56416f08431d009439e889c4850114b65fbb3ed18e623e76ddf1",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -4462,7 +4511,7 @@
     ],
     "description": "The first step must say where it is; a plan that does not is BLOCK required_facts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4684,10 +4733,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -4720,8 +4773,8 @@
         "approvalRequests": [],
         "finalFacts": {},
         "finalArea": "",
-        "planDigest": "288e98157c80fa09",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "f19b9361329dac1976b5bb3c22e032dac7ca303109e3266e837e19fa05371998",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -4732,7 +4785,7 @@
     ],
     "description": "A plan naming a clock that is not a declared time fact is BLOCK required_facts.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4954,10 +5007,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -4993,8 +5050,8 @@
         "approvalRequests": [],
         "finalFacts": {},
         "finalArea": "",
-        "planDigest": "17c2872b97c877f7",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "a151f175299a8e7bf04102171ab34e37d846faea898bb21e157a9cdfc949d333",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -5005,7 +5062,7 @@
     ],
     "description": "A plan is decided by the rulebook and the plan alone: a note on a step and facts the rules do not mention change nothing.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5227,10 +5284,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "271a469c3a9e8a48"
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
     },
     "plan": {
       "participant": {
@@ -5302,7 +5363,7 @@
                   "setBy": "high"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -5325,7 +5386,7 @@
                   "setBy": "builtin"
                 }
               ],
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           },
           {
@@ -5354,7 +5415,7 @@
                 }
               ],
               "then": "drop",
-              "fingerprint": "271a469c3a9e8a48"
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
             }
           }
         ],
@@ -5379,8 +5440,8 @@
           "weather": "rain"
         },
         "finalArea": "yard",
-        "planDigest": "9249bee2b741ed27",
-        "fingerprint": "271a469c3a9e8a48"
+        "planDigest": "aa84cdae351bea587d8cc4e6db9a98317dd424d3d00b5e6397e6613fed75ce6e",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
       }
     }
   },
@@ -5391,7 +5452,7 @@
     ],
     "description": "An action whose effect names a fact the site did not declare makes the rulebook invalid.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5608,10 +5669,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "620038af509c2b65"
+      "fingerprint": "467eb6bb46b30b0ec8c46d8bd5ca5845c652b9a7a03280cbc66d9a732856163c"
     },
     "expect": {
       "error": true,
@@ -5625,7 +5690,7 @@
     ],
     "description": "An add effect on a boolean fact makes the rulebook invalid.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5842,10 +5907,14 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "c3cf14eb6a727ae9"
+      "fingerprint": "0b1ffa937c97bb7e65742d642e98be1327a75c0c9390186bf2553741cdcf8a29"
     },
     "expect": {
       "error": true,
@@ -5860,7 +5929,7 @@
     ],
     "description": "A plan rule that does not say who set it is rejected, like any rule.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6082,6 +6151,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -6148,7 +6221,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "7b28361b83077591"
+      "fingerprint": "dd64565911060ec6c341a8c55aeb218a0fa5d64df822623281108167eea70c1c"
     },
     "expect": {
       "error": true,
@@ -6162,7 +6235,7 @@
     ],
     "description": "A plan rule naming an undeclared area is rejected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6384,6 +6457,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -6451,7 +6528,7 @@
         }
       ],
       "findings": [],
-      "fingerprint": "4d61e24afc45eac4"
+      "fingerprint": "1298be00b9e30ddd582a573539c2e376c20d3617be6c1dd36dee03480c95d0e4"
     },
     "expect": {
       "error": true,
@@ -6459,13 +6536,14 @@
     }
   },
   {
-    "id": "plan-rule-duplicate-finding",
+    "id": "plan-step-area-without-move-is-refused",
     "principle": [
-      7
+      3,
+      4
     ],
-    "description": "Two plan rules that make the same check for roles in common are a duplicate finding (plan rules only reject, so they never disagree).",
+    "description": "A step may name another area only when its action moves the participant there: \"look in the floor, look in the yard\" with no move is BLOCK plan_area_continuity at the second step, by the evaluator, and nothing is projected past it.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6687,6 +6765,1026 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+    },
+    "plan": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "initialFacts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "steps": [
+        {
+          "action": "look",
+          "area": "floor",
+          "facts": {
+            "approvedBy": {
+              "id": "ann",
+              "authority": "high"
+            }
+          }
+        },
+        {
+          "action": "look",
+          "area": "yard",
+          "facts": {
+            "approvedBy": {
+              "id": "ann",
+              "authority": "high"
+            }
+          }
+        },
+        {
+          "action": "drop"
+        }
+      ]
+    },
+    "expect": {
+      "plan": {
+        "status": "BLOCK",
+        "steps": [
+          {
+            "index": 0,
+            "action": "look",
+            "areaId": "floor",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                },
+                {
+                  "ruleId": "ask_before_look",
+                  "status": "ALLOW",
+                  "setBy": "high"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                },
+                {
+                  "ruleId": "ask_before_look",
+                  "status": "ALLOW",
+                  "setBy": "high"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          },
+          {
+            "index": 1,
+            "action": "look",
+            "areaId": "yard",
+            "decision": {
+              "status": "BLOCK",
+              "reasons": [
+                {
+                  "ruleId": "plan_area_continuity",
+                  "status": "BLOCK",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "plan_area_continuity",
+                  "status": "BLOCK",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          }
+        ],
+        "planChecks": [],
+        "firstViolation": {
+          "stepIndex": 1,
+          "ruleId": "plan_area_continuity",
+          "setBy": "builtin",
+          "from": "step"
+        },
+        "approvalRequests": [],
+        "finalFacts": {
+          "people": 0,
+          "time": "10:00",
+          "day": "mon",
+          "approvedBy": {
+            "id": "ann",
+            "authority": "high"
+          }
+        },
+        "finalArea": "yard",
+        "planDigest": "144afdacec99ce82919a4734668e8f0425949693a8f66b86c9fbf2ff058128e7",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+      }
+    }
+  },
+  {
+    "id": "plan-step-area-restated-is-fine",
+    "principle": [
+      3
+    ],
+    "description": "A step may restate the area it is already in; a moving action may name a new one.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ],
+          "effects": [
+            {
+              "op": "move"
+            }
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        },
+        {
+          "id": "pick",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": true
+            },
+            {
+              "op": "add",
+              "fact": "people",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "drop",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look",
+            "pick",
+            "drop"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 2,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        },
+        {
+          "id": "loaded",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "no_load_in_yard",
+          "text": "no_load_in_yard",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "deny",
+            "instead": "drop"
+          },
+          "when": [
+            {
+              "fact": "loaded",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_load_in_yard"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_before_look",
+          "text": "ask_before_look",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_before_look"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+    },
+    "plan": {
+      "participant": {
+        "id": "b-1",
+        "kind": "robot",
+        "roleId": "bot"
+      },
+      "initialFacts": {
+        "people": 0,
+        "time": "10:00",
+        "day": "mon"
+      },
+      "steps": [
+        {
+          "action": "look",
+          "area": "floor",
+          "facts": {
+            "approvedBy": {
+              "id": "ann",
+              "authority": "high"
+            }
+          }
+        },
+        {
+          "action": "drop",
+          "area": "floor"
+        },
+        {
+          "action": "go",
+          "area": "yard"
+        },
+        {
+          "action": "drop",
+          "area": "yard"
+        }
+      ]
+    },
+    "expect": {
+      "plan": {
+        "status": "ALLOW",
+        "steps": [
+          {
+            "index": 0,
+            "action": "look",
+            "areaId": "floor",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                },
+                {
+                  "ruleId": "ask_before_look",
+                  "status": "ALLOW",
+                  "setBy": "high"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                },
+                {
+                  "ruleId": "ask_before_look",
+                  "status": "ALLOW",
+                  "setBy": "high"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          },
+          {
+            "index": 1,
+            "action": "drop",
+            "areaId": "floor",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          },
+          {
+            "index": 2,
+            "action": "go",
+            "areaId": "yard",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          },
+          {
+            "index": 3,
+            "action": "drop",
+            "areaId": "yard",
+            "decision": {
+              "status": "ALLOW",
+              "reasons": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "trace": [
+                {
+                  "ruleId": "role_permits_action",
+                  "status": "ALLOW",
+                  "setBy": "builtin"
+                }
+              ],
+              "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+            }
+          }
+        ],
+        "planChecks": [],
+        "approvalRequests": [],
+        "finalFacts": {
+          "people": 0,
+          "time": "10:00",
+          "day": "mon",
+          "approvedBy": {
+            "id": "ann",
+            "authority": "high"
+          },
+          "loaded": false
+        },
+        "finalArea": "yard",
+        "planDigest": "76c1d94794222974daa97dd605e14e7db9db3823040202773916fc3bf19f2206",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+      }
+    }
+  },
+  {
+    "id": "plan-null-is-block",
+    "principle": [
+      4
+    ],
+    "description": "A plan that is not an object (null) is BLOCK required_facts, never a throw; its digest is the digest of null.",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ],
+          "effects": [
+            {
+              "op": "move"
+            }
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        },
+        {
+          "id": "pick",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": true
+            },
+            {
+              "op": "add",
+              "fact": "people",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "drop",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look",
+            "pick",
+            "drop"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 2,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        },
+        {
+          "id": "loaded",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "no_load_in_yard",
+          "text": "no_load_in_yard",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "deny",
+            "instead": "drop"
+          },
+          "when": [
+            {
+              "fact": "loaded",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_load_in_yard"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_before_look",
+          "text": "ask_before_look",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_before_look"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
+        }
+      ],
+      "findings": [],
+      "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+    },
+    "plan": null,
+    "expect": {
+      "plan": {
+        "status": "BLOCK",
+        "steps": [],
+        "planChecks": [],
+        "firstViolation": {
+          "stepIndex": 0,
+          "ruleId": "required_facts",
+          "setBy": "builtin",
+          "from": "plan"
+        },
+        "approvalRequests": [],
+        "finalFacts": {},
+        "finalArea": "",
+        "planDigest": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "fingerprint": "8d4998dbb24b0554f03fe13beaf0a35cec532acbf236e2592d151809baa213b0"
+      }
+    }
+  },
+  {
+    "id": "plan-rule-duplicate-finding",
+    "principle": [
+      7
+    ],
+    "description": "Two plan rules that make the same check for roles in common are a duplicate finding (plan rules only reject, so they never disagree).",
+    "rulebook": {
+      "format": "neuroverse-domain-rules/3",
+      "site": {
+        "id": "tiny",
+        "name": "Tiny site"
+      },
+      "kinds": [
+        "robot"
+      ],
+      "authorities": [
+        {
+          "id": "high"
+        },
+        {
+          "id": "low"
+        }
+      ],
+      "actions": [
+        {
+          "id": "go",
+          "kinds": [
+            "robot"
+          ],
+          "tags": [
+            "movement"
+          ],
+          "effects": [
+            {
+              "op": "move"
+            }
+          ]
+        },
+        {
+          "id": "look",
+          "kinds": [
+            "robot"
+          ]
+        },
+        {
+          "id": "pick",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": true
+            },
+            {
+              "op": "add",
+              "fact": "people",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "id": "drop",
+          "kinds": [
+            "robot"
+          ],
+          "effects": [
+            {
+              "op": "set",
+              "fact": "loaded",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "floor",
+          "name": "Floor"
+        },
+        {
+          "id": "yard",
+          "name": "Yard",
+          "tags": [
+            "outside"
+          ]
+        }
+      ],
+      "roles": [
+        {
+          "id": "bot",
+          "name": "Bot",
+          "kind": "robot",
+          "actions": [
+            "go",
+            "look",
+            "pick",
+            "drop"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "id": "people",
+          "type": "number",
+          "integer": true,
+          "min": 0,
+          "max": 2,
+          "required": true
+        },
+        {
+          "id": "load",
+          "type": "number",
+          "min": 0,
+          "default": 0
+        },
+        {
+          "id": "time",
+          "type": "time",
+          "required": true
+        },
+        {
+          "id": "mode",
+          "type": "enum",
+          "values": [
+            "a",
+            "b",
+            "c"
+          ],
+          "default": "a"
+        },
+        {
+          "id": "alarm",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "id": "day",
+          "type": "day",
+          "required": true
+        },
+        {
+          "id": "speedAsked",
+          "type": "number",
+          "min": 0
+        },
+        {
+          "id": "loaded",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "limits": [
+        {
+          "id": "speed",
+          "unit": "m/s",
+          "requestedFact": "speedAsked"
+        }
+      ],
+      "tags": {
+        "actions": [],
+        "areas": [],
+        "roles": []
+      },
+      "answers": {},
+      "otherwise": "deny",
+      "rules": [
+        {
+          "setBy": "high",
+          "id": "no_load_in_yard",
+          "text": "no_load_in_yard",
+          "who": "*",
+          "does": "go",
+          "where": "yard",
+          "then": {
+            "answer": "deny",
+            "instead": "drop"
+          },
+          "when": [
+            {
+              "fact": "loaded",
+              "op": "==",
+              "value": true
+            }
+          ],
+          "source": {
+            "kind": "manual",
+            "ref": "no_load_in_yard"
+          }
+        },
+        {
+          "setBy": "high",
+          "id": "ask_before_look",
+          "text": "ask_before_look",
+          "who": "*",
+          "does": "look",
+          "where": "*",
+          "then": {
+            "answer": "wait",
+            "for": "approval",
+            "by": "high"
+          },
+          "source": {
+            "kind": "manual",
+            "ref": "ask_before_look"
+          }
+        }
+      ],
+      "builtin": [
+        {
+          "id": "required_facts",
+          "text": "Every fact a decision needs must be supplied and valid; a missing or invalid fact is never permission."
+        },
+        {
+          "id": "area_declared",
+          "text": "Only declared areas are governed; anything in an undeclared area is blocked."
+        },
+        {
+          "id": "role_declared",
+          "text": "Only declared roles may act; unknown roles are blocked."
+        },
+        {
+          "id": "role_permits_action",
+          "text": "A participant may only take actions its role lists."
+        },
+        {
+          "id": "unknown_action",
+          "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "planRules": [
@@ -6733,7 +7831,7 @@
           "message": "Plan rules `one_pick` (set by high) and `one_pick_again` (set by low) make the same check for Bot. One of them can go."
         }
       ],
-      "fingerprint": "5afc2f57cbce47e8"
+      "fingerprint": "3d1eecad9a2cbcf3ef3b6a36d8d567ef48253f6b15eb60a923baefd8b9e95b41"
     },
     "expect": {
       "findings": [

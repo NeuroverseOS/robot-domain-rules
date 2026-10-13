@@ -13,7 +13,7 @@
  *       reason and the authority behind it; every other violation is listed too
  *   v2  scans first, puts the stock down in the back room, fetches a part
  *       from the electrical room, docks → one step needs a person's approval;
- *       the result says which, with the request digest to sign
+ *       the result says which rule, participant, action and area to sign for
  *   v2 + Dana's signed approval (Ed25519, TEST ONLY key, as in replay.ts)
  *       → accepted, with the projected facts and the area it ends in
  *
@@ -30,10 +30,10 @@ import {
   DomainRulesBuilder, compileDomain, evaluatePlan, publicKeyOf, signApproval, verifyApproval,
   type Plan, type PlanEvaluation, type Rulebook,
 } from '../../src/index';
-import { volumesToAreas, type SemanticVolumesCollection } from './volumes-to-areas';
+import { parseSemanticVolumes, volumesToAreas } from './volumes-to-areas';
 
 const dir = import.meta.dirname;
-const volumes = JSON.parse(readFileSync(join(dir, 'semantic-volumes.json'), 'utf8')) as SemanticVolumesCollection;
+const volumes = parseSemanticVolumes(JSON.parse(readFileSync(join(dir, 'semantic-volumes.json'), 'utf8')), 'harness-store-scene');
 
 // TEST ONLY signing key for the manager's glasses (the same as replay.ts). Real keys live in your key management.
 const DANA_SEED = '4444444444444444444444444444444444444444444444444444444444444444';
@@ -53,7 +53,7 @@ export async function harnessRulebook(): Promise<Rulebook> {
   builder.confirm(builder.addRuleFromText('robots slow to 0.3 m/s in checkout', { id: 'checkout_speed' }));
   builder.addRule({
     id: 'no_carrying_through_checkout', text: 'Robots carrying stock do not enter the checkout.',
-    who: 'kind:robot', does: 'enter_zone', where: 'vol-checkout', when: [{ fact: 'carrying', op: '==', value: true }],
+    who: 'kind:robot', does: 'enter_zone', where: '7f2d9a10-1b3c-4d5e-8f60-000000000003', when: [{ fact: 'carrying', op: '==', value: true }],
     then: { answer: 'deny', instead: 'place' }, reason: 'Robots carrying stock do not enter the checkout; put it down first.',
   });
   builder.addPlanRule({ id: 'scan_before_restock', text: 'A robot scans a shelf before it restocks it.', who: 'kind:robot', check: { kind: 'before', first: 'scan', then: 'manipulate', sameArea: true }, reason: 'Scan the shelf before restocking it.' });
@@ -73,7 +73,7 @@ function transcript(label: string, plan: Plan, r: PlanEvaluation, rulebook: Rule
   }
   if (r.steps.length < plan.steps.length) L.push(`      (${plan.steps.length - r.steps.length} later step${plan.steps.length - r.steps.length === 1 ? '' : 's'} not projected: the plan does not continue past a refusal)`);
   for (const c of r.planChecks) L.push(`  plan rule ${c.ruleId} [${c.setBy}]: ${c.status}${c.stepIndex !== undefined ? ` at step ${c.stepIndex + 1}` : ''} — ${c.reason}`);
-  if (r.approvalRequests.length) L.push(`  approvals needed before this plan can run: ${r.approvalRequests.map(a => `${a.ruleId} by ${a.by ?? 'anyone'} (digest ${a.requestDigest})`).join('; ')}`);
+  if (r.approvalRequests.length) L.push(`  approvals needed before this plan can run: ${r.approvalRequests.map(a => `${a.ruleId} by ${a.by ?? 'anyone'} (${a.participantId} ${a.action} in ${name(a.areaId)})`).join('; ')}`);
   if (r.status !== 'BLOCK') L.push(`  ends in ${name(r.finalArea)}; final facts carrying=${String(r.finalFacts.carrying)}, localTime=${String(r.finalFacts.localTime)}`);
   return L;
 }
@@ -83,7 +83,7 @@ async function main() {
   const lines = readFileSync(join(dir, 'plans.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l) as { version: string; by: string; t: string; note: string; plan: Plan });
   const log: Array<Record<string, unknown>> = [];
   const out: string[] = [];
-  out.push(`Rulebook ${rulebook.fingerprint} — ${rulebook.areas.length} areas from ${volumes.volumes.length} semantic volumes, ${rulebook.rules.length} rules, ${rulebook.planRules?.length ?? 0} plan rules, findings: ${rulebook.findings.length}`, '');
+  out.push(`Rulebook ${rulebook.fingerprint} — ${rulebook.areas.length} areas from ${volumes.items.length} semantic volumes, ${rulebook.rules.length} rules, ${rulebook.planRules?.length ?? 0} plan rules, findings: ${rulebook.findings.length}`, '');
 
   let seq = 0;
   let pending: PlanEvaluation | null = null;
@@ -101,16 +101,17 @@ async function main() {
   if (pending && last) {
     const ask = pending.approvalRequests[0];
     const t = '2026-10-12T09:33:00Z';
-    const signed = await signApproval({ id: 'dana', authority: 'site-manager', requestDigest: ask.requestDigest, rulebookFingerprint: ask.rulebookFingerprint, issuedAt: t }, { keyId: 'dana-glasses', privateKey: DANA_SEED });
+    const signed = await signApproval({ id: 'dana', authority: 'site-manager', ruleId: ask.ruleId, rulebookFingerprint: ask.rulebookFingerprint, participantId: ask.participantId, action: ask.action, areaId: ask.areaId, nonce: 'dana-glasses-plan-1', issuedAt: t, expiresAt: '2026-10-12T10:33:00Z' }, { keyId: 'dana-glasses', privateKey: DANA_SEED });
     const verified = await verifyApproval(signed, rulebook);
     if (!verified.ok) throw new Error(`approval did not verify: ${verified.reason}`);
-    out.push(`${t.slice(11, 16)}  dana: signs the approval request her glasses showed her (rule ${ask.ruleId}, key ${signed.keyId}, signature ${signed.signature.slice(0, 12)}…)`, '');
-    const stepIndex = pending.steps.findIndex(s => s.decision.approvalRequests?.some(a => a.requestDigest === ask.requestDigest));
+    out.push(`${t.slice(11, 16)}  dana: signs the approval request her glasses showed her (rule ${ask.ruleId}, key ${signed.keyId}, signature ${signed.signature.slice(0, 12)}…; valid until 10:33, one use)`, '');
+    const stepIndex = pending.steps.findIndex(s => s.decision.approvalRequests?.some(a => a.ruleId === ask.ruleId && a.action === ask.action && a.areaId === ask.areaId));
     const approvedPlan: Plan = { ...last.plan, steps: last.plan.steps.map((s, i) => (i === stepIndex ? { ...s, facts: { ...(s.facts ?? {}), approvedBy: verified.approval } } : s)) };
     const r = evaluatePlan(rulebook, approvedPlan);
     seq++;
-    log.push({ seq, t: '2026-10-12T09:33:05Z', by: 'planner-1', version: `${last.version}+approval`, plan: approvedPlan, evaluation: r, rulebookFingerprint: rulebook.fingerprint, approvalRef: { keyId: signed.keyId, signature: signed.signature, requestDigest: ask.requestDigest } });
+    log.push({ seq, t: '2026-10-12T09:33:05Z', by: 'planner-1', version: `${last.version}+approval`, plan: approvedPlan, evaluation: r, rulebookFingerprint: rulebook.fingerprint, approvalRef: { keyId: signed.keyId, signature: signed.signature, nonce: signed.nonce } });
     out.push(`09:33  planner-1: re-sends plan ${last.version} with Dana's signed approval on step ${stepIndex + 1}.`, ...transcript(`Plan ${last.version} + approval`, approvedPlan, r, rulebook), '');
+    out.push('  (A plan verdict is a verdict on the plan as described. As each step comes up, the harness asks again with evaluateDomainAction on the facts then current; the approval authorises that one step\'s rule, participant, action and area, once, until it expires.)', '');
   }
 
   writeFileSync(join(dir, 'plan-decisions.jsonl'), log.map(l => JSON.stringify(l)).join('\n') + '\n');

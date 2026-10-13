@@ -7,7 +7,7 @@
     ],
     "description": "A log replayed through a rulebook gives one row per event with the decision's status and reasons, totals by status, and counts by area, by role and by rule; the fingerprint names the rulebook that decided.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -202,7 +202,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -299,6 +298,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -373,7 +376,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -448,7 +451,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 4,
         "totals": {
           "events": 4,
@@ -613,9 +616,9 @@
       4,
       9
     ],
-    "description": "A rule that counts history sees, for each event, the earlier events of the same participant in this log, timed by the clock fact: the fourth look within the hour is refused, another participant's looks do not count, and nothing is kept between runs.",
+    "description": "A rule that counts history sees, for each event, the earlier events of the same participant in this log, timed by each event's at (which is also each request's now): the fourth look within the hour is refused, another participant's looks do not count, and nothing is kept between runs.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -810,7 +813,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -907,6 +909,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -981,7 +987,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -1089,7 +1095,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 6,
         "totals": {
           "events": 6,
@@ -1262,14 +1268,14 @@
     }
   },
   {
-    "id": "backtest-history-does-not-cross-days",
+    "id": "backtest-history-is-absolute-time",
     "principle": [
       4,
       9
     ],
-    "description": "Built history never crosses a day (the text of `at` before its first \"T\"): three looks on Monday do not count toward Tuesday's first look, whose history is empty.",
+    "description": "Built history is all of the participant's earlier events, and windows are absolute time: three looks on Monday are a day before Tuesday's looks and do not count, with no day boundary needed.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -1464,7 +1470,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -1561,6 +1566,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -1635,7 +1644,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -1726,7 +1735,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 5,
         "totals": {
           "events": 5,
@@ -1883,7 +1892,7 @@
     ],
     "description": "An event whose request carries its own history is decided on that history, not on the log: the first look is refused because the request says three happened already.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2078,7 +2087,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -2175,6 +2183,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2249,7 +2261,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -2271,17 +2283,17 @@
             {
               "action": "look",
               "areaId": "floor",
-              "at": "09:30"
+              "at": "2026-10-05T09:30"
             },
             {
               "action": "look",
               "areaId": "floor",
-              "at": "09:40"
+              "at": "2026-10-05T09:40"
             },
             {
               "action": "look",
               "areaId": "floor",
-              "at": "09:50"
+              "at": "2026-10-05T09:50"
             }
           ]
         }
@@ -2306,7 +2318,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 2,
         "totals": {
           "events": 2,
@@ -2429,7 +2441,7 @@
     ],
     "description": "An event the log did not carry enough facts for is counted as missing facts, not as a refusal by a rule, and the report names each fact and how often it was missing or invalid.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -2624,7 +2636,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -2721,6 +2732,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -2795,7 +2810,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -2866,7 +2881,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 4,
         "totals": {
           "events": 4,
@@ -3025,7 +3040,7 @@
     ],
     "description": "An event whose request is not a request is a row refused as missing facts (`request`), never a throw.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3220,7 +3235,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -3317,6 +3331,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3391,7 +3409,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -3418,7 +3436,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 2,
         "totals": {
           "events": 2,
@@ -3556,7 +3574,7 @@
     ],
     "description": "Requests for actions no rule covers are gaps, grouped by action, most often first.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -3751,7 +3769,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -3848,6 +3865,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -3922,7 +3943,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -3996,7 +4017,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 4,
         "totals": {
           "events": 4,
@@ -4166,7 +4187,7 @@
     ],
     "description": "Rules that would have stalled work are listed most often first, then by first occurrence, with the earliest example timestamps (three by default).",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -4361,7 +4382,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -4458,6 +4478,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -4532,7 +4556,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -4640,7 +4664,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 6,
         "totals": {
           "events": 6,
@@ -4837,7 +4861,7 @@
     ],
     "description": "A finding counts as having occurred when both of its rules matched a recorded request (the matching relation of § 6 step 4, as for a witness): the allow-versus-deny contradiction on alarm occurred twice; the finding between the yard rules did not occur in this log.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5032,7 +5056,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -5129,6 +5152,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -5203,7 +5230,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -5262,7 +5289,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 3,
         "totals": {
           "events": 3,
@@ -5415,7 +5442,7 @@
     ],
     "description": "When the log records what happened, the report lists where the rule and the record differ, in event order, without judging which is right: a refusal the record says happened, an allowance the record says did not; \"unknown\" and events without an outcome are left out.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -5610,7 +5637,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -5707,6 +5733,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -5781,7 +5811,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -5876,7 +5906,7 @@
     ],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 5,
         "totals": {
           "events": 5,
@@ -6073,7 +6103,7 @@
     ],
     "description": "An empty log is a report of zeros in which every rule never fired.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6268,7 +6298,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -6365,6 +6394,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -6439,12 +6472,12 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [],
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 0,
         "totals": {
           "events": 0,
@@ -6511,7 +6544,7 @@
     ],
     "description": "The examples option bounds how many timestamps each list keeps; counts are unaffected.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -6706,7 +6739,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -6803,6 +6835,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -6877,7 +6913,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -6937,7 +6973,7 @@
     },
     "expect": {
       "backtest": {
-        "fingerprint": "31f1ec3125009114",
+        "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
         "events": 3,
         "totals": {
           "events": 3,
@@ -7074,7 +7110,7 @@
     ],
     "description": "Two reports on the same log, current rulebook versus proposed: which events are newly blocked, which newly allowed, which changed otherwise, and how each rule's count of decided events moved.",
     "rulebook": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -7269,7 +7305,6 @@
             {
               "actions": "look",
               "withinMinutes": 60,
-              "clock": "time",
               "op": ">=",
               "value": 3
             }
@@ -7366,6 +7401,10 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [
@@ -7440,7 +7479,7 @@
           "message": "`alarm_allows_look` set by low tries to loosen what `no_look_in_alarm` set by high sets: `alarm_allows_look` (set by low) says allow; `no_look_in_alarm` (set by high) says deny. Both apply to every role · look · everywhere, when alarm in true. A lower authority can only tighten, so `alarm_allows_look` never takes effect at all. For example: bot does look in floor with people=0, time=\"00:00\", day=\"mon\", alarm=true."
         }
       ],
-      "fingerprint": "31f1ec3125009114"
+      "fingerprint": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6"
     },
     "events": [
       {
@@ -7530,7 +7569,7 @@
       }
     ],
     "proposed": {
-      "format": "neuroverse-domain-rules/2",
+      "format": "neuroverse-domain-rules/3",
       "site": {
         "id": "tiny",
         "name": "Tiny site"
@@ -7732,15 +7771,19 @@
         {
           "id": "unknown_action",
           "text": "An action the rulebook does not know is denied, or waits for approval, as the rulebook says (otherwise)."
+        },
+        {
+          "id": "plan_area_continuity",
+          "text": "A plan step happens where the earlier steps left the participant unless its action moves it there."
         }
       ],
       "findings": [],
-      "fingerprint": "8da918ceaae7706c"
+      "fingerprint": "b6ba7c9477ec17172010027ed69e204146d3cae786f8e2217c67442148b65290"
     },
     "expect": {
       "comparison": {
-        "baseline": "31f1ec3125009114",
-        "proposed": "8da918ceaae7706c",
+        "baseline": "87913980209a5c554bc8db21c68fceb895109049dcb1ae21a69f524123547cc6",
+        "proposed": "b6ba7c9477ec17172010027ed69e204146d3cae786f8e2217c67442148b65290",
         "events": 5,
         "totals": {
           "baseline": {

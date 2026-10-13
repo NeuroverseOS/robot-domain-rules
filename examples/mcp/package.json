@@ -1,7 +1,7 @@
 {
   "name": "robot-domain-rules-mcp-example",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.2",
   "description": "Example: a stdio MCP server exposing may_i and explain_rulebook over a rulebook file. The MCP SDK is a dependency here only; the core stays zero-dependency.",
   "type": "module",
   "scripts": {
